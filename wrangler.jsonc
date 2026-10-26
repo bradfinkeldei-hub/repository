@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "coaching-circle",
+  // custom-worker.ts wraps the built app and adds the daily reminder run.
+  "main": "custom-worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "observability": { "enabled": true },
+  // Keep settings added in the Cloudflare dashboard when a new version deploys.
+  "keep_vars": true,
+  // Once a day, in UTC. 13:00 UTC is 8am Central in summer and 7am in winter.
+  "triggers": { "crons": ["0 13 * * *"] },
+  // Settings that aren't secret. Secrets (keys and passwords) are added in the
+  // Cloudflare dashboard under Settings > Variables and Secrets, never here.
+  "vars": {
+    "COACH_NAME": "Brad",
+    "SMTP_HOST": "smtp.gmail.com",
+    "SMTP_PORT": "465",
+    "REMINDER_FROM_NAME": "Brad at The Coaching Circle",
+    "REMINDER_TIMEZONE": "America/Chicago"
+  }
+}

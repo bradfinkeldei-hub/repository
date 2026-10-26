@@ -1,0 +1,193 @@
+import Link from "next/link";
+import { AREAS, fmt, teamAverage, teamLabel, weekKey, type Profile, type Team, type Wheel } from "@/lib/coaching";
+import { setTeam, toggleDone } from "@/app/actions";
+import { AutoSubmitSelect } from "@/components/client";
+
+const TZ = process.env.REMINDER_TIMEZONE;
+
+export function WheelSvg({ wheel, size = 150, label }: { wheel: Partial<Record<string, number | null>>; size?: number; label: string }) {
+  const cx = 85, cy = 85, R = 72, step = (Math.PI * 2) / AREAS.length;
+  const p = (a: number, r: number) => `${(cx + r * Math.cos(a)).toFixed(2)} ${(cy + r * Math.sin(a)).toFixed(2)}`;
+  return (
+    <svg className="wheel" viewBox="0 0 170 170" width={size} height={size} role="img" aria-label={label}>
+      {[2, 4, 6, 8].map((r) => <circle key={r} cx={cx} cy={cy} r={(R * r) / 10} fill="none" stroke="var(--line)" />)}
+      {AREAS.map(([k], i) => {
+        const v = Math.max(0, Math.min(10, Number(wheel?.[k]) || 0));
+        const a0 = -Math.PI / 2 + i * step + 0.02, a1 = a0 + step - 0.04, r = (R * v) / 10;
+        return r > 0 ? <path key={k} d={`M${cx} ${cy} L${p(a0, r)} A${r.toFixed(2)} ${r.toFixed(2)} 0 0 1 ${p(a1, r)} Z`} fill={`var(--w${i + 1})`} fillOpacity={0.85} /> : null;
+      })}
+      {AREAS.map(([k], i) => {
+        const a = -Math.PI / 2 + i * step;
+        const [x, y] = p(a, R).split(" ");
+        return <line key={k} x1={cx} y1={cy} x2={x} y2={y} stroke="var(--line)" />;
+      })}
+      <circle cx={cx} cy={cy} r={R} fill="none" stroke="var(--muted)" strokeOpacity={0.5} />
+    </svg>
+  );
+}
+
+export function Legend({ wheel, two = false }: { wheel: Partial<Record<string, number | null>>; two?: boolean }) {
+  return (
+    <ul className={`legend${two ? " two" : ""}`}>
+      {AREAS.map(([k, label], i) => (
+        <li key={k}><i style={{ background: `var(--w${i + 1})` }} /><span>{label}</span><b>{fmt(wheel?.[k] ?? null)}</b></li>
+      ))}
+    </ul>
+  );
+}
+
+export function TeamWheel({ team, members, ownTeam }: { team: Team | null; members: Profile[]; ownTeam?: boolean }) {
+  const avg = teamAverage(members);
+  const scored = AREAS.filter(([k]) => avg[k] != null).map(([k, l]) => ({ l, v: avg[k] as number })).sort((a, b) => b.v - a.v);
+  const top = scored[0], bottom = scored[scored.length - 1];
+  return (
+    <section className="card teamwheel">
+      <WheelSvg wheel={avg} size={190} label={`${teamLabel(team)} average life wheel`} />
+      <div style={{ flex: "1 1 320px", minWidth: 0 }}>
+        <h2>{ownTeam ? "Our team's life wheel" : `${teamLabel(team)} life wheel`}</h2>
+        <p className="sub">The average of {members.length} {members.length === 1 ? "member's wheel" : "members' wheels"}.</p>
+        <Legend wheel={avg} two />
+        {top && bottom && (
+          <div className="row" style={{ marginTop: 10 }}>
+            <span className="pill done">Strongest: {top.l} {fmt(top.v)}</span>
+            <span className="pill warn">Growth edge: {bottom.l} {fmt(bottom.v)}</span>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function initials(name: string) {
+  return name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "?";
+}
+
+function Who({ m, viewer, coachTools }: { m: Profile; viewer: Profile; coachTools?: boolean }) {
+  const isMe = m.id === viewer.id;
+  const canEdit = isMe || viewer.role === "coach";
+  return (
+    <div className="who">
+      <div className="avatar">{initials(m.name)}</div>
+      <div style={{ minWidth: 0 }}>
+        <h3>{m.name}</h3>
+        {isMe && <div className="meta">You</div>}
+      </div>
+      <div className="end row">
+        {coachTools && viewer.role === "coach" && (
+          <AutoSubmitSelect
+            label={`${m.name}'s team`}
+            value={m.team ?? ""}
+            action={setTeam.bind(null, m.id)}
+            options={[["Monday", "Monday"], ["Tuesday", "Tuesday"], ["Wednesday", "Wednesday"], ["Thursday", "Thursday"], ["", "No team"]]}
+          />
+        )}
+        {canEdit && <Link className="btn ghost small" href={isMe ? "/profile" : `/profile?id=${m.id}`}>{isMe ? "Edit my profile" : "Edit"}</Link>}
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, value, className = "" }: { label: string; value: string; className?: string }) {
+  return (
+    <div className={`field ${className}`}>
+      <span className="label">{label}</span>
+      <p className={value ? "" : "empty"}>{value || "Not shared yet"}</p>
+    </div>
+  );
+}
+
+function DoneState({ m, viewer }: { m: Profile; viewer: Profile }) {
+  const done = m.done_week === weekKey(new Date(), TZ);
+  if (m.id === viewer.id || viewer.role === "coach") {
+    return (
+      <form action={toggleDone.bind(null, m.id)} className="row">
+        {done && <span className="pill done">Done this week</span>}
+        <button className={`btn small${done ? " ghost" : ""}`} type="submit">{done ? "Undo this week" : "Mark this week done"}</button>
+      </form>
+    );
+  }
+  return done ? <span className="pill done" style={{ alignSelf: "flex-start" }}>Done this week</span> : <span className="pill warn" style={{ alignSelf: "flex-start" }}>Not marked done yet</span>;
+}
+
+export function MemberCard({ m, viewer }: { m: Profile; viewer: Profile }) {
+  return (
+    <article className="card">
+      <Who m={m} viewer={viewer} coachTools />
+      <div className="wheelrow">
+        <WheelSvg wheel={m.wheel as Wheel} label={`${m.name}'s life wheel`} />
+        <Legend wheel={m.wheel as Wheel} />
+      </div>
+      <Field label="Actively creating" value={m.creating} className="creating" />
+      <div className="acct"><Field label="Held accountable to" value={m.accountability} /></div>
+      <DoneState m={m} viewer={viewer} />
+    </article>
+  );
+}
+
+export function AcctCard({ m, viewer }: { m: Profile; viewer: Profile }) {
+  return (
+    <article className="card">
+      <Who m={m} viewer={viewer} />
+      <div className="acct"><Field label="Held accountable to" value={m.accountability} /></div>
+      <div className="row">
+        {m.reminder_enabled ? <span className="pill on">Weekly email · {m.reminder_day}</span> : <span className="pill">No reminder</span>}
+      </div>
+      <DoneState m={m} viewer={viewer} />
+    </article>
+  );
+}
+
+export function MissionCard({ m, viewer }: { m: Profile; viewer: Profile }) {
+  return (
+    <article className="card mission">
+      <blockquote>{m.mission}</blockquote>
+      <Who m={m} viewer={viewer} />
+    </article>
+  );
+}
+
+export type Tab = "team" | "accountability" | "missions";
+
+/** The Team, Accountability and Missions views for one or more teams. */
+export function TeamViews({ tab, groups, viewer, ownTeam }: { tab: Tab; groups: { team: Team | null; members: Profile[] }[]; viewer: Profile; ownTeam?: boolean }) {
+  const multi = groups.length > 1;
+  return (
+    <>
+      {groups.map(({ team, members }) => {
+        const key = team ?? "none";
+        let body: React.ReactNode;
+        if (tab === "team") {
+          body = members.length ? (
+            <>
+              {team && <TeamWheel team={team} members={members} ownTeam={ownTeam} />}
+              <div className="grid">{members.map((m) => <MemberCard key={m.id} m={m} viewer={viewer} />)}</div>
+            </>
+          ) : <EmptyTeam team={team} coach={viewer.role === "coach"} />;
+        } else if (tab === "accountability") {
+          const list = members.filter((m) => m.accountability);
+          body = list.length ? <div className="grid">{list.map((m) => <AcctCard key={m.id} m={m} viewer={viewer} />)}</div>
+            : <div className="empty"><h3>No commitments yet</h3><p>Once someone on this team adds what they're accountable to, it shows up here.</p></div>;
+        } else {
+          const list = members.filter((m) => m.mission);
+          body = list.length ? <div className="grid">{list.map((m) => <MissionCard key={m.id} m={m} viewer={viewer} />)}</div>
+            : <div className="empty"><h3>No missions shared yet</h3><p>Members add their mission from their profile.</p></div>;
+        }
+        return (
+          <section key={key} className="team-block">
+            {multi && <h2>{teamLabel(team)}</h2>}
+            {body}
+          </section>
+        );
+      })}
+    </>
+  );
+}
+
+function EmptyTeam({ team, coach }: { team: Team | null; coach: boolean }) {
+  return (
+    <div className="empty">
+      <h3>No one on the {teamLabel(team)} yet</h3>
+      <p>{coach ? "Invite people from Members and invites, or move someone here with the team menu on their card." : "Your teammates show up here as they join."}</p>
+    </div>
+  );
+}
