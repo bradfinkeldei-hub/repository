@@ -63,6 +63,7 @@ export default async function ProfilePage({ searchParams: sp }: { searchParams: 
           <Link className="btn ghost" href={back}>Cancel</Link>
         </div>
       </form>
+      {own && <p style={{ marginTop: 24 }}><Link className="linkbtn" href="/set-password">Set or change your password</Link></p>}
     </div>
   );
 }

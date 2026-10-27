@@ -26,9 +26,10 @@ Team-only access is enforced in the database, not just hidden on screen (`supaba
    ```
    Do this before you first sign in. That email becomes the coach account.
 3. **Authentication > URL Configuration**: set Site URL to the app's address (for example `https://app.sparkzofcourage.com`) and add `https://app.sparkzofcourage.com/**` to Redirect URLs.
-4. **Authentication > Email Templates**: change the link in two templates so it comes back through the app.
-   - Invite user: `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite`
+4. **Authentication > Email Templates**: change the link in three templates so it comes back through the app.
+   - Invite user: `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite` (new members then choose a password)
    - Magic link: `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=magiclink`
+   - Reset password: `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`
 5. **Authentication > Providers**: turn on Google (needs a Google Cloud OAuth client; Supabase links to the steps). Microsoft is the `azure` provider. Apple needs a paid Apple developer account, so start with Google and email links.
 6. **Authentication > Sign In / Providers**: after you've signed in once as the coach, turn off "Allow new users to sign up". Invites still work.
 7. Supabase's built-in email is rate limited. For more than a few invites an hour, set **Authentication > SMTP Settings** to the same Gmail app password as below.

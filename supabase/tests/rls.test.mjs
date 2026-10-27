@@ -13,6 +13,7 @@ await db.exec(`
     select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
   $$;
   create role authenticated nologin;
+  create role anon nologin;
   grant usage on schema auth to authenticated;
 `);
 const dir = new URL("../migrations/", import.meta.url);
@@ -21,7 +22,7 @@ await db.exec(`
   grant usage on schema public to authenticated;
   grant select, insert, update, delete on all tables in schema public to authenticated;
   insert into public.app_settings values ('coach_email', 'coach@example.com');
-  insert into public.invites (email, team) values ('mon1@example.com', 'Monday'), ('mon2@example.com', 'Monday'), ('TUE1@example.com', 'Tuesday');
+  insert into public.invites (email, team) values ('mon1@example.com', 'Monday'), ('mon2@example.com', 'Monday'), ('TUE1@example.com', 'Tuesday'), ('stranger@example.com', 'Monday');
 `);
 
 async function addUser(email, name) {
@@ -33,6 +34,8 @@ const mon1 = await addUser("mon1@example.com", "Jordan");
 const mon2 = await addUser("mon2@example.com", "Priya");
 const tue1 = await addUser("tue1@example.com", "Sam");
 const stranger = await addUser("stranger@example.com", "Stranger");
+// The coach took Stranger off their team.
+await db.query(`update public.profiles set team = null where id = $1`, [stranger]);
 
 // Run a query as a signed-in user, with RLS enforced.
 async function as(uid, sql, params = []) {
@@ -60,6 +63,10 @@ await check("new users get the team from their invite, matched without case", as
   ]);
   const open = (await db.query(`select count(*)::int as n from public.invites where accepted_at is null`)).rows[0].n;
   assert.equal(open, 0);
+});
+await check("people without an invite can't create an account", async () => {
+  await assert.rejects(addUser("uninvited@example.com", "Nobody"), /not been invited/);
+  await assert.rejects(addUser("mon1@example.com", "Jordan again"), /not been invited/);
 });
 await check("coach sees every profile", async () => {
   assert.deepEqual(names(await as(coach, `select name from public.profiles`)), ["Brad", "Jordan", "Priya", "Sam", "Stranger"]);
