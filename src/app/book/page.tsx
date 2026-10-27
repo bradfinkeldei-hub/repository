@@ -1,11 +1,13 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/session";
 import { bookCall } from "@/app/actions";
-import { monthKey, monthName } from "@/lib/coaching";
+import { BOOKING_ENABLED, monthKey, monthName } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 
 export default async function BookPage({ searchParams: sp }: { searchParams: Promise<{ error?: string }> }) {
+  if (!BOOKING_ENABLED) redirect("/");
   const searchParams = await sp;
   const { supabase, me } = await requireProfile();
   const coach = process.env.COACH_NAME || "your coach";

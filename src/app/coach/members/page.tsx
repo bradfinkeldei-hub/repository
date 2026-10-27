@@ -4,7 +4,7 @@ import { Header } from "@/components/header";
 import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitSelect } from "@/components/client";
 import { cancelInvite, inviteMember, removeMember, resendInvite, resetFreeCall, setTeam } from "@/app/actions";
-import { isTeam, monthKey, TEAMS, type Booking, type Profile } from "@/lib/coaching";
+import { BOOKING_ENABLED, isTeam, monthKey, TEAMS, type Booking, type Profile } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 const MESSAGES: Record<string, [string, boolean]> = {
@@ -64,9 +64,9 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
 
           <div className="tablebox">
             <table>
-              <thead><tr><th>Member</th><th>Team</th><th>Weekly reminder</th><th>Calls this month</th><th>Last update</th><th /></tr></thead>
+              <thead><tr><th>Member</th><th>Team</th><th>Weekly reminder</th>{BOOKING_ENABLED && <th>Calls this month</th>}<th>Last update</th><th /></tr></thead>
               <tbody>
-                {members.length === 0 && <tr><td colSpan={6} className="muted">No members yet. Send your first invite above.</td></tr>}
+                {members.length === 0 && <tr><td colSpan={BOOKING_ENABLED ? 6 : 5} className="muted">No members yet. Send your first invite above.</td></tr>}
                 {members.map((m) => {
                   const b = monthBookings.filter((x) => x.member_id === m.id);
                   const free = b.some((x) => x.kind === "free"), paid = b.filter((x) => x.kind === "paid").length;
@@ -78,10 +78,10 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
                           options={[...TEAMS.map((t) => [t, t] as [string, string]), ["", "No team"]]} />
                       </td>
                       <td>{m.reminder_enabled ? `Email · ${m.reminder_day}` : <span className="muted">Off</span>}</td>
-                      <td>
+                      {BOOKING_ENABLED && <td>
                         {free ? "Free call used" : "1 free call left"}{paid ? ` + ${paid} paid` : ""}
                         {free && <form action={resetFreeCall.bind(null, m.id)} style={{ display: "inline" }}> <button className="linkbtn" type="submit" style={{ fontSize: "0.82rem" }}>Give back</button></form>}
-                      </td>
+                      </td>}
                       <td className="muted">{ago(m.updated_at)}</td>
                       <td>
                         <details>

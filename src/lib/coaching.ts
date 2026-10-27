@@ -1,5 +1,8 @@
 // Shared rules for life wheels, weeks and the coach's suggested actions.
 
+/** "Book a call" is switched off for now. Set to true to bring it back everywhere. */
+export const BOOKING_ENABLED = false;
+
 export const AREAS = [
   ["health", "Health"],
   ["career", "Career"],

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCoach, requireProfile } from "@/lib/session";
-import { AREAS, DAYS, isTeam, monthKey, weekKey, type Wheel } from "@/lib/coaching";
+import { AREAS, BOOKING_ENABLED, DAYS, isTeam, monthKey, weekKey, type Wheel } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 const str = (v: FormDataEntryValue | null, max: number) => String(v ?? "").trim().slice(0, max);
@@ -136,6 +136,7 @@ export async function deleteAction(id: string) {
 
 /** Records the booking, then sends the member to the scheduling page. */
 export async function bookCall(kind: "free" | "paid") {
+  if (!BOOKING_ENABLED) redirect("/");
   const { supabase, me } = await requireProfile();
   const url = kind === "free" ? process.env.FREE_CALL_URL : process.env.PAID_CALL_URL;
   if (!url) redirect("/book?error=nolink");
