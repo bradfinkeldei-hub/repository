@@ -11,6 +11,7 @@ const MESSAGES: Record<string, [string, boolean]> = {
   sent: ["Invite sent.", true],
   moved: ["That person already had an account, so they've been moved onto the team.", true],
   invite: ["Check the email address and pick a team, then send again.", false],
+  setup: ["Invites can't send yet: the app is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Cloudflare under the Worker's Settings > Variables and Secrets (type Secret), then try again.", false],
   send: ["The invite was saved but the email didn't send. Try Resend below.", false],
 };
 
@@ -42,7 +43,7 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
         <TeamColumn members={members} current="members" />
         <main>
           <div className="intro"><div>
-            <h1>Members and invites</h1>
+            <h1>Add and manage members</h1>
             <p>Invite people onto a team and move them between teams. A person&apos;s team decides what they can see.</p>
           </div></div>
           {msg && <div className={`notice${MESSAGES[msg][1] ? " good" : ""}`}>{MESSAGES[msg][0]}</div>}

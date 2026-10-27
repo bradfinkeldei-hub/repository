@@ -65,6 +65,7 @@ export async function inviteMember(formData: FormData) {
   await supabase.from("invites").delete().ilike("email", email).is("accepted_at", null);
   const { error } = await supabase.from("invites").insert({ email, team });
   if (error) redirect("/coach/members?error=invite");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) redirect("/coach/members?error=setup");
   // Sends Supabase's invite email. That fails when the person already has an
   // account, so in that case move them onto the team directly.
   const admin = createAdminClient();
@@ -93,7 +94,7 @@ export async function cancelInvite(id: string) {
 export async function resendInvite(id: string) {
   const { supabase } = await requireCoach();
   const { data } = await supabase.from("invites").select("email").eq("id", id).single();
-  if (data) {
+  if (data && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const site = process.env.SITE_URL ?? "";
     await createAdminClient().auth.admin.inviteUserByEmail(data.email, { redirectTo: `${site}/auth/callback` });
     await supabase.from("invites").update({ invited_at: new Date().toISOString() }).eq("id", id);
