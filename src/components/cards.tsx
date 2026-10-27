@@ -187,7 +187,7 @@ function EmptyTeam({ team, coach }: { team: Team | null; coach: boolean }) {
   return (
     <div className="empty">
       <h3>No one on the {teamLabel(team)} yet</h3>
-      <p>{coach ? "Invite people from Members and invites, or move someone here with the team menu on their card." : "Your teammates show up here as they join."}</p>
+      <p>{coach ? "Use + Add member at the top to invite people, or move someone here with the team menu on their card." : "Your teammates show up here as they join."}</p>
     </div>
   );
 }

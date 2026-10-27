@@ -6,7 +6,7 @@ import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitCheckbox } from "@/components/client";
 import { addAction, deleteAction, setActionDone } from "@/app/actions";
 import {
-  coachActions, isTeam, teamLabel, TEAMS,
+  BOOKING_ENABLED, coachActions, isTeam, teamLabel, TEAMS,
   type Booking, type CoachActionRow, type Profile, type Suggestion, type Team,
 } from "@/lib/coaching";
 
@@ -50,7 +50,7 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
           { key: "actions", label: "Coaches actions", href: href("actions"), count: openCount },
         ]}
         current={tab}
-        right={<Link className="btn ghost small" href="/profile">My profile</Link>}
+        right={<><Link className="btn small" href="/coach/members">+ Add member</Link><Link className="btn ghost small" href="/profile">My profile</Link></>}
       />
       <div className="wrap layout coach">
         <TeamColumn members={members} selected={sel} tab={tab} actions={tab === "actions" ? actions : undefined} />
@@ -64,7 +64,7 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
                   <h1>{tab === "team" ? selLabel : tab === "accountability" ? `${selLabel}: commitments` : `${selLabel}: missions`}</h1>
                   <p>{sel === "all" ? `${members.length} members across all teams.` : `${groups[0].members.length} ${groups[0].members.length === 1 ? "member" : "members"}.`} Only you can see other teams.</p>
                 </div>
-                {isTeam(sel) && <Link className="btn" href={`/coach/members?team=${sel}`}>Invite to {sel} team</Link>}
+                <Link className="btn" href={isTeam(sel) ? `/coach/members?team=${sel}` : "/coach/members"}>{isTeam(sel) ? `Add a member to ${sel} team` : "Add a member"}</Link>
               </div>
               <TeamViews tab={tab} groups={groups} viewer={me} />
             </>
@@ -94,7 +94,7 @@ function ActionsView({ actions, teams, members, title, showGeneral }: {
       <div className="stats">
         <div className="stat"><b>{open.length}</b><span>open this week</span></div>
         <div className="stat"><b>{open.filter((a) => a.kind === "checkin").length}</b><span>need a check-in</span></div>
-        <div className="stat"><b>{scoped.filter((a) => a.kind === "call").length}</b><span>calls booked</span></div>
+        {BOOKING_ENABLED && <div className="stat"><b>{scoped.filter((a) => a.kind === "call").length}</b><span>calls booked</span></div>}
         <div className="stat"><b>{done.length}</b><span>done this week</span></div>
       </div>
       <form className="addact" action={addAction}>

@@ -53,7 +53,7 @@ The free Workers plan allows 100,000 requests a day and 10 ms of CPU per request
 
 ### Booking links
 
-`FREE_CALL_URL` and `PAID_CALL_URL` are your scheduling links (Calendly, Google Calendar appointment pages and similar). The paid link should take payment, for example a Calendly event with Stripe or a Stripe payment link. A member's free call is counted when they click through to book; you can give one back from **Members and invites**.
+`FREE_CALL_URL` and `PAID_CALL_URL` are your scheduling links (Calendly, Google Calendar appointment pages and similar). The paid link should take payment, for example a Calendly event with Stripe or a Stripe payment link. A member's free call is counted when they click through to book; you can give one back from **Add or manage members**.
 
 ## Working on it
 

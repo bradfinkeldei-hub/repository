@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireProfile } from "@/lib/session";
-import { teamLabel } from "@/lib/coaching";
+import { BOOKING_ENABLED, teamLabel } from "@/lib/coaching";
 
 const STEPS: [string, string][] = [
   ["Fill in your profile", "Rate 8 areas of your life from 1 to 10 (your life wheel), and write the one thing you're creating right now."],
@@ -28,7 +28,7 @@ export default async function WelcomePage() {
       </p>
       <ol className="steps">
         {STEPS.map(([title, text]) => <li key={title}><b>{title}</b><span>{text}</span></li>)}
-        <li><b>Feeling stuck? Book a call</b><span>You get one free one-on-one call with {coach} each month. Extra sessions are $150.</span></li>
+        {BOOKING_ENABLED && <li><b>Feeling stuck? Book a call</b><span>You get one free one-on-one call with {coach} each month. Extra sessions are $150.</span></li>}
       </ol>
       <div className="row">
         <Link className="btn" href="/profile">{empty ? "Fill in my profile" : "Edit my profile"}</Link>

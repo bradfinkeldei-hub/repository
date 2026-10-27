@@ -28,7 +28,7 @@ export function TeamColumn({ members, selected, tab, actions, current }: {
         </Link>
       ))}
       <hr />
-      <Link href="/coach/members" aria-current={current === "members" ? "page" : undefined}>Members and invites<span>›</span></Link>
+      <Link href="/coach/members" aria-current={current === "members" ? "page" : undefined}>Add or manage members<span>›</span></Link>
       <p className="note">Only you see this column. Members see just their own team.</p>
     </nav>
   );

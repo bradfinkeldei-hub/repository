@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/session";
 import { Header } from "@/components/header";
 import { TeamViews, type Tab } from "@/components/cards";
-import { monthKey, monthName, teamLabel, type Profile } from "@/lib/coaching";
+import { BOOKING_ENABLED, monthKey, monthName, teamLabel, type Profile } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 const TABS: { key: Tab; label: string }[] = [
@@ -44,14 +44,14 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
         sub={teamLabel(me.team)}
         tabs={TABS.map((t) => ({ ...t, href: `/team?tab=${t.key}` }))}
         current={tab}
-        right={<Link className="btn sun ghost" href="/book">Feeling stuck? Book a call</Link>}
+        right={BOOKING_ENABLED ? <Link className="btn sun ghost" href="/book">Feeling stuck? Book a call</Link> : undefined}
       />
       <div className="wrap layout"><main>
         <div className="intro"><div>
           <h1>{tab === "team" ? teamLabel(me.team) : tab === "accountability" ? "What we're holding each other to" : "The missions we're living into"}</h1>
           <p>{tab === "team" ? "You and your teammates." : tab === "accountability" ? "Everyone's commitment this week. Mark yours done when you've shown up for it." : "The bigger why behind each person's work."}</p>
         </div></div>
-        {tab === "team" && (
+        {BOOKING_ENABLED && tab === "team" && (
           <section className="stuck">
             <div>
               <h2>Feeling stuck this week?</h2>
