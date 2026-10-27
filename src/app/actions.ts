@@ -151,6 +151,18 @@ export async function resetFreeCall(memberId: string) {
   revalidatePath("/coach/members");
 }
 
+/** Sets or changes the signed-in person's password. */
+export async function setPassword(formData: FormData) {
+  const { supabase } = await requireProfile();
+  const password = String(formData.get("password") ?? "");
+  const back = formData.get("welcome") === "1" ? "/set-password?welcome=1&" : "/set-password?";
+  if (password.length < 8) redirect(`${back}error=short`);
+  if (password !== formData.get("confirm")) redirect(`${back}error=match`);
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) redirect(`${back}error=save`);
+  redirect("/");
+}
+
 export async function signOut() {
   await (await createClient()).auth.signOut();
   redirect("/login");

@@ -9,5 +9,7 @@ export async function GET(request: NextRequest) {
     const { error } = await (await createClient()).auth.exchangeCodeForSession(code);
     if (!error) return NextResponse.redirect(`${origin}/`);
   }
-  return NextResponse.redirect(`${origin}/login?error=link`);
+  // A new Google account that wasn't invited is turned away by the database.
+  const why = searchParams.get("error_description") ?? "";
+  return NextResponse.redirect(`${origin}/login?error=${/database error/i.test(why) ? "invite" : "link"}`);
 }
