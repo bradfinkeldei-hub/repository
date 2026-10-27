@@ -66,7 +66,8 @@ export async function sendReminders(env: ReminderEnv, now = new Date()) {
   let sent = 0, failed = 0;
   for (const p of people) {
     const to = email.get(p.id);
-    if (!to) continue;
+    // @example.com is the made-up Example team; those addresses can't receive mail.
+    if (!to || to.toLowerCase().endsWith("@example.com")) continue;
     try {
       await mailer.send({ from, to: { email: to }, subject: "Your weekly accountability reminder", text: reminderText(p, site, coach) });
       await admin.from("profiles").update({ last_reminder_week: week }).eq("id", p.id);
