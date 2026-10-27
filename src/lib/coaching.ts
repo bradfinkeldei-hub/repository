@@ -17,7 +17,8 @@ export const AREAS = [
 export type AreaKey = (typeof AREAS)[number][0];
 export type Wheel = Partial<Record<AreaKey, number>>;
 
-export const TEAMS = ["Monday", "Tuesday", "Wednesday", "Thursday"] as const;
+/** "Example" holds made-up demo members (supabase/seed/example_team.sql). */
+export const TEAMS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Example"] as const;
 export type Team = (typeof TEAMS)[number];
 export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
 

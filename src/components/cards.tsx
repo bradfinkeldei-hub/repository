@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AREAS, fmt, teamAverage, teamLabel, weekKey, type Profile, type Team, type Wheel } from "@/lib/coaching";
+import { AREAS, fmt, teamAverage, teamLabel, TEAMS, weekKey, type Profile, type Team, type Wheel } from "@/lib/coaching";
 import { setTeam, toggleDone } from "@/app/actions";
 import { AutoSubmitSelect } from "@/components/client";
 
@@ -78,7 +78,7 @@ function Who({ m, viewer, coachTools }: { m: Profile; viewer: Profile; coachTool
             label={`${m.name}'s team`}
             value={m.team ?? ""}
             action={setTeam.bind(null, m.id)}
-            options={[["Monday", "Monday"], ["Tuesday", "Tuesday"], ["Wednesday", "Wednesday"], ["Thursday", "Thursday"], ["", "No team"]]}
+            options={[...TEAMS.map((t) => [t, t] as [string, string]), ["", "No team"]]}
           />
         )}
         {canEdit && <Link className="btn ghost small" href={isMe ? "/profile" : `/profile?id=${m.id}`}>{isMe ? "Edit my profile" : "Edit"}</Link>}
