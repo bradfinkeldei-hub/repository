@@ -176,3 +176,70 @@ export function coachActions(
   const order = { high: 0, mid: 1, low: 2 };
   return out.sort((a, b) => order[a.level] - order[b.level]);
 }
+
+/** One meeting week of a member's accountability history (commitment_log). */
+export type LogRow = { member_id: string; week: string; commitment: string; done: boolean };
+
+export type WeekStatus = "done" | "missed" | "open";
+export type ProgressWeek = { week: string; commitment: string; status: WeekStatus; recorded: boolean };
+export type Progress = { weeks: ProgressWeek[]; streak: number; best: number; done: number; total: number };
+
+/** Midnight UTC on the Monday of an ISO week like "2026-W44". */
+function weekMonday(week: string) {
+  const [y, w] = week.split("-W").map(Number);
+  // ISO week 1 is the week holding January 4th.
+  const jan4 = Date.UTC(y, 0, 4);
+  return jan4 - ((new Date(jan4).getUTCDay() || 7) - 1) * 864e5 + (w - 1) * 7 * 864e5;
+}
+
+/** The ISO week n weeks after (or before, if negative) the given one. */
+export function addWeeks(week: string, n: number) {
+  return weekKey(new Date(weekMonday(week) + n * 7 * 864e5), "UTC");
+}
+
+/** The date of a team's meeting in the given ISO week. Teams without a weekday meet Monday. */
+export function meetingDate(week: string, team: Team | null) {
+  return new Date(weekMonday(week) + (((team && DAY_INDEX[team]) || 1) - 1) * 864e5);
+}
+
+export function shortDate(d: Date) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(d);
+}
+
+/**
+ * A member's week-by-week record, from their first logged week to this one.
+ * Weeks with no row count as missed and keep the last known commitment. This
+ * week stays "open" until it's marked done, so it never breaks a streak.
+ */
+export function progress(rows: LogRow[], currentWeek: string): Progress {
+  const byWeek = new Map(rows.filter((r) => r.week <= currentWeek).map((r) => [r.week, r]));
+  const weeks: ProgressWeek[] = [];
+  const first = [...byWeek.keys()].sort()[0];
+  if (first) {
+    let commitment = "";
+    for (let wk = first; wk <= currentWeek; wk = addWeeks(wk, 1)) {
+      const r = byWeek.get(wk);
+      if (r?.commitment) commitment = r.commitment;
+      const status: WeekStatus = r?.done ? "done" : wk === currentWeek ? "open" : "missed";
+      weeks.push({ week: wk, commitment: r?.commitment || commitment, status, recorded: !!r });
+    }
+  }
+  let streak = 0, best = 0, run = 0;
+  for (const w of weeks) {
+    if (w.status === "done") best = Math.max(best, ++run);
+    else if (w.status === "missed") run = 0;
+  }
+  for (const w of [...weeks].reverse()) {
+    if (w.status === "open") continue;
+    if (w.status !== "done") break;
+    streak++;
+  }
+  const counted = weeks.filter((w) => w.status !== "open");
+  return { weeks, streak, best, done: counted.filter((w) => w.status === "done").length, total: counted.length };
+}
+
+export function progressByMember(rows: LogRow[], currentWeek: string): Record<string, Progress> {
+  const out: Record<string, LogRow[]> = {};
+  for (const r of rows) (out[r.member_id] ??= []).push(r);
+  return Object.fromEntries(Object.entries(out).map(([id, list]) => [id, progress(list, currentWeek)]));
+}

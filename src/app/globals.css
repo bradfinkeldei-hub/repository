@@ -207,3 +207,39 @@ tr:last-child td { border-bottom: 0; }
 .steps li::before { content: counter(step); position: absolute; left: 16px; top: 14px; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--surface); display: grid; place-items: center; font-weight: 700; }
 .steps b { display: block; font-size: 1.02rem; }
 .steps span { color: var(--muted); font-size: 0.9rem; }
+
+/* Accountability tracker */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.strip { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.strip li { position: relative; width: 44px; display: grid; gap: 4px; justify-items: center; }
+.strip li::before { content: ""; width: 44px; height: 44px; border-radius: 10px; border: 2px solid var(--line); box-sizing: border-box; }
+.strip li.done::before { background: var(--ok); border-color: var(--ok); }
+.strip li.missed::before { background: var(--alert-soft); border-color: var(--alert-soft); }
+.strip li.open::before { border-style: dashed; border-color: var(--accent); }
+.strip li.done::after, .strip li.missed::after { content: "\2713"; position: absolute; top: 9px; color: var(--surface); font-weight: 700; font-size: 1.2rem; }
+.strip li.missed::after { content: "\2013"; color: var(--alert); }
+.strip small { font-size: 0.7rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.strip.small { gap: 4px; }
+.strip.small li, .strip.small li::before { width: 16px; height: 16px; border-radius: 4px; }
+.strip.small li::before { border-width: 1.5px; }
+.strip.small li::after { content: none !important; }
+.stripkey { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.8rem; color: var(--muted); }
+.stripkey span { display: inline-flex; align-items: center; gap: 6px; }
+.stripkey i { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--line); }
+.stripkey i.done { background: var(--ok); border-color: var(--ok); }
+.stripkey i.missed { background: var(--alert-soft); border-color: var(--alert-soft); }
+.stripkey i.open { border-style: dashed; border-color: var(--accent); }
+.miniprog { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 0.82rem; }
+.thisweek { background: var(--accent-soft); border: 0; }
+.thisweek blockquote { margin: 0; font-family: var(--display); font-size: 1.3rem; line-height: 1.35; overflow-wrap: anywhere; }
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.tl { display: flex; gap: 14px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.tl.done { border-left-color: var(--ok); }
+.tl.missed { border-left-color: var(--alert); }
+.tl.open { border-left-color: var(--accent); }
+.tl .when { width: 72px; flex: none; font-weight: 700; font-size: 0.88rem; }
+.tl .when small { display: block; font-weight: 500; color: var(--muted); }
+.tl p { margin: 0; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.tl .end { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+@media (max-width: 520px) { .tl { flex-wrap: wrap; } .tl .end { width: 100%; justify-content: flex-start; } }
+.progtable td:first-child a { font-weight: 600; text-decoration: none; }

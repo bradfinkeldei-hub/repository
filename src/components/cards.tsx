@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { AREAS, fmt, teamAverage, teamLabel, TEAMS, weekKey, type Profile, type Team, type Wheel } from "@/lib/coaching";
+import { AREAS, fmt, teamAverage, teamLabel, TEAMS, weekKey, type Profile, type Progress, type Team, type Wheel } from "@/lib/coaching";
 import { setTeam, toggleDone } from "@/app/actions";
 import { AutoSubmitSelect } from "@/components/client";
 import { Avatar } from "@/components/avatar";
+import { MiniProgress } from "@/components/progress";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 
@@ -121,11 +122,12 @@ export function MemberCard({ m, viewer }: { m: Profile; viewer: Profile }) {
   );
 }
 
-export function AcctCard({ m, viewer }: { m: Profile; viewer: Profile }) {
+export function AcctCard({ m, viewer, p }: { m: Profile; viewer: Profile; p?: Progress }) {
   return (
     <article className="card">
       <Who m={m} viewer={viewer} />
       <div className="acct"><Field label="Held accountable to" value={m.accountability} /></div>
+      {p && <MiniProgress p={p} team={m.team} />}
       <div className="row">
         {m.reminder_enabled ? <span className="pill on">Weekly email · {m.reminder_day}</span> : <span className="pill">No reminder</span>}
       </div>
@@ -146,7 +148,9 @@ export function MissionCard({ m, viewer }: { m: Profile; viewer: Profile }) {
 export type Tab = "team" | "accountability" | "missions";
 
 /** The Team, Accountability and Missions views for one or more teams. */
-export function TeamViews({ tab, groups, viewer, ownTeam }: { tab: Tab; groups: { team: Team | null; members: Profile[] }[]; viewer: Profile; ownTeam?: boolean }) {
+export function TeamViews({ tab, groups, viewer, ownTeam, logs }: {
+  tab: Tab; groups: { team: Team | null; members: Profile[] }[]; viewer: Profile; ownTeam?: boolean; logs?: Record<string, Progress>;
+}) {
   const multi = groups.length > 1;
   return (
     <>
@@ -162,7 +166,7 @@ export function TeamViews({ tab, groups, viewer, ownTeam }: { tab: Tab; groups: 
           ) : <EmptyTeam team={team} coach={viewer.role === "coach"} />;
         } else if (tab === "accountability") {
           const list = members.filter((m) => m.accountability);
-          body = list.length ? <div className="grid">{list.map((m) => <AcctCard key={m.id} m={m} viewer={viewer} />)}</div>
+          body = list.length ? <div className="grid">{list.map((m) => <AcctCard key={m.id} m={m} viewer={viewer} p={logs?.[m.id]} />)}</div>
             : <div className="empty"><h3>No commitments yet</h3><p>Once someone on this team adds what they're accountable to, it shows up here.</p></div>;
         } else {
           const list = members.filter((m) => m.mission);

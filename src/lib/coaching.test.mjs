@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { coachActions, monthKey, teamAverage, weekKey, weekdayName } from "./coaching.ts";
+import { addWeeks, coachActions, meetingDate, monthKey, progress, teamAverage, weekKey, weekdayName } from "./coaching.ts";
 
 const TZ = "America/Chicago";
 const base = {
@@ -52,4 +52,30 @@ test("team average ignores unrated areas", () => {
   const avg = teamAverage([{ wheel: { health: 4 } }, { wheel: { health: 7, money: 5 } }, { wheel: {} }]);
   assert.equal(avg.health, 5.5);
   assert.equal(avg.money, 5);
+});
+
+test("week arithmetic and meeting dates", () => {
+  assert.equal(addWeeks("2026-W44", 1), "2026-W45");
+  assert.equal(addWeeks("2026-W53", 1), "2027-W01");
+  assert.equal(addWeeks("2027-W01", -1), "2026-W53");
+  assert.equal(meetingDate("2026-W44", "Tuesday").toISOString().slice(0, 10), "2026-10-27");
+  assert.equal(meetingDate("2026-W44", "Example").toISOString().slice(0, 10), "2026-10-26");
+});
+
+test("progress fills gaps, carries commitments and counts streaks", () => {
+  const row = (week, done, commitment = "") => ({ member_id: "a", week, done, commitment });
+  const p = progress([
+    row("2026-W40", true, "Run 3x"), row("2026-W41", true), row("2026-W43", true, "Write daily"),
+    row("2026-W44", true), row("2026-W45", false), row("2026-W50", true),
+  ], "2026-W45");
+  assert.deepEqual(p.weeks.map((w) => w.status), ["done", "done", "missed", "done", "done", "open"]);
+  assert.equal(p.weeks[2].commitment, "Run 3x");
+  assert.equal(p.weeks[2].recorded, false);
+  assert.equal(p.weeks[5].commitment, "Write daily");
+  assert.equal(p.streak, 2);
+  assert.equal(p.best, 2);
+  assert.equal(p.done, 4);
+  assert.equal(p.total, 5);
+  assert.equal(progress([row("2026-W44", false, "x")], "2026-W45").streak, 0);
+  assert.deepEqual(progress([], "2026-W45").weeks, []);
 });

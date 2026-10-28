@@ -1,20 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/session";
-import { Header } from "@/components/header";
+import { Header, MEMBER_TABS } from "@/components/header";
 import { TeamViews, type Tab } from "@/components/cards";
-import { BOOKING_ENABLED, monthKey, monthName, teamLabel, type Profile } from "@/lib/coaching";
+import { BOOKING_ENABLED, monthKey, monthName, progressByMember, teamLabel, weekKey, type LogRow, type Profile } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
-const TABS: { key: Tab; label: string }[] = [
-  { key: "team", label: "Team" }, { key: "accountability", label: "Accountability" }, { key: "missions", label: "Missions" },
-];
 
 export default async function TeamPage({ searchParams: sp }: { searchParams: Promise<{ tab?: string }> }) {
   const searchParams = await sp;
   const { supabase, me } = await requireProfile();
   if (me.role === "coach") redirect("/coach");
-  const tab = (TABS.find((t) => t.key === searchParams.tab)?.key ?? "team") as Tab;
+  const tab = (["team", "accountability", "missions"].includes(searchParams.tab ?? "") ? searchParams.tab : "team") as Tab;
   const coach = process.env.COACH_NAME || "your coach";
 
   if (!me.team) {
@@ -34,6 +31,9 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
   // The database only returns profiles on this person's team.
   const { data } = await supabase.from("profiles").select("*").eq("team", me.team).neq("role", "coach").order("name");
   const members = (data ?? []) as Profile[];
+  const { data: log } = await supabase.from("commitment_log").select("member_id, week, commitment, done")
+    .in("member_id", members.map((m) => m.id));
+  const logs = progressByMember((log ?? []) as LogRow[], weekKey(new Date(), TZ));
   const { count } = await supabase.from("bookings").select("id", { count: "exact", head: true })
     .eq("member_id", me.id).eq("month", monthKey(new Date(), TZ)).eq("kind", "free");
   const freeLeft = !count;
@@ -42,7 +42,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
     <>
       <Header me={me}
         sub={teamLabel(me.team)}
-        tabs={TABS.map((t) => ({ ...t, href: `/team?tab=${t.key}` }))}
+        tabs={MEMBER_TABS}
         current={tab}
         right={BOOKING_ENABLED ? <Link className="btn sun ghost" href="/book">Feeling stuck? Book a call</Link> : undefined}
       />
@@ -63,7 +63,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
         {Object.keys(me.wheel ?? {}).length === 0 && (
           <div className="notice">Your profile is almost empty. <Link href="/profile">Fill in your life wheel</Link> so your team can see where you are.</div>
         )}
-        <TeamViews tab={tab} groups={[{ team: me.team, members }]} viewer={me} ownTeam />
+        <TeamViews tab={tab} groups={[{ team: me.team, members }]} viewer={me} logs={logs} ownTeam />
       </main></div>
     </>
   );
