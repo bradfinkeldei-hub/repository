@@ -4,7 +4,7 @@ import { requireProfile } from "@/lib/session";
 import { Header, MEMBER_TABS } from "@/components/header";
 import { TeamViews, type Tab } from "@/components/cards";
 import { loadCheckins } from "@/lib/checkin";
-import { loadChecked, loadSocial } from "@/lib/social";
+import { loadChecked, loadSocial, loadThreadSeen, unseen } from "@/lib/social";
 import { BOOKING_ENABLED, monthKey, monthName, progressByMember, teamLabel, weekKey, type LogRow, type Profile } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
@@ -43,6 +43,9 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
   const freeLeft = !count;
   const checkins = tab === "team" ? await loadCheckins(supabase, [me.team], TZ) : undefined;
   const social = tab === "team" ? await loadSocial(supabase, members.map((m) => m.id)) : undefined;
+  // In-app only: a signal for comments and kudos on your own card since you last opened them.
+  const seenAt = social ? await loadThreadSeen(supabase, me.id) : undefined;
+  if (social && seenAt !== undefined) social.fresh = { memberId: me.id, ...unseen(social, me.id, seenAt) };
   const checked = tab !== "missions" ? await loadChecked(supabase, members.map((m) => m.id), weekKey(new Date(), TZ)) : undefined;
 
   return (
@@ -68,6 +71,11 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
           </section>
         )}
         {viewing && searchParams.readonly && <div className="notice">You&apos;re viewing as {me.name || "this member"}, so nothing saves. Use Exit member view at the bottom to make changes.</div>}
+        {social?.fresh && social.fresh.comments + social.fresh.kudos > 0 && (
+          <div className="notice good new-note" data-new-for={`thread-${me.id}`}>
+            <span aria-hidden="true">{"\u{1F514}"}</span> Your team left you {newSummary(social.fresh)} on your card. <a href={`#thread-${me.id}`}>See them</a>
+          </div>
+        )}
         {Object.keys(me.wheel ?? {}).length === 0 && (
           <div className="notice">Your profile is almost empty. <Link href="/profile">Fill in your life wheel</Link> so your team can see where you are.</div>
         )}
@@ -77,3 +85,11 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
   );
 }
 
+
+function newSummary({ comments, kudos }: { comments: number; kudos: number }) {
+  const parts = [
+    comments ? `${comments} new ${comments === 1 ? "comment" : "comments"}` : "",
+    kudos ? `${kudos} new kudos` : "",
+  ].filter(Boolean);
+  return parts.join(" and ");
+}

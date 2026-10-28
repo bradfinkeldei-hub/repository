@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireCoach, requireEditor, requireRealCoach, VIEW_AS_COOKIE } from "@/lib/session";
+import { requireCoach, requireEditor, requireProfile, requireRealCoach, VIEW_AS_COOKIE } from "@/lib/session";
 import { AREAS, BOOKING_ENABLED, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, type Profile, type Wheel } from "@/lib/coaching";
 import { sendEmails } from "@/lib/mail";
 import { rsvpLink } from "@/lib/rsvp";
@@ -539,4 +539,11 @@ export async function deleteNote(id: string) {
   const { supabase } = await requireCoach();
   await supabase.from("coach_notes").delete().eq("id", id);
   revalidatePath("/coach");
+}
+
+/** The member opened the kudos & comments under their own card: clears their "New" signal. */
+export async function markThreadSeen() {
+  const { supabase, me, viewing } = await requireProfile();
+  if (viewing) return;
+  await supabase.from("thread_seen").upsert({ member_id: me.id, seen_at: new Date().toISOString() });
 }

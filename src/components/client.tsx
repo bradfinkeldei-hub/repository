@@ -163,3 +163,27 @@ export function CommitmentFields({ initial, max }: { initial: string[]; max: num
     </div>
   );
 }
+
+/**
+ * On your own card: opening Kudos & comments (or following a link to it)
+ * marks what's there as seen and drops the New badge.
+ */
+export function SeenOnOpen({ id, unseen, mark }: { id: string; unseen: boolean; mark: () => Promise<void> }) {
+  useEffect(() => {
+    const el = document.getElementById(id) as HTMLDetailsElement | null;
+    if (!el) return;
+    let done = false;
+    const onToggle = () => {
+      if (!el.open || done) return;
+      done = true;
+      document.querySelectorAll(`[data-new-for="${id}"]`).forEach((n) => n.remove());
+      if (unseen) mark().catch(() => {});
+    };
+    const onHash = () => { if (location.hash === `#${id}`) { el.open = true; el.scrollIntoView({ block: "start" }); } };
+    el.addEventListener("toggle", onToggle);
+    window.addEventListener("hashchange", onHash);
+    onHash();
+    return () => { el.removeEventListener("toggle", onToggle); window.removeEventListener("hashchange", onHash); };
+  }, [id, unseen, mark]);
+  return null;
+}
