@@ -3,14 +3,16 @@ import { requireCoach } from "@/lib/session";
 import { Header } from "@/components/header";
 import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitSelect } from "@/components/client";
-import { cancelInvite, inviteMember, removeMember, resendInvite, resetFreeCall, setTeam } from "@/app/actions";
-import { BOOKING_ENABLED, isTeam, monthKey, TEAMS, type Booking, type Profile } from "@/lib/coaching";
+import { cancelInvite, inviteMember, removeMember, renameTeams, resendInvite, resetFreeCall, setTeam } from "@/app/actions";
+import { BOOKING_ENABLED, isTeam, monthKey, teamLabel, teamOptions, TEAMS, type Booking, type Profile, type Team } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 const MESSAGES: Record<string, [string, boolean]> = {
   sent: ["Invite sent.", true],
   moved: ["That person already had an account, so they've been moved onto the team.", true],
-  invite: ["Check the email address and pick a team, then send again.", false],
+  invite: ["Add their name and check the email address, then send again.", false],
+  renamed: ["Team names saved. Everyone sees the new names right away.", true],
+  rename: ["The team names didn't save. Try again.", false],
   setup: ["Invites can't send yet: the app is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Cloudflare under the Worker's Settings > Variables and Secrets (type Secret), then try again.", false],
   send: ["The invite was saved but the email didn't send. Try Resend below.", false],
 };
@@ -22,7 +24,7 @@ function ago(iso: string) {
 
 export default async function MembersPage({ searchParams: sp }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const searchParams = await sp;
-  const { supabase, me } = await requireCoach();
+  const { supabase, me, names } = await requireCoach();
   const month = monthKey(new Date(), TZ);
   const [{ data: profiles }, { data: contacts }, { data: invites }, { data: bookings }] = await Promise.all([
     supabase.from("profiles").select("*").neq("role", "coach").order("name"),
@@ -40,7 +42,7 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
     <>
       <Header me={me} sub="Coach view" tabs={[{ key: "team", label: "Back to teams", href: "/coach" }]} current="" />
       <div className="wrap layout coach">
-        <TeamColumn members={members} current="members" />
+        <TeamColumn members={members} names={names} current="members" />
         <main>
           <div className="intro"><div>
             <h1>Add and manage members</h1>
@@ -51,13 +53,16 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
           <form action={inviteMember} className="card" style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "flex-end", gap: 12 }}>
             <div style={{ flex: "1 1 100%" }}>
               <h2 style={{ margin: 0, fontSize: "1.05rem" }}>Invite a member</h2>
-              <p className="muted" style={{ margin: "2px 0 0", fontSize: "0.9rem" }}>They get an email with a sign-in link that puts them on the team you choose.</p>
+              <p className="muted" style={{ margin: "2px 0 0", fontSize: "0.9rem" }}>They get a personal invite from you, greeting them by first name, with a link that puts them on the team you choose.</p>
             </div>
-            <label style={{ flex: "2 1 260px", display: "flex", flexDirection: "column", gap: 4, fontWeight: 600 }}>Email
+            <label style={{ flex: "1 1 200px", display: "flex", flexDirection: "column", gap: 4, fontWeight: 600 }}>Name
+              <input className="input" type="text" name="name" required maxLength={60} autoComplete="off" placeholder="Their full name" />
+            </label>
+            <label style={{ flex: "2 1 240px", display: "flex", flexDirection: "column", gap: 4, fontWeight: 600 }}>Email
               <input className="input" type="email" name="email" required placeholder="name@example.com" />
             </label>
             <label style={{ flex: "1 1 180px", display: "flex", flexDirection: "column", gap: 4, fontWeight: 600 }}>Team
-              <select className="input" name="team" defaultValue={defaultTeam}>{TEAMS.map((t) => <option key={t} value={t}>{t} team</option>)}</select>
+              <select className="input" name="team" defaultValue={defaultTeam}>{teamOptions(names).map(([t, label]) => <option key={t} value={t}>{label}</option>)}</select>
             </label>
             <button className="btn" type="submit" style={{ minHeight: 42 }}>Send invite</button>
           </form>
@@ -75,7 +80,7 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
                       <td><b>{m.name}</b><div className="muted" style={{ fontSize: "0.82rem" }}>{email.get(m.id)}</div></td>
                       <td>
                         <AutoSubmitSelect label={`${m.name}'s team`} value={m.team ?? ""} action={setTeam.bind(null, m.id)}
-                          options={[...TEAMS.map((t) => [t, t] as [string, string]), ["", "No team"]]} />
+                          options={[...teamOptions(names), ["", "No team"]]} />
                       </td>
                       <td>{m.reminder_enabled ? `Email · ${m.reminder_day}` : <span className="muted">Off</span>}</td>
                       {BOOKING_ENABLED && <td>
@@ -103,7 +108,7 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
               <h2>Waiting to accept</h2>
               {(invites ?? []).map((inv) => (
                 <div key={inv.id} className="empty" style={{ display: "flex", flexWrap: "wrap", gap: "10px 20px", alignItems: "center" }}>
-                  <b>{inv.email}</b><span className="muted">{inv.team} team · invited {ago(inv.invited_at).toLowerCase()}</span>
+                  <b>{inv.name || inv.email}</b><span className="muted">{inv.name ? `${inv.email} · ` : ""}{teamLabel(inv.team as Team, names)} · invited {ago(inv.invited_at).toLowerCase()}</span>
                   <span className="spacer" />
                   <form action={resendInvite.bind(null, inv.id)}><button className="btn ghost small" type="submit">Resend</button></form>
                   <form action={cancelInvite.bind(null, inv.id)}><button className="linkbtn" type="submit">Cancel invite</button></form>
@@ -111,6 +116,19 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
               ))}
             </section>
           )}
+          <form id="team-names" action={renameTeams} className="card" style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "flex-end", gap: 12, scrollMarginTop: 80 }}>
+            <div style={{ flex: "1 1 100%" }}>
+              <h2 style={{ margin: 0, fontSize: "1.05rem" }}>Team names</h2>
+              <p className="muted" style={{ margin: "2px 0 0", fontSize: "0.9rem" }}>Rename a team whenever you like. Members see the new name on their screens; nobody changes team. Leave a box empty to go back to the day name.</p>
+            </div>
+            {TEAMS.map((t) => (
+              <label key={t} style={{ flex: "1 1 180px", display: "flex", flexDirection: "column", gap: 4, fontWeight: 600 }}>{t === "Example" ? "Example (demo) team" : `${t} team`}
+                <input className="input" type="text" name={`name_${t}`} maxLength={40} defaultValue={teamLabel(t, names)} placeholder={`${t} team`} />
+              </label>
+            ))}
+            <button className="btn" type="submit" style={{ minHeight: 42 }}>Save team names</button>
+          </form>
+
           <p className="muted" style={{ fontSize: "0.85rem" }}>Signed in as {me.name}, coach.</p>
         </main>
       </div>

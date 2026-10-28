@@ -11,7 +11,7 @@ const TZ = process.env.REMINDER_TIMEZONE;
 /** The accountability tracker: what someone committed to at each meeting, and whether they followed through. */
 export default async function ProgressPage({ searchParams: sp }: { searchParams: Promise<{ id?: string }> }) {
   const searchParams = await sp;
-  const { supabase, me } = await requireProfile();
+  const { supabase, me, names } = await requireProfile();
   const isCoach = me.role === "coach";
   let m: Profile = me;
   if (searchParams.id && searchParams.id !== me.id) {
@@ -33,16 +33,16 @@ export default async function ProgressPage({ searchParams: sp }: { searchParams:
     <>
       {isCoach
         ? <Header me={me} sub="Coach view" tabs={coachTabs(m.team ?? "none")} current="progress" />
-        : <Header me={me} sub={teamLabel(me.team)} tabs={MEMBER_TABS} current="progress" />}
+        : <Header me={me} sub={teamLabel(me.team, names)} tabs={MEMBER_TABS} current="progress" />}
       <div className="wrap layout"><main>
-        {!own && <Link href={`/coach?team=${m.team ?? "none"}&tab=progress`} className="linkbtn">← Back to {teamLabel(m.team)}</Link>}
+        {!own && <Link href={`/coach?team=${m.team ?? "none"}&tab=progress`} className="linkbtn">← Back to {teamLabel(m.team, names)}</Link>}
         <div className="intro"><div>
           <h1>{own ? "My progress" : `${m.name}'s progress`}</h1>
           <p>What {name} committed to at each meeting, and whether {own ? "you" : "they"} followed through. {own ? "Your team sees your streak on the Accountability tab." : ""}</p>
         </div></div>
 
         <section className="card thisweek">
-          <span className="label">This week · {teamLabel(m.team)} meets {shortDate(meetingDate(current, m.team))}</span>
+          <span className="label">This week · {teamLabel(m.team, names)} meets {shortDate(meetingDate(current, m.team))}</span>
           {m.accountability
             ? <blockquote>{m.accountability}</blockquote>
             : <p className="muted" style={{ margin: 0 }}>{own ? "You haven't set a commitment yet." : `${firstName(m.name)} hasn't set a commitment yet.`}</p>}

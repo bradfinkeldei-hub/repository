@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { TEAMS, type Profile, type Suggestion } from "@/lib/coaching";
+import { teamOptions, type Profile, type Suggestion, type TeamNames } from "@/lib/coaching";
 
 /** The coach's team list. Members never see this. */
-export function TeamColumn({ members, selected, tab, actions, current }: {
+export function TeamColumn({ members, names, selected, tab, actions, current }: {
   members: Profile[];
+  names: TeamNames;
   selected?: string;
   tab?: string;
   actions?: Suggestion[];
@@ -17,7 +18,7 @@ export function TeamColumn({ members, selected, tab, actions, current }: {
     }
     return String(team === "all" ? members.length : members.filter((m) => (m.team ?? "none") === team).length);
   };
-  const items: [string, string][] = [["all", "All teams"], ...TEAMS.map((x) => [x, x] as [string, string])];
+  const items: [string, string][] = [["all", "All teams"], ...teamOptions(names)];
   if (members.some((m) => !m.team)) items.push(["none", "Not on a team"]);
   return (
     <nav className="teams" aria-label="Teams">
@@ -29,6 +30,7 @@ export function TeamColumn({ members, selected, tab, actions, current }: {
       ))}
       <hr />
       <Link href="/coach/members" aria-current={current === "members" ? "page" : undefined}>Add or manage members<span>›</span></Link>
+      <Link href="/coach/members#team-names">Rename teams<span>›</span></Link>
       <p className="note">Only you see this column. Members see just their own team.</p>
     </nav>
   );

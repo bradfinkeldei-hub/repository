@@ -9,7 +9,7 @@ const TZ = process.env.REMINDER_TIMEZONE;
 
 export default async function TeamPage({ searchParams: sp }: { searchParams: Promise<{ tab?: string }> }) {
   const searchParams = await sp;
-  const { supabase, me } = await requireProfile();
+  const { supabase, me, names } = await requireProfile();
   if (me.role === "coach") redirect("/coach");
   const tab = (["team", "accountability", "missions"].includes(searchParams.tab ?? "") ? searchParams.tab : "team") as Tab;
   const coach = process.env.COACH_NAME || "your coach";
@@ -21,7 +21,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
         <div className="wrap layout"><main>
           <div className="empty">
             <h2>You&apos;re signed in, but not on a team yet</h2>
-            <p>Ask {coach} to add you to your Monday, Tuesday, Wednesday or Thursday team. Once you&apos;re on a team, you&apos;ll see your teammates here.</p>
+            <p>Ask {coach} to add you to your team. Once you&apos;re on a team, you&apos;ll see your teammates here.</p>
           </div>
         </main></div>
       </>
@@ -41,14 +41,14 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
   return (
     <>
       <Header me={me}
-        sub={teamLabel(me.team)}
+        sub={teamLabel(me.team, names)}
         tabs={MEMBER_TABS}
         current={tab}
         right={BOOKING_ENABLED ? <Link className="btn sun ghost" href="/book">Feeling stuck? Book a call</Link> : undefined}
       />
       <div className="wrap layout"><main>
         <div className="intro"><div>
-          <h1>{tab === "team" ? teamLabel(me.team) : tab === "accountability" ? "What we're holding each other to" : "The missions we're living into"}</h1>
+          <h1>{tab === "team" ? teamLabel(me.team, names) : tab === "accountability" ? "What we're holding each other to" : "The missions we're living into"}</h1>
           <p>{tab === "team" ? "You and your teammates." : tab === "accountability" ? "Everyone's commitment this week. Mark yours done when you've shown up for it." : "The bigger why behind each person's work."}</p>
         </div></div>
         {BOOKING_ENABLED && tab === "team" && (
@@ -63,7 +63,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
         {Object.keys(me.wheel ?? {}).length === 0 && (
           <div className="notice">Your profile is almost empty. <Link href="/profile">Fill in your life wheel</Link> so your team can see where you are.</div>
         )}
-        <TeamViews tab={tab} groups={[{ team: me.team, members }]} viewer={me} logs={logs} ownTeam />
+        <TeamViews tab={tab} groups={[{ team: me.team, members }]} viewer={me} logs={logs} names={names} ownTeam />
       </main></div>
     </>
   );

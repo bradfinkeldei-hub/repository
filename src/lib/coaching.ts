@@ -55,8 +55,16 @@ export function isTeam(v: unknown): v is Team {
   return typeof v === "string" && (TEAMS as readonly string[]).includes(v);
 }
 
-export function teamLabel(team: Team | null) {
-  return team ? `${team} team` : "Not on a team";
+/** The names the coach has given the teams (table team_names). The keys never change. */
+export type TeamNames = Partial<Record<Team, string>>;
+
+export function teamLabel(team: Team | null, names: TeamNames = {}) {
+  return team ? names[team]?.trim() || `${team} team` : "Not on a team";
+}
+
+/** The team menu's choices: [team key, its current name]. */
+export function teamOptions(names: TeamNames = {}): [string, string][] {
+  return TEAMS.map((t) => [t, teamLabel(t, names)]);
 }
 
 export function firstName(name: string) {
@@ -133,6 +141,7 @@ export function coachActions(
   bookings: Booking[],
   now = new Date(),
   timeZone?: string,
+  names: TeamNames = {},
 ): Suggestion[] {
   const wk = weekKey(now, timeZone);
   const today = DAY_INDEX[weekdayName(now, timeZone)] ?? 1;
@@ -169,7 +178,7 @@ export function coachActions(
   for (const r of rows.filter((r) => r.custom)) {
     const m = members.find((x) => x.id === r.member_id);
     out.push({
-      id: r.id, kind: "custom", level: "mid", text: r.text, why: m ? `${m.name} · ${teamLabel(m.team)}` : "",
+      id: r.id, kind: "custom", level: "mid", text: r.text, why: m ? `${m.name} · ${teamLabel(m.team, names)}` : "",
       team: m?.team ?? null, memberId: r.member_id, done: r.done, custom: true,
     });
   }
