@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireCoach, requireProfile } from "@/lib/session";
+import { requireCoach, requireEditor, requireRealCoach, VIEW_AS_COOKIE } from "@/lib/session";
 import { AREAS, BOOKING_ENABLED, DAYS, firstName, isTeam, monthKey, TEAMS, weekKey, type Wheel } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
@@ -12,7 +13,7 @@ const str = (v: FormDataEntryValue | null, max: number) => String(v ?? "").trim(
 
 /** Save a profile. Members save their own; the coach can save anyone's and set their team. */
 export async function saveProfile(formData: FormData) {
-  const { supabase, me } = await requireProfile();
+  const { supabase, me } = await requireEditor();
   const id = str(formData.get("id"), 64) || me.id;
   const isCoach = me.role === "coach";
   if (id !== me.id && !isCoach) redirect("/team");
@@ -59,7 +60,7 @@ function reminderUpdate(formData: FormData) {
 
 /** Settings page: the signed-in person's name and weekly reminder. */
 export async function saveSettings(formData: FormData) {
-  const { supabase, me } = await requireProfile();
+  const { supabase, me } = await requireEditor();
   const { error } = await supabase.from("profiles").update({
     name: str(formData.get("name"), 60) || me.name,
     ...reminderUpdate(formData),
@@ -71,7 +72,7 @@ export async function saveSettings(formData: FormData) {
 
 /** Starts a sign-in email change. Supabase emails a link to confirm it. */
 export async function changeEmail(formData: FormData) {
-  const { supabase, user } = await requireProfile();
+  const { supabase, user } = await requireEditor();
   const email = str(formData.get("email"), 200).toLowerCase();
   if (!/^\S+@\S+\.\S+$/.test(email)) redirect("/settings?error=email");
   if (email === user.email?.toLowerCase()) redirect("/settings");
@@ -82,7 +83,7 @@ export async function changeEmail(formData: FormData) {
 }
 
 export async function toggleDone(memberId: string) {
-  const { supabase } = await requireProfile();
+  const { supabase } = await requireEditor();
   const wk = weekKey(new Date(), TZ);
   const { data } = await supabase.from("profiles").select("done_week").eq("id", memberId).single();
   await setWeekDone(memberId, wk, data?.done_week !== wk);
@@ -90,7 +91,7 @@ export async function toggleDone(memberId: string) {
 
 /** Marks one meeting week done or not done in the accountability tracker. */
 export async function setWeekDone(memberId: string, week: string, done: boolean) {
-  const { supabase, me } = await requireProfile();
+  const { supabase, me } = await requireEditor();
   if (memberId !== me.id && me.role !== "coach") return;
   const current = weekKey(new Date(), TZ);
   if (!/^\d{4}-W\d{2}$/.test(week) || week > current) return;
@@ -214,7 +215,7 @@ export async function deleteAction(id: string) {
 /** Records the booking, then sends the member to the scheduling page. */
 export async function bookCall(kind: "free" | "paid") {
   if (!BOOKING_ENABLED) redirect("/");
-  const { supabase, me } = await requireProfile();
+  const { supabase, me } = await requireEditor();
   const url = kind === "free" ? process.env.FREE_CALL_URL : process.env.PAID_CALL_URL;
   if (!url) redirect("/book?error=nolink");
   const { error } = await supabase.from("bookings").insert({ member_id: me.id, month: monthKey(new Date(), TZ), kind });
@@ -230,7 +231,7 @@ export async function resetFreeCall(memberId: string) {
 
 /** Sets or changes the signed-in person's password. */
 export async function setPassword(formData: FormData) {
-  const { supabase } = await requireProfile();
+  const { supabase } = await requireEditor();
   const password = String(formData.get("password") ?? "");
   const back = formData.get("welcome") === "1" ? "/set-password?welcome=1&" : "/set-password?";
   if (password.length < 8) redirect(`${back}error=short`);
@@ -241,13 +242,14 @@ export async function setPassword(formData: FormData) {
 }
 
 export async function signOut() {
+  (await cookies()).delete(VIEW_AS_COOKIE);
   await (await createClient()).auth.signOut();
   redirect("/login");
 }
 
 /** Saves a photo the browser already uploaded to avatars/<my id>/, and clears out older ones. */
 export async function setAvatar(path: string) {
-  const { supabase, me } = await requireProfile();
+  const { supabase, me } = await requireEditor();
   if (!new RegExp(`^${me.id}/[\\w-]+\\.jpg$`).test(path)) return { error: "That photo didn't upload. Try again." };
   const bucket = supabase.storage.from("avatars");
   const { error } = await supabase.from("profiles").update({ avatar_url: bucket.getPublicUrl(path).data.publicUrl }).eq("id", me.id);
@@ -258,7 +260,7 @@ export async function setAvatar(path: string) {
 }
 
 export async function removeAvatar() {
-  const { supabase, me } = await requireProfile();
+  const { supabase, me } = await requireEditor();
   await supabase.from("profiles").update({ avatar_url: "" }).eq("id", me.id);
   await removeAvatarFiles(me.id);
   revalidatePath("/", "layout");
@@ -269,4 +271,22 @@ async function removeAvatarFiles(id: string, keep?: string) {
   const { data } = await bucket.list(id);
   const old = (data ?? []).map((f) => `${id}/${f.name}`).filter((p) => p !== keep);
   if (old.length) await bucket.remove(old);
+}
+
+/** Coach only: see the app exactly as this member does, read-only, until they exit. */
+export async function startViewAs(memberId: string) {
+  const { supabase } = await requireRealCoach();
+  const { data } = await supabase.from("profiles").select("id").eq("id", memberId).neq("role", "coach").maybeSingle();
+  if (!data) redirect("/coach");
+  (await cookies()).set(VIEW_AS_COOKIE, memberId, { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 8 });
+  redirect("/");
+}
+
+export async function stopViewAs() {
+  const { supabase } = await requireRealCoach();
+  const jar = await cookies();
+  const id = jar.get(VIEW_AS_COOKIE)?.value;
+  jar.delete(VIEW_AS_COOKIE);
+  const { data } = id ? await supabase.from("profiles").select("team").eq("id", id).maybeSingle() : { data: null };
+  redirect(`/coach?team=${data?.team ?? "all"}`);
 }
