@@ -144,6 +144,68 @@ export function meetingWhen(meeting: string, now = new Date(), timeZone?: string
     .format(new Date(`${meeting}T12:00:00Z`));
 }
 
+/** A team's standing weekly meeting (columns on team_names). time is like "19:00" in the coach's time zone, or "" if not set. */
+export type MeetingTime = { time: string; minutes: number; url: string };
+
+/** "7:00 PM" for "19:00". */
+export function clockLabel(time: string) {
+  const [h, m] = time.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
+const BYDAY: Record<string, string> = { Monday: "MO", Tuesday: "TU", Wednesday: "WE", Thursday: "TH", Friday: "FR", Saturday: "SA", Sunday: "SU" };
+
+/** "20261029T190000" for a meeting date and time, plus some minutes. Local time, no zone. */
+function calStamp(date: string, time: string, plusMinutes = 0) {
+  const [h, m] = time.split(":").map(Number);
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCMinutes(h * 60 + m + plusMinutes);
+  return d.toISOString().slice(0, 19).replace(/[-:]/g, "");
+}
+
+/** What "Add to calendar" puts in a team's repeating weekly event. Null until the team has a weekday and a meeting time. */
+export type CalendarEvent = { team: Team; title: string; details: string; start: string; end: string; byDay: string; timeZone: string; url: string };
+
+export function calendarEvent(team: Team, mt: MeetingTime | undefined, opts: { title: string; details: string; now?: Date; timeZone?: string }): CalendarEvent | null {
+  if (!mt?.time || !BYDAY[team]) return null;
+  const date = nextMeeting(team, opts.now ?? new Date(), opts.timeZone);
+  return {
+    team, title: opts.title, details: opts.details, url: mt.url, byDay: BYDAY[team], timeZone: opts.timeZone ?? "UTC",
+    start: calStamp(date, mt.time), end: calStamp(date, mt.time, mt.minutes || 60),
+  };
+}
+
+/** A Google Calendar link that opens the repeating event ready to save. */
+export function googleCalendarUrl(e: CalendarEvent) {
+  const q = new URLSearchParams({
+    action: "TEMPLATE", text: e.title, dates: `${e.start}/${e.end}`, ctz: e.timeZone,
+    recur: `RRULE:FREQ=WEEKLY;BYDAY=${e.byDay}`, details: e.details,
+  });
+  if (e.url) q.set("location", e.url);
+  return `https://calendar.google.com/calendar/render?${q}`;
+}
+
+const icsText = (s: string) => s.replace(/[\\;,]/g, (c) => `\\${c}`).replace(/\r?\n/g, "\\n");
+
+/** The same event as an .ics file, for Apple Calendar and Outlook. The fixed UID lets a second import update the first. */
+export function meetingIcs(e: CalendarEvent, now = new Date()) {
+  const lines = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Coaching Circle//Meetings//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:team-${e.team.toLowerCase()}-meeting@coaching-circle`,
+    `DTSTAMP:${now.toISOString().slice(0, 19).replace(/[-:]/g, "")}Z`,
+    `DTSTART;TZID=${e.timeZone}:${e.start}`,
+    `DTEND;TZID=${e.timeZone}:${e.end}`,
+    `RRULE:FREQ=WEEKLY;BYDAY=${e.byDay}`,
+    `SUMMARY:${icsText(e.title)}`,
+    `DESCRIPTION:${icsText(e.details)}`,
+    ...(e.url ? [`LOCATION:${icsText(e.url)}`, `URL:${e.url}`] : []),
+    "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Meeting in 30 minutes", "TRIGGER:-PT30M", "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR",
+  ];
+  return lines.join("\r\n") + "\r\n";
+}
+
 /** A member's answer to "Will you be at the meeting?" (table attendance). */
 export type Rsvp = { member_id: string; meeting: string; going: boolean };
 

@@ -8,7 +8,7 @@ import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitCheckbox } from "@/components/client";
 import { addAction, deleteAction, setActionDone } from "@/app/actions";
 import { loadCheckins } from "@/lib/checkin";
-import { loadChecked, loadSocial } from "@/lib/social";
+import { loadChecked, loadNotes, loadSocial } from "@/lib/social";
 import {
   BOOKING_ENABLED, coachActions, isTeam, progressByMember, teamLabel, TEAMS, weekKey,
   type Booking, type CoachActionRow, type LogRow, type Profile, type Progress, type Suggestion, type Team, type TeamNames,
@@ -44,9 +44,10 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
     ? [...TEAMS, ...(members.some((m) => !m.team) ? [null] : [])]
     : [sel === "none" ? null : (sel as Team)];
   const groups = teamsShown.map((team) => ({ team, members: members.filter((m) => m.team === team) }));
-  const [checkins, social] = tab === "team"
-    ? await Promise.all([loadCheckins(supabase, teamsShown.filter(isTeam), TZ), loadSocial(supabase, groups.flatMap((g) => g.members.map((m) => m.id)))])
-    : [undefined, undefined];
+  const shownIds = groups.flatMap((g) => g.members.map((m) => m.id));
+  const [checkins, social, notes] = tab === "team"
+    ? await Promise.all([loadCheckins(supabase, teamsShown.filter(isTeam), TZ), loadSocial(supabase, shownIds), loadNotes(supabase, shownIds)])
+    : [undefined, undefined, undefined];
   const checked = tab === "team" || tab === "accountability"
     ? await loadChecked(supabase, groups.flatMap((g) => g.members.map((m) => m.id)), weekKey(new Date(), TZ)) : undefined;
   const selLabel = sel === "all" ? "All teams" : teamLabel(sel === "none" ? null : (sel as Team), names);
@@ -74,12 +75,12 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
                   <p>{sel === "all" ? `${members.length} members across all teams.` : `${groups[0].members.length} ${groups[0].members.length === 1 ? "member" : "members"}.`} Only you can see other teams.</p>
                 </div>
                 <div className="row intro-actions">
-                  <Link className="btn ghost" href="/coach/teams">{isTeam(sel) ? "Rename team" : "Rename teams"}</Link>
+                  <Link className="btn ghost" href="/coach/teams">Team settings</Link>
                   <Link className="btn" href={isTeam(sel) ? `/coach/members?team=${sel}` : "/coach/members"}>{isTeam(sel) ? `Add a member to ${selLabel}` : "Add a member"}</Link>
                 </div>
               </div>
               {searchParams.asked && <AskedNotice asked={searchParams.asked} />}
-              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} names={names} checkins={checkins} social={social} checked={checked} />
+              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} names={names} checkins={checkins} social={social} checked={checked} notes={notes} />
             </>
           )}
         </main>

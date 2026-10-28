@@ -32,7 +32,7 @@ export function TeamColumn({ members, names, selected, tab, actions, current }: 
       ))}
       <hr />
       <Link href="/coach/members" aria-current={current === "members" ? "page" : undefined}>Add or manage members<span>›</span></Link>
-      <Link href="/coach/teams" aria-current={current === "teams" ? "page" : undefined}>Rename teams<span>›</span></Link>
+      <Link href="/coach/teams" aria-current={current === "teams" ? "page" : undefined}>Teams and meeting times<span>›</span></Link>
       {members.length > 0 && (
         <label className="viewas-pick">
           <span className="label">See the app as a member</span>

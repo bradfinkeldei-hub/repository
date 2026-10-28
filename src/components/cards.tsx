@@ -6,8 +6,9 @@ import { Avatar } from "@/components/avatar";
 import { MiniProgress } from "@/components/progress";
 import { MeetingCheckin } from "@/components/attendance";
 import { Milestones, Thread } from "@/components/thread";
+import { CoachNotes } from "@/components/notes";
 import type { Checkin } from "@/lib/checkin";
-import type { Social } from "@/lib/social";
+import type { CoachNote, Social } from "@/lib/social";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 
@@ -165,8 +166,9 @@ function Commitments({ m, viewer, checked = [] }: { m: Profile; viewer: Profile;
   );
 }
 
-export function MemberCard({ m, viewer, names, p, social, avatars, checked }: {
+export function MemberCard({ m, viewer, names, p, social, avatars, checked, notes }: {
   m: Profile; viewer: Profile; names?: TeamNames; p?: Progress; social?: Social | null; avatars?: Record<string, string>; checked?: string[];
+  notes?: CoachNote[];
 }) {
   const kudos = social?.kudos[m.id] ?? [];
   return (
@@ -180,6 +182,7 @@ export function MemberCard({ m, viewer, names, p, social, avatars, checked }: {
       <Commitments m={m} viewer={viewer} checked={checked} />
       {social && <Milestones m={m} viewer={viewer} p={p} items={social.milestones[m.id] ?? []} kudos={kudos.length} />}
       {social && <Thread m={m} viewer={viewer} comments={social.comments[m.id] ?? []} kudos={kudos} avatars={avatars ?? {}} />}
+      {notes && viewer.role === "coach" && <CoachNotes m={m} notes={notes} />}
     </article>
   );
 }
@@ -209,9 +212,11 @@ export function MissionCard({ m, viewer }: { m: Profile; viewer: Profile }) {
 export type Tab = "team" | "accountability" | "missions";
 
 /** The Team, Accountability and Missions views for one or more teams. */
-export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins, social, checked }: {
+export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins, social, checked, notes }: {
   tab: Tab; groups: { team: Team | null; members: Profile[] }[]; viewer: Profile; ownTeam?: boolean; logs?: Record<string, Progress>; names?: TeamNames;
   checkins?: Partial<Record<Team, Checkin>>; social?: Social | null; checked?: Record<string, string[]>;
+  /** The coach's private notes by member id. Only the coach page passes these. */
+  notes?: Record<string, CoachNote[]> | null;
 }) {
   const multi = groups.length > 1;
   const avatars = Object.fromEntries(groups.flatMap((g) => g.members).filter((m) => m.avatar_url).map((m) => [m.id, m.avatar_url]));
@@ -224,9 +229,9 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins,
         if (tab === "team") {
           body = members.length ? (
             <>
-              {team && checkins?.[team] && <MeetingCheckin team={team} members={members} viewer={viewer} c={checkins[team]} />}
+              {team && checkins?.[team] && <MeetingCheckin team={team} label={teamLabel(team, names)} members={members} viewer={viewer} c={checkins[team]} />}
               {team && <TeamWheel team={team} members={members} ownTeam={ownTeam} names={names} />}
-              <div className="grid">{members.map((m) => <MemberCard key={m.id} m={m} viewer={viewer} names={names} p={logs?.[m.id]} social={social} avatars={avatars} checked={checked?.[m.id]} />)}</div>
+              <div className="grid">{members.map((m) => <MemberCard key={m.id} m={m} viewer={viewer} names={names} p={logs?.[m.id]} social={social} avatars={avatars} checked={checked?.[m.id]} notes={notes ? notes[m.id] ?? [] : undefined} />)}</div>
             </>
           ) : <EmptyTeam label={teamLabel(team, names)} coach={viewer.role === "coach"} />;
         } else if (tab === "accountability") {

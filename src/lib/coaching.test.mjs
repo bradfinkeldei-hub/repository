@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addWeeks, coachActions, dateKey, meetingDate, meetingWhen, nextMeeting, monthKey, progress, teamAverage, teamLabel, teamOptions, weekKey, weekdayName } from "./coaching.ts";
+import { addWeeks, calendarEvent, clockLabel, coachActions, googleCalendarUrl, meetingIcs, dateKey, meetingDate, meetingWhen, nextMeeting, monthKey, progress, teamAverage, teamLabel, teamOptions, weekKey, weekdayName } from "./coaching.ts";
 
 const TZ = "America/Chicago";
 const base = {
@@ -135,4 +135,26 @@ test("up to three commitments, one per line", async () => {
   assert.deepEqual(commitmentList(" Run 3x \n\n Read nightly \nCall Mom\nOne too many"), ["Run 3x", "Read nightly", "Call Mom"]);
   assert.deepEqual(commitmentList(""), []);
   assert.equal(joinCommitments(["Run 3x", "", "  Read\n nightly ", "Call Mom", "Extra"]), "Run 3x\nRead nightly\nCall Mom");
+});
+
+test("a team's weekly meeting becomes a repeating calendar event", () => {
+  const now = new Date("2026-10-28T17:00:00Z"); // Wednesday in Chicago
+  const opts = { title: "Thursday team meeting", details: "Weekly circle; bring your wins", now, timeZone: TZ };
+  assert.equal(calendarEvent("Thursday", { time: "", minutes: 60, url: "" }, opts), null);
+  assert.equal(calendarEvent("Example", { time: "19:00", minutes: 60, url: "" }, opts), null);
+  const e = calendarEvent("Thursday", { time: "23:30", minutes: 90, url: "https://meet.google.com/abc" }, opts);
+  assert.equal(e.start, "20261029T233000");
+  assert.equal(e.end, "20261030T010000");
+  const g = new URL(googleCalendarUrl(e));
+  assert.equal(g.searchParams.get("dates"), "20261029T233000/20261030T010000");
+  assert.equal(g.searchParams.get("recur"), "RRULE:FREQ=WEEKLY;BYDAY=TH");
+  assert.equal(g.searchParams.get("ctz"), TZ);
+  assert.equal(g.searchParams.get("location"), "https://meet.google.com/abc");
+  const ics = meetingIcs(e, now);
+  assert.match(ics, /\r\nDTSTART;TZID=America\/Chicago:20261029T233000\r\n/);
+  assert.match(ics, /\r\nRRULE:FREQ=WEEKLY;BYDAY=TH\r\n/);
+  assert.match(ics, /\r\nDESCRIPTION:Weekly circle\\; bring your wins\r\n/);
+  assert.match(ics, /\r\nUID:team-thursday-meeting@coaching-circle\r\n/);
+  assert.equal(clockLabel("19:05"), "7:05 PM");
+  assert.equal(clockLabel("00:30"), "12:30 AM");
 });

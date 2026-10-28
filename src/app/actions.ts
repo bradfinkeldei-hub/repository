@@ -261,10 +261,24 @@ export async function setTeam(memberId: string, team: string) {
   revalidatePath("/", "layout");
 }
 
-/** Saves the coach's names for the teams. A blank name goes back to "Monday team" and so on. */
+/**
+ * Saves the coach's names for the teams, plus each team's meeting time and link for "Add to calendar".
+ * A blank name goes back to "Monday team" and so on; a blank time turns the calendar buttons off.
+ */
 export async function renameTeams(formData: FormData) {
   const { supabase } = await requireCoach();
-  const rows = TEAMS.map((team) => ({ team, name: str(formData.get(`name_${team}`), 40) || `${team} team` }));
+  if (TEAMS.some((t) => { const u = str(formData.get(`url_${t}`), 500); return u && !/^https?:\/\/\S+$/.test(u); })) redirect("/coach/teams?error=link");
+  const rows = TEAMS.map((team) => {
+    const time = str(formData.get(`time_${team}`), 5);
+    const minutes = Math.round(Number(formData.get(`minutes_${team}`)));
+    const url = str(formData.get(`url_${team}`), 500);
+    return {
+      team, name: str(formData.get(`name_${team}`), 40) || `${team} team`,
+      meeting_time: /^([01]\d|2[0-3]):[0-5]\d$/.test(time) ? time : "",
+      meeting_minutes: minutes >= 15 && minutes <= 240 ? minutes : 60,
+      meeting_url: /^https?:\/\/\S+$/.test(url) ? url : "",
+    };
+  });
   const { error } = await supabase.from("team_names").upsert(rows);
   revalidatePath("/", "layout");
   redirect(error ? "/coach/teams?error=1" : "/coach/teams?saved=1");
@@ -511,4 +525,18 @@ export async function deleteMilestone(id: string) {
   const { supabase } = await requireEditor();
   await supabase.from("milestones").delete().eq("id", id);
   revalidatePath("/", "layout");
+}
+
+/** The coach's private notes on a member. Only the coach can read or write them. */
+export async function addNote(memberId: string, formData: FormData) {
+  const { supabase } = await requireCoach();
+  const body = str(formData.get("body"), 2000);
+  if (body) await supabase.from("coach_notes").insert({ member_id: memberId, body });
+  revalidatePath("/coach");
+}
+
+export async function deleteNote(id: string) {
+  const { supabase } = await requireCoach();
+  await supabase.from("coach_notes").delete().eq("id", id);
+  revalidatePath("/coach");
 }

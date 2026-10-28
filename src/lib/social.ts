@@ -4,6 +4,8 @@ export type CardComment = { id: string; member_id: string; author_id: string; au
 export type Kudo = { member_id: string; author_id: string; author_name: string; week: string };
 export type Milestone = { id: string; member_id: string; author_id: string; author_name: string; title: string; achieved_on: string };
 
+export type CoachNote = { id: string; member_id: string; body: string; created_at: string };
+
 /** Comments, kudos and milestones under each member's card, by member id. */
 export type Social = {
   comments: Record<string, CardComment[]>;
@@ -39,4 +41,11 @@ export async function loadChecked(supabase: Awaited<ReturnType<typeof createClie
   const { data, error } = await supabase.from("commitment_log").select("member_id, checked").in("member_id", ids).eq("week", week);
   if (error) return {};
   return Object.fromEntries((data ?? []).map((r: { member_id: string; checked: string[] | null }) => [r.member_id, r.checked ?? []]));
+}
+
+/** The coach's private notes, newest first, by member id. Access rules return none to members. Null if the table isn't there yet. */
+export async function loadNotes(supabase: Awaited<ReturnType<typeof createClient>>, ids: string[]): Promise<Record<string, CoachNote[]> | null> {
+  if (!ids.length) return {};
+  const { data, error } = await supabase.from("coach_notes").select("id, member_id, body, created_at").in("member_id", ids).order("created_at", { ascending: false });
+  return error ? null : byMember(data);
 }
