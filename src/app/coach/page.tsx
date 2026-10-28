@@ -7,6 +7,7 @@ import { TeamViews, type Tab } from "@/components/cards";
 import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitCheckbox } from "@/components/client";
 import { addAction, deleteAction, setActionDone } from "@/app/actions";
+import { loadCheckins } from "@/lib/checkin";
 import {
   BOOKING_ENABLED, coachActions, isTeam, progressByMember, teamLabel, TEAMS, weekKey,
   type Booking, type CoachActionRow, type LogRow, type Profile, type Progress, type Suggestion, type Team, type TeamNames,
@@ -19,7 +20,7 @@ const KIND: Record<Suggestion["kind"], string> = {
   remind: "Reminder", refresh: "Refresh", call: "Call", custom: "Your action",
 };
 
-export default async function CoachPage({ searchParams: sp }: { searchParams: Promise<{ team?: string; tab?: string }> }) {
+export default async function CoachPage({ searchParams: sp }: { searchParams: Promise<{ team?: string; tab?: string; asked?: string }> }) {
   const searchParams = await sp;
   const { supabase, me, names } = await requireCoach();
   const sel = searchParams.team === "all" || searchParams.team === "none" || isTeam(searchParams.team) ? searchParams.team : "Monday";
@@ -40,6 +41,7 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
     ? [...TEAMS, ...(members.some((m) => !m.team) ? [null] : [])]
     : [sel === "none" ? null : (sel as Team)];
   const groups = teamsShown.map((team) => ({ team, members: members.filter((m) => m.team === team) }));
+  const checkins = tab === "team" ? await loadCheckins(supabase, teamsShown.filter(isTeam), TZ) : undefined;
   const selLabel = sel === "all" ? "All teams" : teamLabel(sel === "none" ? null : (sel as Team), names);
 
   return (
@@ -69,13 +71,27 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
                   <Link className="btn" href={isTeam(sel) ? `/coach/members?team=${sel}` : "/coach/members"}>{isTeam(sel) ? `Add a member to ${selLabel}` : "Add a member"}</Link>
                 </div>
               </div>
-              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} names={names} />
+              {searchParams.asked && <AskedNotice asked={searchParams.asked} />}
+              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} names={names} checkins={checkins} />
             </>
           )}
         </main>
       </div>
     </>
   );
+}
+
+function AskedNotice({ asked }: { asked: string }) {
+  const n = Number(asked);
+  const text: Record<string, string> = {
+    badlink: "That meeting link didn't look right. It needs to start with https://",
+    setup: "Email isn't set up yet: SUPABASE_SERVICE_ROLE_KEY is missing in Cloudflare.",
+    nomail: "Email only sends from the live app, not from a local preview.",
+  };
+  if (Number.isInteger(n)) {
+    return <div className="notice good">{n ? `Asked ${n} ${n === 1 ? "person" : "people"} by email. Answers show up below as they come in.` : "Saved. No one needed an email (everyone's answered, or they're Example members)."}</div>;
+  }
+  return <div className="notice">{text[asked] ?? "That didn't send. Try again."}</div>;
 }
 
 function ActionsView({ actions, teams, members, names, title, showGeneral }: {

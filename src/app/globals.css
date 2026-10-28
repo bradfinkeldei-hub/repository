@@ -390,3 +390,46 @@ tr:last-child td { border-bottom: 0; }
   .intro-actions { width: 100%; }
   .intro-actions .btn { flex: 1 1 auto; }
 }
+
+/* Meeting check-in: who's in and who's out for the next meeting. */
+.checkin { gap: 16px; border-top: 4px solid var(--ok); }
+.checkin-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.checkin h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1.4rem; }
+.checkin .sub { margin: 2px 0 0; color: var(--muted); }
+.in-ink { color: var(--ok); }
+.out-ink { color: var(--alert); }
+.tally { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); }
+.tally i { display: block; height: 100%; transition: width 0.3s; }
+.tally .in { background: var(--ok); }
+.tally .out { background: var(--alert); }
+.rsvp-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--r); background: var(--surface-2); border: 1px solid var(--line); }
+.rsvp-ask span { font-weight: 650; margin-right: auto; }
+.btn.rsvp { min-width: 120px; background: var(--surface); box-shadow: none; }
+.btn.rsvp.in { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+.btn.rsvp.out { color: var(--alert); border-color: color-mix(in srgb, var(--alert) 45%, var(--line)); }
+.btn.rsvp.in.picked { background: var(--ok); color: #fff; border-color: transparent; }
+.btn.rsvp.out.picked { background: var(--alert); color: #fff; border-color: transparent; }
+.rsvp-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.rsvp-col { border-radius: var(--r); padding: 12px; border: 1px solid var(--line); min-width: 0; }
+.rsvp-col.in { background: var(--ok-soft); border-color: transparent; }
+.rsvp-col.out { background: var(--alert-soft); border-color: transparent; }
+.rsvp-col.in .label { color: var(--ok); }
+.rsvp-col.out .label { color: var(--alert); }
+.rsvp-col .label span { font-family: var(--display); font-size: 1.1rem; letter-spacing: 0; margin-left: 4px; }
+.rsvp-col ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.rsvp-col li { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+.rsvp-col li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rsvp-col.out li .avatar, .rsvp-col.wait li .avatar { opacity: 0.6; filter: grayscale(0.6); }
+.rsvp-col p { margin: 8px 0 0; font-size: 0.88rem; }
+.rsvp-send { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; padding-top: 14px; border-top: 1px dashed var(--line-strong); }
+.rsvp-send label { flex: 1 1 280px; display: grid; gap: 4px; font-size: 0.86rem; font-weight: 650; }
+.rsvp-send .hint { flex: 1 1 100%; color: var(--muted); font-size: 0.82rem; }
+.rsvp-big { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 2rem; font-weight: 800; color: #fff; }
+.rsvp-big.in { background: var(--ok); }
+.rsvp-big.out { background: var(--alert); }
+@media (max-width: 640px) {
+  .rsvp-cols { grid-template-columns: 1fr; }
+  .rsvp-ask span { flex: 1 1 100%; }
+  .rsvp-ask form { flex: 1 1 0; }
+  .btn.rsvp { width: 100%; min-width: 0; }
+}

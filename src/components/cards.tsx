@@ -4,6 +4,8 @@ import { setTeam, startViewAs, toggleDone } from "@/app/actions";
 import { AutoSubmitSelect } from "@/components/client";
 import { Avatar } from "@/components/avatar";
 import { MiniProgress } from "@/components/progress";
+import { MeetingCheckin } from "@/components/attendance";
+import type { Checkin } from "@/lib/checkin";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 
@@ -151,8 +153,9 @@ export function MissionCard({ m, viewer }: { m: Profile; viewer: Profile }) {
 export type Tab = "team" | "accountability" | "missions";
 
 /** The Team, Accountability and Missions views for one or more teams. */
-export function TeamViews({ tab, groups, viewer, ownTeam, logs, names }: {
+export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins }: {
   tab: Tab; groups: { team: Team | null; members: Profile[] }[]; viewer: Profile; ownTeam?: boolean; logs?: Record<string, Progress>; names?: TeamNames;
+  checkins?: Partial<Record<Team, Checkin>>;
 }) {
   const multi = groups.length > 1;
   return (
@@ -163,6 +166,7 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs, names }: {
         if (tab === "team") {
           body = members.length ? (
             <>
+              {team && checkins?.[team] && <MeetingCheckin team={team} members={members} viewer={viewer} c={checkins[team]} />}
               {team && <TeamWheel team={team} members={members} ownTeam={ownTeam} names={names} />}
               <div className="grid">{members.map((m) => <MemberCard key={m.id} m={m} viewer={viewer} names={names} />)}</div>
             </>

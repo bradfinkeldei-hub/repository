@@ -146,4 +146,22 @@ await check("everyone sees team names, only the coach renames them", async () =>
   assert.equal((await as(mon1, `select name from public.team_names where team = 'Monday'`))[0].name, "Trailblazers");
   await assert.rejects(as(coach, `update public.team_names set name = '  ' where team = 'Monday'`));
 });
+await check("meeting check-in: answer for yourself, see your own team, coach sends roll calls", async () => {
+  await as(mon1, `insert into public.attendance (member_id, meeting, going) values ($1, '2026-10-26', true)`, [mon1]);
+  await as(tue1, `insert into public.attendance (member_id, meeting, going) values ($1, '2026-10-27', false)`, [tue1]);
+  await assert.rejects(as(mon1, `insert into public.attendance (member_id, meeting, going) values ($1, '2026-10-27', true)`, [mon2]));
+  await as(mon1, `update public.attendance set going = true where member_id = $1`, [tue1]);
+  assert.equal((await db.query(`select going from public.attendance where member_id = $1`, [tue1])).rows[0].going, false);
+  // Priya is on Tuesday with Sam, so she sees his answer but not Jordan's.
+  assert.equal((await as(mon2, `select * from public.attendance`)).length, 1);
+  assert.equal((await as(mon1, `select * from public.attendance`)).length, 1);
+  assert.equal((await as(coach, `select * from public.attendance`)).length, 2);
+  await as(coach, `insert into public.attendance (member_id, meeting, going) values ($1, '2026-10-27', true)`, [mon2]);
+
+  await assert.rejects(as(mon1, `insert into public.roll_calls (team, meeting) values ('Monday', '2026-10-26')`));
+  await as(coach, `insert into public.roll_calls (team, meeting, meeting_url) values ('Monday', '2026-10-26', 'https://zoom.us/j/1'), ('Tuesday', '2026-10-27', '')`);
+  assert.deepEqual((await as(mon1, `select team from public.roll_calls`)).map((r) => r.team), ["Monday"]);
+  assert.equal((await as(coach, `select * from public.roll_calls`)).length, 2);
+  await assert.rejects(as(coach, `insert into public.roll_calls (team, meeting, meeting_url) values ('Wednesday', '2026-10-28', 'javascript:alert(1)')`));
+});
 console.log(`\n${passed} checks passed`);
