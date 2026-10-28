@@ -15,7 +15,7 @@ export default async function SetPasswordPage({ searchParams: sp }: { searchPara
   const welcome = searchParams.welcome === "1";
   return (
     <div className="wrap" style={{ paddingBlock: "32px 64px", maxWidth: 520 }}>
-      {!welcome && <Link href="/profile" className="linkbtn">← Back</Link>}
+      {!welcome && <Link href="/settings" className="linkbtn">← Back</Link>}
       <h1 style={{ fontFamily: "var(--display)", fontWeight: 400, fontSize: "2rem", margin: "12px 0 4px" }}>
         {welcome ? `Welcome${me.name ? `, ${me.name.split(" ")[0]}` : ""}! Choose a password` : "Set your password"}
       </h1>
@@ -27,7 +27,7 @@ export default async function SetPasswordPage({ searchParams: sp }: { searchPara
         <label>Type it again<input type="password" name="confirm" autoComplete="new-password" minLength={8} required /></label>
         <div className="row">
           <button className="btn" type="submit">Save password</button>
-          <Link className="linkbtn" href="/">{welcome ? "Skip for now" : "Cancel"}</Link>
+          <Link className="linkbtn" href={welcome ? "/" : "/settings"}>{welcome ? "Skip for now" : "Cancel"}</Link>
         </div>
       </form>
     </div>
