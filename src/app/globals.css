@@ -132,6 +132,17 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
 .who h3 { margin: 0; font-size: 1.08rem; }
 .who .meta { color: var(--muted); font-size: 0.8rem; }
 .who .end { margin-left: auto; }
+.who-name { min-width: 0; flex: 1; }
+.who-name h3 { overflow-wrap: anywhere; }
+/* The coach's controls for one member: which team they're in, preview, edit. */
+.coach-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--r); background: var(--surface-2); border: 1px solid var(--line); }
+.team-pick { display: flex; align-items: center; gap: 8px; flex: 1 1 200px; min-width: 0; }
+.team-pick span { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+.team-pick .inline-select { flex: 1; min-width: 0; background: var(--surface); }
+.coach-btns { display: flex; gap: 8px; }
+.coach-btns form { display: flex; }
+.coach-btns form .btn { flex: 1; min-width: 0; }
+.coach-btns .clip { overflow: hidden; text-overflow: ellipsis; }
 .avatar { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--sun-soft) 70%, var(--accent-soft))); color: var(--accent); flex: none; box-shadow: 0 0 0 2px var(--surface); }
 .wheelrow { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
 .wheel { flex: none; max-width: 100%; }
@@ -341,6 +352,10 @@ tr:last-child td { border-bottom: 0; }
   .teamwheel { padding: 18px; gap: 16px; }
   .teamwheel .wheel { margin-inline: auto; }
   .who .end { flex-wrap: nowrap; }
+  .coach-tools { padding: 10px; }
+  .team-pick { flex-basis: 100%; }
+  .coach-btns { flex: 1 1 100%; }
+  .coach-btns > * { flex: 1 1 0; min-width: 0; }
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .stat { padding: 12px 14px; }
   .stat b { font-size: 1.6rem; }
@@ -388,7 +403,7 @@ tr:last-child td { border-bottom: 0; }
 .intro-actions { gap: 8px; flex-wrap: wrap; }
 @media (max-width: 760px) {
   .intro-actions { width: 100%; }
-  .intro-actions .btn { flex: 1 1 auto; }
+  .intro-actions .btn { flex: 1 1 auto; min-width: 0; white-space: normal; text-align: center; padding-block: 8px; }
 }
 
 /* Meeting check-in: who's in and who's out for the next meeting. */
