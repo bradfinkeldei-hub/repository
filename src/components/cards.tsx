@@ -65,28 +65,36 @@ export function TeamWheel({ team, members, ownTeam, names }: { team: Team | null
 function Who({ m, viewer, coachTools, names }: { m: Profile; viewer: Profile; coachTools?: boolean; names?: TeamNames }) {
   const isMe = m.id === viewer.id;
   const canEdit = isMe || viewer.role === "coach";
+  const tools = coachTools && viewer.role === "coach" && !isMe;
+  const edit = canEdit && <Link className="btn ghost small" href={isMe ? "/profile" : `/profile?id=${m.id}`}>{isMe ? "Edit my profile" : "Edit profile"}</Link>;
   return (
-    <div className="who">
-      <Avatar name={m.name} url={m.avatar_url} />
-      <div style={{ minWidth: 0 }}>
-        <h3>{m.name}</h3>
-        {isMe && <div className="meta">You</div>}
+    <>
+      <div className="who">
+        <Avatar name={m.name} url={m.avatar_url} />
+        <div className="who-name">
+          <h3>{m.name}</h3>
+          {isMe && <div className="meta">You</div>}
+        </div>
+        {!tools && edit && <div className="end">{edit}</div>}
       </div>
-      <div className="end row">
-        {coachTools && viewer.role === "coach" && (
-          <AutoSubmitSelect
-            label={`${m.name}'s team`}
-            value={m.team ?? ""}
-            action={setTeam.bind(null, m.id)}
-            options={[...teamOptions(names), ["", "No team"]]}
-          />
-        )}
-        {coachTools && viewer.role === "coach" && (
-          <form action={startViewAs.bind(null, m.id)}><button className="linkbtn" type="submit" title={`See the app the way ${m.name} sees it`}>View as</button></form>
-        )}
-        {canEdit && <Link className="btn ghost small" href={isMe ? "/profile" : `/profile?id=${m.id}`}>{isMe ? "Edit my profile" : "Edit"}</Link>}
-      </div>
-    </div>
+      {tools && (
+        <div className="coach-tools">
+          <label className="team-pick">
+            <span>Team</span>
+            <AutoSubmitSelect
+              label={`Move ${m.name} to another team`}
+              value={m.team ?? ""}
+              action={setTeam.bind(null, m.id)}
+              options={[...teamOptions(names), ["", "No team"]]}
+            />
+          </label>
+          <div className="coach-btns">
+            <form action={startViewAs.bind(null, m.id)}><button className="btn ghost small" type="submit" title={`See the app the way ${m.name} sees it`}><span className="clip">View as {m.name.split(" ")[0]}</span></button></form>
+            {edit}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
