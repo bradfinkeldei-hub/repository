@@ -82,6 +82,17 @@ export function MeetingCheckin({ team, label, members, viewer, c }: { team: Team
   );
 }
 
+/** The coach can answer for anyone, say when they texted instead. */
+function CoachAnswer({ m, kind }: { m: Profile; kind: "in" | "out" | "wait" }) {
+  const first = firstName(m.name);
+  return (
+    <span className="rsvp-set">
+      {kind !== "in" && <form action={setAttendance.bind(null, m.id, true)}><button className="rsvp-mini in" type="submit" aria-label={`Mark ${first} in`} title={`Mark ${first} in`}>✓</button></form>}
+      {kind !== "out" && <form action={setAttendance.bind(null, m.id, false)}><button className="rsvp-mini out" type="submit" aria-label={`Mark ${first} out`} title={`Mark ${first} out`}>✕</button></form>}
+    </span>
+  );
+}
+
 function Column({ label, kind, list, viewer }: { label: string; kind: "in" | "out" | "wait"; list: Profile[]; viewer: Profile }) {
   return (
     <div className={`rsvp-col ${kind}`}>
@@ -92,6 +103,7 @@ function Column({ label, kind, list, viewer }: { label: string; kind: "in" | "ou
             <li key={m.id}>
               <Avatar name={m.name} url={m.avatar_url} size={30} />
               <span>{m.id === viewer.id ? "You" : firstName(m.name)}</span>
+              {viewer.role === "coach" && <CoachAnswer m={m} kind={kind} />}
             </li>
           ))}
         </ul>

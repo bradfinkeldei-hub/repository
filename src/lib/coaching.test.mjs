@@ -4,7 +4,7 @@ import { addWeeks, calendarEvent, clockLabel, coachActions, googleCalendarUrl, m
 
 const TZ = "America/Chicago";
 const base = {
-  role: "member", wheel: {}, creating: "", accountability: "Run 3x", mission: "",
+  role: "member", wheel: {}, becoming: "", creating: "", accountability: "Run 3x", mission: "",
   reminder_enabled: true, reminder_day: "Monday", done_week: "", last_reminder_week: "",
   created_at: "2026-10-20T00:00:00Z", updated_at: "2026-10-20T00:00:00Z",
 };
