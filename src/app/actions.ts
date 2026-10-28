@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCoach, requireEditor, requireRealCoach, VIEW_AS_COOKIE } from "@/lib/session";
-import { AREAS, BOOKING_ENABLED, dateKey, DAYS, firstName, isTeam, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, type Profile, type Wheel } from "@/lib/coaching";
+import { AREAS, BOOKING_ENABLED, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, type Profile, type Wheel } from "@/lib/coaching";
 import { sendEmails } from "@/lib/mail";
 import { rsvpLink } from "@/lib/rsvp";
 
@@ -29,7 +29,9 @@ export async function saveProfile(formData: FormData) {
     name: str(formData.get("name"), 60) || me.name,
     wheel,
     creating: str(formData.get("creating"), 400),
-    accountability: str(formData.get("accountability"), 400),
+    accountability: formData.has("commitment")
+      ? joinCommitments(formData.getAll("commitment").map(String))
+      : str(formData.get("accountability"), 600),
     mission: str(formData.get("mission"), 600),
   };
   // Your own reminder lives on the Settings page; the coach edits others' here.
@@ -42,14 +44,56 @@ export async function saveProfile(formData: FormData) {
   const { error } = await supabase.from("profiles").update(update).eq("id", id);
   if (error) redirect(`/profile?${id !== me.id ? `id=${id}&` : ""}error=save`);
   // A new commitment becomes this week's entry in the accountability tracker.
-  if (update.accountability && update.accountability !== before?.accountability) {
-    await supabase.from("commitment_log").upsert(
-      { member_id: id, week: weekKey(new Date(), TZ), commitment: update.accountability, updated_at: new Date().toISOString() },
-      { onConflict: "member_id,week" },
-    );
-  }
+  if (update.accountability !== before?.accountability) await logCommitment(supabase, id, String(update.accountability));
   revalidatePath("/", "layout");
   redirect(isCoach ? (id === me.id ? "/coach" : `/coach?team=${update.team ?? "none"}`) : "/team");
+}
+
+/** A new commitment becomes this week's entry in the accountability tracker. */
+async function logCommitment(supabase: Awaited<ReturnType<typeof createClient>>, id: string, accountability: string) {
+  if (!accountability) return;
+  await supabase.from("commitment_log").upsert(
+    { member_id: id, week: weekKey(new Date(), TZ), commitment: accountability, updated_at: new Date().toISOString() },
+    { onConflict: "member_id,week" },
+  );
+}
+
+/** Adds one more commitment from the card, up to three. */
+export async function addCommitment(memberId: string, formData: FormData) {
+  const { supabase, me } = await requireEditor();
+  if (memberId !== me.id && me.role !== "coach") return;
+  const text = str(formData.get("commitment"), 200);
+  const { data: p } = await supabase.from("profiles").select("accountability").eq("id", memberId).single();
+  const list = commitmentList(p?.accountability);
+  if (!text || !p || list.length >= MAX_COMMITMENTS) return;
+  const accountability = joinCommitments([...list, text]);
+  const { error } = await supabase.from("profiles").update({ accountability }).eq("id", memberId);
+  if (!error) await logCommitment(supabase, memberId, accountability);
+  revalidatePath("/", "layout");
+}
+
+/** Ticks one of this week's commitments off, or back on. The week is done once every one is ticked. */
+export async function toggleCommitment(memberId: string, index: number) {
+  const { supabase, me } = await requireEditor();
+  if (memberId !== me.id && me.role !== "coach") return;
+  const week = weekKey(new Date(), TZ);
+  const { data: p } = await supabase.from("profiles").select("accountability, done_week").eq("id", memberId).single();
+  const items = commitmentList(p?.accountability);
+  const item = items[index];
+  if (!p || !item) return;
+  const { data: row, error } = await supabase.from("commitment_log").select("checked, done").eq("member_id", memberId).eq("week", week).maybeSingle();
+  // Before the checked column exists, ticking works like the old one-button "done".
+  if (error) return setWeekDone(memberId, week, p.done_week !== week);
+  const ticked = new Set<string>(row?.done ? items : (row?.checked ?? []).filter((t: string) => items.includes(t)));
+  if (ticked.has(item)) ticked.delete(item); else ticked.add(item);
+  const checked = items.filter((t) => ticked.has(t));
+  const done = checked.length === items.length;
+  await supabase.from("commitment_log").upsert(
+    { member_id: memberId, week, commitment: p.accountability, checked, done, updated_at: new Date().toISOString() },
+    { onConflict: "member_id,week" },
+  );
+  await supabase.from("profiles").update({ done_week: done ? week : "" }).eq("id", memberId);
+  revalidatePath("/", "layout");
 }
 
 function reminderUpdate(formData: FormData) {
@@ -110,7 +154,11 @@ export async function setWeekDone(memberId: string, week: string, done: boolean)
     await supabase.from("commitment_log").insert({ member_id: memberId, week, commitment, done });
   }
   // The profile's done_week still drives the coach's check-ins and the team cards.
-  if (week === current) await supabase.from("profiles").update({ done_week: done ? week : "" }).eq("id", memberId);
+  if (week === current) {
+    await supabase.from("profiles").update({ done_week: done ? week : "" }).eq("id", memberId);
+    // Done ticks every commitment; undone clears them. Harmless if the checked column isn't there yet.
+    await supabase.from("commitment_log").update({ checked: done ? commitmentList(profile.accountability) : [] }).eq("member_id", memberId).eq("week", week);
+  }
   revalidatePath("/", "layout");
 }
 

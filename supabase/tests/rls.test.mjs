@@ -226,6 +226,12 @@ await check("teammates comment on and give kudos to each other's cards, and the 
   await as(mon2, `delete from public.milestones`);
   assert.equal((await db.query(`select count(*)::int as n from public.milestones`)).rows[0].n, 2);
 });
+await check("members tick off their own commitments, not a teammate's", async () => {
+  await as(tue1, `insert into public.commitment_log (member_id, week, commitment, checked) values ($1, '2026-W44', 'Run 3x\nRead', '{"Run 3x"}')
+    on conflict (member_id, week) do update set checked = excluded.checked`, [tue1]);
+  await as(mon2, `update public.commitment_log set checked = '{}' where member_id = $1`, [tue1]);
+  assert.deepEqual((await db.query(`select checked from public.commitment_log where member_id = $1 and week = '2026-W44'`, [tue1])).rows[0].checked, ["Run 3x"]);
+});
 await check("an archived member's card, comments and kudos are hidden until they're restored", async () => {
   await as(coach, `update public.profiles set archived_at = now() where id = $1`, [mon2]);
   // Priya's comment and kudos on Sam's card disappear for Sam, and for the coach too.

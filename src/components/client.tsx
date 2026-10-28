@@ -144,3 +144,22 @@ export function Menu({ label, children }: { label: React.ReactNode; children: Re
   );
 }
 
+
+/** Up to three commitment fields: one to start, with a button to add the others. */
+export function CommitmentFields({ initial, max }: { initial: string[]; max: number }) {
+  const [list, setList] = useState(initial.length ? initial : [""]);
+  return (
+    <div className="commit-fields">
+      {list.map((v, i) => (
+        <div key={i} className="commit-field">
+          <input type="text" name="commitment" defaultValue={v} maxLength={200} aria-label={`Commitment ${i + 1}`}
+            placeholder={i === 0 ? "e.g. Work out 4 mornings this week" : "e.g. Read 20 pages a night"} />
+          {i > 0 && <button className="linkbtn" type="button" onClick={() => setList(list.filter((_, j) => j !== i))}>Remove</button>}
+        </div>
+      ))}
+      {list.length < max && (
+        <button className="btn ghost small" type="button" style={{ alignSelf: "flex-start" }} onClick={() => setList([...list, ""])}>+ Add another commitment</button>
+      )}
+    </div>
+  );
+}

@@ -71,6 +71,19 @@ export function teamOptions(names: TeamNames = {}): [string, string][] {
   return TEAMS.map((t) => [t, teamLabel(t, names)]);
 }
 
+/** Members can hold themselves to up to this many commitments a week. */
+export const MAX_COMMITMENTS = 3;
+
+/** A member's commitments. profiles.accountability holds them one per line. */
+export function commitmentList(text: string | null | undefined) {
+  return (text ?? "").split("\n").map((s) => s.trim()).filter(Boolean).slice(0, MAX_COMMITMENTS);
+}
+
+/** The accountability text for a list of commitments: one per line, each kept to 200 characters. */
+export function joinCommitments(list: string[]) {
+  return list.map((s) => s.replace(/\s+/g, " ").trim().slice(0, 200)).filter(Boolean).slice(0, MAX_COMMITMENTS).join("\n");
+}
+
 export function firstName(name: string) {
   return name.trim().split(/\s+/)[0] || "them";
 }
@@ -161,6 +174,20 @@ export type Suggestion = {
 
 const DAY_INDEX: Record<string, number> = { Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7 };
 
+const COUNTED = /\d|\b(one|two|three|four|five|six|seven|eight|nine|ten|once|twice|daily|every|each)\b/i;
+const FUZZY = /\bgoals?\b|\bwork(ing)? on\b|\bfocus(ing)? on\b|\bbetter\b|\bimprov(e|ing)\b|\bmore\b|\bless\b/i;
+
+/**
+ * A commitment nobody could check off at the next meeting: a word or two, or
+ * areas and goals ("health goals", "be better with money") with no count or
+ * frequency in it.
+ */
+export function isVagueCommitment(text: string) {
+  const t = text.trim();
+  if (!t) return false;
+  return t.split(/\s+/).length < 3 || (FUZZY.test(t) && !COUNTED.test(t));
+}
+
 /**
  * What the coach should do this week. Generated from member profiles and
  * bookings; done marks and the coach's own actions come from coach_actions.
@@ -185,8 +212,13 @@ export function coachActions(
       out.push({ id, kind, level, text, why, team: m.team, memberId: m.id, done: marks.get(id) ?? false });
     };
     if (!m.accountability) add("commit", "high", `Help ${fn} set a commitment`, "They haven't shared what they want to be held accountable to.");
-    else if (m.team && today >= DAY_INDEX[m.team] && m.done_week !== wk)
-      add("checkin", "high", `Check in with ${fn}`, `Not marked done since ${m.team}'s meeting: ${m.accountability}`);
+    else {
+      const vague = commitmentList(m.accountability).filter(isVagueCommitment);
+      if (vague.length)
+        add("commit", "mid", `Help ${fn} make their commitment specific`, `"${vague.join("; ")}" is hard to check off. Ask for one action they can finish before the next meeting.`);
+    }
+    if (m.accountability && m.team && today >= DAY_INDEX[m.team] && m.done_week !== wk)
+      add("checkin", "high", `Check in with ${fn}`, `Not marked done since ${m.team}'s meeting: ${commitmentList(m.accountability).join("; ")}`);
     const low = AREAS.filter(([k]) => Number(m.wheel?.[k]) > 0 && Number(m.wheel?.[k]) <= 3);
     if (low.length)
       add("wheel", "mid", `Talk with ${fn} about ${low.map(([, l]) => l).join(" and ")}`,

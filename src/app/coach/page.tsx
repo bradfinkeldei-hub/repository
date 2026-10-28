@@ -8,7 +8,7 @@ import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitCheckbox } from "@/components/client";
 import { addAction, deleteAction, setActionDone } from "@/app/actions";
 import { loadCheckins } from "@/lib/checkin";
-import { loadSocial } from "@/lib/social";
+import { loadChecked, loadSocial } from "@/lib/social";
 import {
   BOOKING_ENABLED, coachActions, isTeam, progressByMember, teamLabel, TEAMS, weekKey,
   type Booking, type CoachActionRow, type LogRow, type Profile, type Progress, type Suggestion, type Team, type TeamNames,
@@ -47,6 +47,8 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
   const [checkins, social] = tab === "team"
     ? await Promise.all([loadCheckins(supabase, teamsShown.filter(isTeam), TZ), loadSocial(supabase, groups.flatMap((g) => g.members.map((m) => m.id)))])
     : [undefined, undefined];
+  const checked = tab === "team" || tab === "accountability"
+    ? await loadChecked(supabase, groups.flatMap((g) => g.members.map((m) => m.id)), weekKey(new Date(), TZ)) : undefined;
   const selLabel = sel === "all" ? "All teams" : teamLabel(sel === "none" ? null : (sel as Team), names);
 
   return (
@@ -77,7 +79,7 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
                 </div>
               </div>
               {searchParams.asked && <AskedNotice asked={searchParams.asked} />}
-              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} names={names} checkins={checkins} social={social} />
+              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} names={names} checkins={checkins} social={social} checked={checked} />
             </>
           )}
         </main>

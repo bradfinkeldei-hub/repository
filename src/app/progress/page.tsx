@@ -4,7 +4,7 @@ import { requireProfile } from "@/lib/session";
 import { coachTabs, Header, MEMBER_TABS } from "@/components/header";
 import { ProgressStats, StripKey, WeekStrip } from "@/components/progress";
 import { setWeekDone, toggleDone } from "@/app/actions";
-import { firstName, meetingDate, progress, shortDate, teamLabel, weekKey, type LogRow, type Profile } from "@/lib/coaching";
+import { commitmentList, firstName, meetingDate, progress, shortDate, teamLabel, weekKey, type LogRow, type Profile } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 
@@ -44,7 +44,7 @@ export default async function ProgressPage({ searchParams: sp }: { searchParams:
         <section className="card thisweek">
           <span className="label">This week · {teamLabel(m.team, names)} meets {shortDate(meetingDate(current, m.team))}</span>
           {m.accountability
-            ? <blockquote>{m.accountability}</blockquote>
+            ? <blockquote>{commitmentList(m.accountability).map((c, i) => <span key={i} className="commit-line">{c}</span>)}</blockquote>
             : <p className="muted" style={{ margin: 0 }}>{own ? "You haven't set a commitment yet." : `${firstName(m.name)} hasn't set a commitment yet.`}</p>}
           <div className="row">
             {m.accountability && (

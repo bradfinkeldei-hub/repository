@@ -17,14 +17,22 @@ function list(names: string[]) {
   return names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
-/** Wins on a member's card: the ones the app works out, then the ones they or the coach added. */
+/** Wins on a member's card, folded away until tapped open: the ones the app works out, then the ones they or the coach added. */
 export function Milestones({ m, viewer, p, items, kudos }: { m: Profile; viewer: Profile; p?: Progress; items: Milestone[]; kudos: number }) {
   const { earned, next } = autoMilestones(p, kudos);
   const isMe = m.id === viewer.id;
   const canEdit = isMe || viewer.role === "coach";
+  const count = earned.length + items.length;
   return (
-    <section className="milestones">
-      <h4>Milestones</h4>
+    <details className="fold milestones" id={`milestones-${m.id}`}>
+      <summary aria-label={`Milestones for ${m.name}`}>
+        <h4>Milestones</h4>
+        <span className="fold-counts">
+          <span><span aria-hidden="true">{"\u{1F3C6}"}</span> {count}<span className="sr"> {count === 1 ? "milestone" : "milestones"}</span></span>
+        </span>
+        <span className="chev" aria-hidden="true" />
+      </summary>
+      <div className="fold-body">
       {earned.length > 0 && (
         <ul className="badges">
           {earned.map((e) => <li key={e.key} className="badge"><span aria-hidden="true">{e.icon}</span>{e.label}</li>)}
@@ -57,7 +65,8 @@ export function Milestones({ m, viewer, p, items, kudos }: { m: Profile; viewer:
           <button className="btn ghost small" type="submit">Add</button>
         </form>
       )}
-    </section>
+      </div>
+    </details>
   );
 }
 
@@ -79,17 +88,17 @@ export function Thread({ m, viewer, comments, kudos, avatars }: {
   const fromNames = [...new Set(thisWeek.map((k) => (k.author_id === viewer.id ? "you" : firstName(k.author_name))))];
 
   return (
-    <details className="thread" id={`thread-${m.id}`}>
+    <details className="fold thread" id={`thread-${m.id}`}>
       <summary aria-label={`Kudos and comments for ${m.name}`}>
         <h4>Kudos &amp; comments</h4>
-        <span className="thread-counts">
+        <span className="fold-counts">
           <span><span aria-hidden="true">{"\u{1F44F}"}</span> {kudos.length}<span className="sr"> kudos</span></span>
           <span><span aria-hidden="true">{"\u{1F4AC}"}</span> {comments.length}<span className="sr"> {comments.length === 1 ? "comment" : "comments"}</span></span>
           {!open && <span className="closed-tag">Closed</span>}
         </span>
         <span className="chev" aria-hidden="true" />
       </summary>
-      <div className="thread-body">
+      <div className="fold-body">
       {(isMe || isCoach) && (
         <form action={setThreadOpen.bind(null, m.id, !open)} className="thread-toggle">
           <button className="linkbtn" type="submit">{open ? "Close comments" : "Open comments"}</button>

@@ -112,3 +112,27 @@ test("milestones come from streaks, kept commitments and kudos", async () => {
   assert.equal(autoMilestones({ ...p, streak: 4, best: 4, done: 9 }, 0).next, "1 more week to a 5-week streak");
   assert.equal(autoMilestones({ ...p, streak: 0, best: 4, done: 9 }, 0).next, "1 more to 10 commitments kept");
 });
+
+test("vague commitments get a coach nudge to make them specific", async () => {
+  const { isVagueCommitment } = await import("./coaching.ts");
+  assert.equal(isVagueCommitment("Busines goals, physical and health goals, energy retention goals."), true);
+  assert.equal(isVagueCommitment("Health"), true);
+  assert.equal(isVagueCommitment("Be better with money"), true);
+  assert.equal(isVagueCommitment("Work out 4 mornings"), false);
+  assert.equal(isVagueCommitment("Phone off by 9pm every night"), false);
+  assert.equal(isVagueCommitment("Call two old friends"), false);
+  assert.equal(isVagueCommitment("Clear the garage on Saturday"), false);
+  assert.equal(isVagueCommitment(""), false);
+  const shad = member({ id: "s", name: "Shad", team: "Tuesday", accountability: "Business goals, health goals" });
+  const acts = coachActions([shad], [], [], new Date("2026-10-28T18:00:00Z"), TZ);
+  assert.ok(acts.some((a) => a.kind === "commit" && a.text === "Help Shad make their commitment specific"));
+  assert.ok(acts.some((a) => a.kind === "checkin"));
+});
+
+test("up to three commitments, one per line", async () => {
+  const { commitmentList, joinCommitments } = await import("./coaching.ts");
+  assert.deepEqual(commitmentList("Run 3x"), ["Run 3x"]);
+  assert.deepEqual(commitmentList(" Run 3x \n\n Read nightly \nCall Mom\nOne too many"), ["Run 3x", "Read nightly", "Call Mom"]);
+  assert.deepEqual(commitmentList(""), []);
+  assert.equal(joinCommitments(["Run 3x", "", "  Read\n nightly ", "Call Mom", "Extra"]), "Run 3x\nRead nightly\nCall Mom");
+});

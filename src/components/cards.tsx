@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { AREAS, fmt, teamAverage, teamLabel, teamOptions, weekKey, type Profile, type Progress, type Team, type TeamNames, type Wheel } from "@/lib/coaching";
-import { setTeam, startViewAs, toggleDone } from "@/app/actions";
+import { AREAS, commitmentList, fmt, isVagueCommitment, MAX_COMMITMENTS, teamAverage, teamLabel, teamOptions, weekKey, type Profile, type Progress, type Team, type TeamNames, type Wheel } from "@/lib/coaching";
+import { addCommitment, setTeam, startViewAs, toggleCommitment } from "@/app/actions";
 import { AutoSubmitSelect } from "@/components/client";
 import { Avatar } from "@/components/avatar";
 import { MiniProgress } from "@/components/progress";
@@ -117,21 +117,56 @@ function Field({ label, value, className = "" }: { label: string; value: string;
   );
 }
 
-function DoneState({ m, viewer }: { m: Profile; viewer: Profile }) {
-  const done = m.done_week === weekKey(new Date(), TZ);
-  if (m.id === viewer.id || viewer.role === "coach") {
-    return (
-      <form action={toggleDone.bind(null, m.id)} className="row">
-        {done && <span className="pill done">Done this week</span>}
-        <button className={`btn small${done ? " ghost" : ""}`} type="submit">{done ? "Undo this week" : "Mark this week done"}</button>
-      </form>
-    );
-  }
-  return done ? <span className="pill done" style={{ alignSelf: "flex-start" }}>Done this week</span> : <span className="pill warn" style={{ alignSelf: "flex-start" }}>Not marked done yet</span>;
+/** A member's commitments for the week, each ticked off on its own, plus a way to add up to three. */
+function Commitments({ m, viewer, checked = [] }: { m: Profile; viewer: Profile; checked?: string[] }) {
+  const items = commitmentList(m.accountability);
+  const isMe = m.id === viewer.id;
+  const canEdit = isMe || viewer.role === "coach";
+  const weekDone = m.done_week === weekKey(new Date(), TZ);
+  const ticked = items.filter((t) => weekDone || checked.includes(t)).length;
+  return (
+    <div className="acct">
+      <span className="label">Held accountable to{items.length > 1 ? ` · ${items.length} commitments` : ""}</span>
+      {items.length ? (
+        <ul className="commits">
+          {items.map((t, i) => {
+            const on = weekDone || checked.includes(t);
+            return (
+              <li key={i} className={on ? "on" : ""}>
+                {canEdit ? (
+                  <form action={toggleCommitment.bind(null, m.id, i)}>
+                    <button className="tick" type="submit" aria-pressed={on} aria-label={on ? `Not done yet: ${t}` : `Done: ${t}`} title={on ? "Tap to undo" : "Tap when it's done"} />
+                  </form>
+                ) : <span className="tick" role="img" aria-label={on ? "Done" : "Not done yet"} />}
+                <span className="commit-text">{t}</span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : <p className="empty">Not shared yet</p>}
+      {isMe && items.some(isVagueCommitment) && (
+        <p className="acct-tip">Tip: make each one something you can check off by the next meeting, like &ldquo;Work out 4 mornings.&rdquo; <Link href="/profile">Edit</Link></p>
+      )}
+      <div className="commit-foot">
+        {items.length > 0 && (weekDone ? <span className="pill done">Done this week</span>
+          : <span className="pill warn">{ticked ? `${ticked} of ${items.length} done` : "Not marked done yet"}</span>)}
+        {canEdit && items.length > 0 && items.length < MAX_COMMITMENTS && (
+          <details className="add-commit">
+            <summary>+ Add a commitment</summary>
+            <form className="inline-form" action={addCommitment.bind(null, m.id)}>
+              <input className="input" name="commitment" maxLength={200} required aria-label="Another commitment" placeholder="e.g. Read 20 pages a night" />
+              <button className="btn small" type="submit">Add</button>
+            </form>
+          </details>
+        )}
+        {canEdit && !items.length && <Link className="btn small" href={isMe ? "/profile" : `/profile?id=${m.id}`}>Set a commitment</Link>}
+      </div>
+    </div>
+  );
 }
 
-export function MemberCard({ m, viewer, names, p, social, avatars }: {
-  m: Profile; viewer: Profile; names?: TeamNames; p?: Progress; social?: Social | null; avatars?: Record<string, string>;
+export function MemberCard({ m, viewer, names, p, social, avatars, checked }: {
+  m: Profile; viewer: Profile; names?: TeamNames; p?: Progress; social?: Social | null; avatars?: Record<string, string>; checked?: string[];
 }) {
   const kudos = social?.kudos[m.id] ?? [];
   return (
@@ -142,24 +177,22 @@ export function MemberCard({ m, viewer, names, p, social, avatars }: {
         <Legend wheel={m.wheel as Wheel} />
       </div>
       <Field label="Actively creating" value={m.creating} className="creating" />
-      <div className="acct"><Field label="Held accountable to" value={m.accountability} /></div>
-      <DoneState m={m} viewer={viewer} />
+      <Commitments m={m} viewer={viewer} checked={checked} />
       {social && <Milestones m={m} viewer={viewer} p={p} items={social.milestones[m.id] ?? []} kudos={kudos.length} />}
       {social && <Thread m={m} viewer={viewer} comments={social.comments[m.id] ?? []} kudos={kudos} avatars={avatars ?? {}} />}
     </article>
   );
 }
 
-export function AcctCard({ m, viewer, p }: { m: Profile; viewer: Profile; p?: Progress }) {
+export function AcctCard({ m, viewer, p, checked }: { m: Profile; viewer: Profile; p?: Progress; checked?: string[] }) {
   return (
     <article className="card">
       <Who m={m} viewer={viewer} />
-      <div className="acct"><Field label="Held accountable to" value={m.accountability} /></div>
+      <Commitments m={m} viewer={viewer} checked={checked} />
       {p && <MiniProgress p={p} team={m.team} />}
       <div className="row">
         {m.reminder_enabled ? <span className="pill on">Weekly email · {m.reminder_day}</span> : <span className="pill">No reminder</span>}
       </div>
-      <DoneState m={m} viewer={viewer} />
     </article>
   );
 }
@@ -176,9 +209,9 @@ export function MissionCard({ m, viewer }: { m: Profile; viewer: Profile }) {
 export type Tab = "team" | "accountability" | "missions";
 
 /** The Team, Accountability and Missions views for one or more teams. */
-export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins, social }: {
+export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins, social, checked }: {
   tab: Tab; groups: { team: Team | null; members: Profile[] }[]; viewer: Profile; ownTeam?: boolean; logs?: Record<string, Progress>; names?: TeamNames;
-  checkins?: Partial<Record<Team, Checkin>>; social?: Social | null;
+  checkins?: Partial<Record<Team, Checkin>>; social?: Social | null; checked?: Record<string, string[]>;
 }) {
   const multi = groups.length > 1;
   const avatars = Object.fromEntries(groups.flatMap((g) => g.members).filter((m) => m.avatar_url).map((m) => [m.id, m.avatar_url]));
@@ -193,12 +226,12 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins,
             <>
               {team && checkins?.[team] && <MeetingCheckin team={team} members={members} viewer={viewer} c={checkins[team]} />}
               {team && <TeamWheel team={team} members={members} ownTeam={ownTeam} names={names} />}
-              <div className="grid">{members.map((m) => <MemberCard key={m.id} m={m} viewer={viewer} names={names} p={logs?.[m.id]} social={social} avatars={avatars} />)}</div>
+              <div className="grid">{members.map((m) => <MemberCard key={m.id} m={m} viewer={viewer} names={names} p={logs?.[m.id]} social={social} avatars={avatars} checked={checked?.[m.id]} />)}</div>
             </>
           ) : <EmptyTeam label={teamLabel(team, names)} coach={viewer.role === "coach"} />;
         } else if (tab === "accountability") {
           const list = members.filter((m) => m.accountability);
-          body = list.length ? <div className="grid">{list.map((m) => <AcctCard key={m.id} m={m} viewer={viewer} p={logs?.[m.id]} />)}</div>
+          body = list.length ? <div className="grid">{list.map((m) => <AcctCard key={m.id} m={m} viewer={viewer} p={logs?.[m.id]} checked={checked?.[m.id]} />)}</div>
             : <div className="empty"><h3>No commitments yet</h3><p>Once someone on this team adds what they're accountable to, it shows up here.</p></div>;
         } else {
           const list = members.filter((m) => m.mission);

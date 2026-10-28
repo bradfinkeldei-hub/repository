@@ -2,7 +2,7 @@
 // outside Next.js, because sending through Gmail uses Cloudflare's TCP sockets.
 import { createClient } from "@supabase/supabase-js";
 import { connectMailer } from "./mail";
-import { BOOKING_ENABLED, firstName, weekdayName, weekKey, type Profile } from "../src/lib/coaching";
+import { BOOKING_ENABLED, commitmentList, firstName, weekdayName, weekKey, type Profile } from "../src/lib/coaching";
 
 export type ReminderEnv = {
   NEXT_PUBLIC_SUPABASE_URL?: string;
@@ -18,11 +18,12 @@ export type ReminderEnv = {
 };
 
 export function reminderText(p: Profile, site: string, coach: string) {
-  const commitment = p.accountability?.trim();
+  const list = commitmentList(p.accountability);
+  const commitment = list.length > 1 ? list.map((c) => `  - ${c}`).join("\n") : list.length ? `  "${list[0]}"` : "";
   return [
     `Hi ${firstName(p.name)},`,
     "",
-    commitment ? `This is your weekly reminder of what you're being held accountable to:\n\n  "${commitment}"` : "This is your weekly reminder to set the commitment your team will hold you to.",
+    commitment ? `This is your weekly reminder of what you're being held accountable to:\n\n${commitment}` : "This is your weekly reminder to set the commitment your team will hold you to.",
     p.creating?.trim() ? `\nWhat you're creating: ${p.creating.trim()}` : "",
     "",
     `When you've done your part this week, mark it done: ${site}/team?tab=accountability`,

@@ -161,15 +161,15 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
 .inline-form textarea.input { resize: vertical; min-height: 44px; }
 .xbtn { border: 0; background: none; color: var(--muted); font-size: 1.15rem; line-height: 1; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; flex: none; }
 .xbtn:hover { background: var(--alert-soft); color: var(--alert); }
-.thread summary { list-style: none; display: flex; align-items: center; gap: 10px; cursor: pointer; min-height: 40px; margin: -6px -8px; padding: 6px 8px; border-radius: 12px; -webkit-tap-highlight-color: transparent; }
-.thread summary::-webkit-details-marker { display: none; }
-.thread summary:hover { background: var(--accent-soft); }
-.thread summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent-bright) 45%, transparent); }
-.thread-counts { display: flex; align-items: center; gap: 12px; margin-left: auto; font-size: 0.86rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fold summary { list-style: none; display: flex; align-items: center; gap: 10px; cursor: pointer; min-height: 40px; margin: -6px -8px; padding: 6px 8px; border-radius: 12px; -webkit-tap-highlight-color: transparent; }
+.fold summary::-webkit-details-marker { display: none; }
+.fold summary:hover { background: var(--accent-soft); }
+.fold summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent-bright) 45%, transparent); }
+.fold-counts { display: flex; align-items: center; gap: 12px; margin-left: auto; font-size: 0.86rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .closed-tag { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
 .chev { flex: none; width: 9px; height: 9px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg) translate(-2px, -2px); transition: transform 0.18s; margin: 0 4px; }
-.thread[open] .chev { transform: rotate(225deg) translate(-2px, -2px); }
-.thread-body { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; }
+.fold[open] .chev { transform: rotate(225deg) translate(-2px, -2px); }
+.fold-body { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; }
 .thread-toggle { align-self: flex-end; margin-bottom: -4px; }
 .thread-toggle .linkbtn { font-size: 0.84rem; }
 .kudos-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
@@ -197,6 +197,29 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
 .field p.empty { color: var(--muted); font-style: italic; background: none; border: 0; padding: 0; display: block; }
 .creating p { font-family: var(--display); font-weight: 500; font-size: 1.1rem; line-height: 1.35; }
 .acct { background: var(--accent-soft); border-radius: var(--r); padding: 12px 14px; }
+.acct-tip { margin: 8px 0 0; font-size: 0.84rem; color: var(--sun); }
+.acct .empty { margin: 3px 0 0; color: var(--muted); font-style: italic; }
+.commits { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.commits li { display: flex; align-items: flex-start; gap: 10px; }
+.commits form { display: flex; }
+.tick { flex: none; width: 26px; height: 26px; border-radius: 8px; border: 2px solid color-mix(in srgb, var(--accent) 45%, var(--line-strong)); background: var(--surface); display: grid; place-items: center; padding: 0; cursor: pointer; margin-top: 1px; }
+span.tick { cursor: default; width: 22px; height: 22px; border-radius: 7px; }
+.commits li.on .tick { background: var(--ok); border-color: var(--ok); }
+.commits li.on .tick::after { content: "\2713"; color: #fff; font-weight: 800; font-size: 0.9rem; line-height: 1; }
+.commit-text { overflow-wrap: anywhere; line-height: 1.45; padding-top: 2px; }
+.commits li.on .commit-text { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.commit-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
+.add-commit { flex: 1 1 100%; }
+.add-commit summary { list-style: none; cursor: pointer; color: var(--accent); font-weight: 650; font-size: 0.88rem; display: inline-block; padding: 4px 0; }
+.add-commit summary::-webkit-details-marker { display: none; }
+.add-commit[open] summary { margin-bottom: 6px; }
+.commit-line { display: block; }
+.commit-line + .commit-line { margin-top: 6px; }
+.commit-fields { display: flex; flex-direction: column; gap: 8px; }
+.commit-field { display: flex; align-items: center; gap: 10px; }
+.commit-field input { flex: 1; min-width: 0; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-label { font-weight: 600; font-size: 0.92rem; }
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 650; border-radius: 999px; padding: 4px 11px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); }
 .pill.on { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
 .pill.done { background: var(--ok-soft); border-color: transparent; color: var(--ok); }
@@ -489,3 +512,4 @@ tr:last-child td { border-bottom: 0; }
   .rsvp-ask form { flex: 1 1 0; }
   .btn.rsvp { width: 100%; min-width: 0; }
 }
+.progtable td:nth-child(2) { white-space: pre-line; }

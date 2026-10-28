@@ -32,3 +32,11 @@ export async function loadSocial(supabase: Awaited<ReturnType<typeof createClien
   if (c.error || k.error || m.error) return null;
   return { comments: byMember(c.data), kudos: byMember(k.data), milestones: byMember(m.data) };
 }
+
+/** Which commitments each member has ticked off this week. Empty if the column isn't there yet. */
+export async function loadChecked(supabase: Awaited<ReturnType<typeof createClient>>, ids: string[], week: string): Promise<Record<string, string[]>> {
+  if (!ids.length) return {};
+  const { data, error } = await supabase.from("commitment_log").select("member_id, checked").in("member_id", ids).eq("week", week);
+  if (error) return {};
+  return Object.fromEntries((data ?? []).map((r: { member_id: string; checked: string[] | null }) => [r.member_id, r.checked ?? []]));
+}

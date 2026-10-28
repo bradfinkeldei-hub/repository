@@ -115,3 +115,7 @@ create policy "add milestones to your own card, or anyone's as coach" on public.
   for insert with check (author_id = auth.uid() and (member_id = auth.uid() or public.is_coach()));
 create policy "remove milestones from your own card, or anyone's as coach" on public.milestones
   for delete using (member_id = auth.uid() or public.is_coach());
+
+-- Up to three commitments a week (one per line in profiles.accountability).
+-- checked holds the ones ticked off this week; the week is done when all are.
+alter table public.commitment_log add column checked text[] not null default '{}';
