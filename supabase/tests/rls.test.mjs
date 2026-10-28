@@ -242,4 +242,20 @@ await check("an archived member's card, comments and kudos are hidden until they
   await as(coach, `update public.profiles set archived_at = null where id = $1`, [mon2]);
   assert.equal((await as(tue1, `select * from public.kudos`)).length, 2);
 });
+await check("only the coach can read or write private notes", async () => {
+  await as(coach, `insert into public.coach_notes (member_id, body) values ($1, 'New job stress, check in on Career')`, [mon1]);
+  assert.equal((await as(coach, `select * from public.coach_notes`)).length, 1);
+  assert.equal((await as(mon1, `select * from public.coach_notes`)).length, 0);
+  assert.equal((await as(mon2, `select * from public.coach_notes`)).length, 0);
+  await assert.rejects(as(mon1, `insert into public.coach_notes (member_id, body) values ($1, 'Sneaky')`, [mon1]));
+  await as(mon1, `delete from public.coach_notes`);
+  await as(mon1, `update public.coach_notes set body = 'changed'`);
+  assert.equal((await db.query(`select body from public.coach_notes`)).rows[0].body, "New job stress, check in on Career");
+});
+await check("only the coach sets meeting times; everyone can read them", async () => {
+  await as(coach, `update public.team_names set meeting_time = '19:00', meeting_url = 'https://meet.google.com/abc' where team = 'Monday'`);
+  await as(mon1, `update public.team_names set meeting_time = '06:00' where team = 'Monday'`);
+  assert.deepEqual((await as(mon1, `select meeting_time from public.team_names where team = 'Monday'`)).map((r) => r.meeting_time), ["19:00"]);
+  await assert.rejects(as(coach, `update public.team_names set meeting_time = '7pm' where team = 'Monday'`));
+});
 console.log(`\n${passed} checks passed`);
