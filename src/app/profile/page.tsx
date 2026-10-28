@@ -5,11 +5,11 @@ import { removeAvatar, saveProfile, setAvatar } from "@/app/actions";
 import { PhotoPicker, RangeField, ReminderFields } from "@/components/client";
 import { Avatar } from "@/components/avatar";
 import { AccountTabs } from "@/components/account-tabs";
-import { AREAS, TEAMS, teamLabel, type Profile } from "@/lib/coaching";
+import { AREAS, teamOptions, type Profile } from "@/lib/coaching";
 
 export default async function ProfilePage({ searchParams: sp }: { searchParams: Promise<{ id?: string; error?: string }> }) {
   const searchParams = await sp;
-  const { supabase, me } = await requireProfile();
+  const { supabase, me, names } = await requireProfile();
   const isCoach = me.role === "coach";
   let m: Profile = me;
   if (searchParams.id && searchParams.id !== me.id) {
@@ -25,7 +25,7 @@ export default async function ProfilePage({ searchParams: sp }: { searchParams: 
     <div className="wrap" style={{ paddingBlock: "32px 64px" }}>
       {own ? <AccountTabs current="profile" back={back} /> : <Link href={back} className="linkbtn">← Back</Link>}
       <h1 style={{ fontFamily: "var(--display)", fontWeight: 400, fontSize: "2rem", margin: own ? "0 0 4px" : "12px 0 4px" }}>{own ? "Your profile" : `Edit ${m.name}`}</h1>
-      <p className="muted" style={{ margin: "0 0 24px" }}>{own && !isCoach ? `Your ${teamLabel(m.team)} sees what you share here.` : "Changes show up for the member's team right away."}</p>
+      <p className="muted" style={{ margin: "0 0 24px" }}>{own && !isCoach ? "Your team sees what you share here." : "Changes show up for the member's team right away."}</p>
       <div className="row" style={{ gap: 16, marginBottom: 20 }}>
         <Avatar name={m.name} url={m.avatar_url} size={88} />
         {own
@@ -39,7 +39,7 @@ export default async function ProfilePage({ searchParams: sp }: { searchParams: 
         {isCoach && !own && (
           <label>Team
             <select name="team" defaultValue={m.team ?? ""}>
-              {TEAMS.map((t) => <option key={t} value={t}>{t} team</option>)}
+              {teamOptions(names).map(([t, label]) => <option key={t} value={t}>{label}</option>)}
               <option value="">Not on a team</option>
             </select>
             <span className="hint">Moving someone changes which team they can see.</span>

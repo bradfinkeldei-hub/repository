@@ -9,7 +9,7 @@ import { AutoSubmitCheckbox } from "@/components/client";
 import { addAction, deleteAction, setActionDone } from "@/app/actions";
 import {
   BOOKING_ENABLED, coachActions, isTeam, progressByMember, teamLabel, TEAMS, weekKey,
-  type Booking, type CoachActionRow, type LogRow, type Profile, type Progress, type Suggestion, type Team,
+  type Booking, type CoachActionRow, type LogRow, type Profile, type Progress, type Suggestion, type Team, type TeamNames,
 } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
@@ -21,7 +21,7 @@ const KIND: Record<Suggestion["kind"], string> = {
 
 export default async function CoachPage({ searchParams: sp }: { searchParams: Promise<{ team?: string; tab?: string }> }) {
   const searchParams = await sp;
-  const { supabase, me } = await requireCoach();
+  const { supabase, me, names } = await requireCoach();
   const sel = searchParams.team === "all" || searchParams.team === "none" || isTeam(searchParams.team) ? searchParams.team : "Monday";
   const tab = (["team", "accountability", "missions", "progress", "actions"].includes(searchParams.tab ?? "") ? searchParams.tab : "team") as CoachTab;
 
@@ -33,14 +33,14 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
   ]);
   const logs = progressByMember((log ?? []) as LogRow[], weekKey(new Date(), TZ));
   const members = (profiles ?? []) as Profile[];
-  const actions = coachActions(members, (rows ?? []) as CoachActionRow[], (bookings ?? []) as Booking[], new Date(), TZ);
+  const actions = coachActions(members, (rows ?? []) as CoachActionRow[], (bookings ?? []) as Booking[], new Date(), TZ, names);
   const openCount = actions.filter((a) => !a.done).length;
 
   const teamsShown: (Team | null)[] = sel === "all"
     ? [...TEAMS, ...(members.some((m) => !m.team) ? [null] : [])]
     : [sel === "none" ? null : (sel as Team)];
   const groups = teamsShown.map((team) => ({ team, members: members.filter((m) => m.team === team) }));
-  const selLabel = sel === "all" ? "All teams" : teamLabel(sel === "none" ? null : (sel as Team));
+  const selLabel = sel === "all" ? "All teams" : teamLabel(sel === "none" ? null : (sel as Team), names);
 
   return (
     <>
@@ -51,12 +51,12 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
         right={<Link className="btn small" href="/coach/members">+ Add member</Link>}
       />
       <div className="wrap layout coach">
-        <TeamColumn members={members} selected={sel} tab={tab} actions={tab === "actions" ? actions : undefined} />
+        <TeamColumn members={members} names={names} selected={sel} tab={tab} actions={tab === "actions" ? actions : undefined} />
         <main>
           {tab === "actions" ? (
-            <ActionsView actions={actions} teams={teamsShown} members={members} title={sel === "all" ? "Coaches actions" : `Coaches actions: ${selLabel}`} showGeneral={sel === "all"} />
+            <ActionsView actions={actions} teams={teamsShown} members={members} names={names} title={sel === "all" ? "Coaches actions" : `Coaches actions: ${selLabel}`} showGeneral={sel === "all"} />
           ) : tab === "progress" ? (
-            <ProgressView groups={groups} logs={logs} title={sel === "all" ? "Progress: all teams" : `${selLabel}: progress`} />
+            <ProgressView groups={groups} logs={logs} names={names} title={sel === "all" ? "Progress: all teams" : `${selLabel}: progress`} />
           ) : (
             <>
               <div className="intro">
@@ -64,9 +64,9 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
                   <h1>{tab === "team" ? selLabel : tab === "accountability" ? `${selLabel}: commitments` : `${selLabel}: missions`}</h1>
                   <p>{sel === "all" ? `${members.length} members across all teams.` : `${groups[0].members.length} ${groups[0].members.length === 1 ? "member" : "members"}.`} Only you can see other teams.</p>
                 </div>
-                <Link className="btn" href={isTeam(sel) ? `/coach/members?team=${sel}` : "/coach/members"}>{isTeam(sel) ? `Add a member to ${sel} team` : "Add a member"}</Link>
+                <Link className="btn" href={isTeam(sel) ? `/coach/members?team=${sel}` : "/coach/members"}>{isTeam(sel) ? `Add a member to ${selLabel}` : "Add a member"}</Link>
               </div>
-              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} />
+              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} names={names} />
             </>
           )}
         </main>
@@ -75,8 +75,8 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
   );
 }
 
-function ActionsView({ actions, teams, members, title, showGeneral }: {
-  actions: Suggestion[]; teams: (Team | null)[]; members: Profile[]; title: string; showGeneral: boolean;
+function ActionsView({ actions, teams, members, names, title, showGeneral }: {
+  actions: Suggestion[]; teams: (Team | null)[]; members: Profile[]; names: TeamNames; title: string; showGeneral: boolean;
 }) {
   const scoped = actions.filter((a) => teams.includes(a.team) || (showGeneral && a.custom && !a.memberId));
   const open = scoped.filter((a) => !a.done);
@@ -102,7 +102,7 @@ function ActionsView({ actions, teams, members, title, showGeneral }: {
         <input id="new-action" name="text" maxLength={200} placeholder="Add your own action, e.g. Text Sam congrats on the new job" required />
         <select name="member_id" aria-label="Member">
           <option value="">No specific member</option>
-          {members.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.team ?? "no team"})</option>)}
+          {members.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.team ? teamLabel(m.team, names) : "no team"})</option>)}
         </select>
         <button className="btn" type="submit">Add action</button>
       </form>
@@ -113,7 +113,7 @@ function ActionsView({ actions, teams, members, title, showGeneral }: {
         );
         return (
           <section key={t ?? "none"} className="team-block">
-            {teams.length > 1 && <h2>{teamLabel(t)}</h2>}
+            {teams.length > 1 && <h2>{teamLabel(t, names)}</h2>}
             <ul className="actlist">{list.map((a) => <ActionRow key={a.id} a={a} />)}</ul>
           </section>
         );
@@ -150,7 +150,7 @@ function ActionRow({ a }: { a: Suggestion }) {
   );
 }
 
-function ProgressView({ groups, logs, title }: { groups: { team: Team | null; members: Profile[] }[]; logs: Record<string, Progress>; title: string }) {
+function ProgressView({ groups, logs, names, title }: { groups: { team: Team | null; members: Profile[] }[]; logs: Record<string, Progress>; names: TeamNames; title: string }) {
   const all = groups.flatMap((g) => g.members);
   const tracked = all.map((m) => logs[m.id]).filter((p): p is Progress => !!p && p.weeks.length > 0);
   const done = tracked.reduce((n, p) => n + p.done, 0), total = tracked.reduce((n, p) => n + p.total, 0);
@@ -168,7 +168,7 @@ function ProgressView({ groups, logs, title }: { groups: { team: Team | null; me
       <StripKey />
       {groups.map(({ team, members }) => (
         <section key={team ?? "none"} className="team-block">
-          {groups.length > 1 && <h2>{teamLabel(team)}</h2>}
+          {groups.length > 1 && <h2>{teamLabel(team, names)}</h2>}
           {members.length ? (
             <div className="tablebox">
               <table className="progtable">
@@ -189,7 +189,7 @@ function ProgressView({ groups, logs, title }: { groups: { team: Team | null; me
                 </tbody>
               </table>
             </div>
-          ) : <div className="empty"><h3>No one on the {teamLabel(team)} yet</h3></div>}
+          ) : <div className="empty"><h3>No one on {teamLabel(team, names)} yet</h3></div>}
         </section>
       ))}
     </>

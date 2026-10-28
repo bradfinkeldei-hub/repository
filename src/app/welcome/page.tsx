@@ -11,7 +11,7 @@ const STEPS: [string, string][] = [
 
 /** First screen for new members, and the "How it works" guide. */
 export default async function WelcomePage() {
-  const { me } = await requireProfile();
+  const { me, names } = await requireProfile();
   const coach = process.env.COACH_NAME || "your coach";
   const isCoach = me.role === "coach";
   const empty = Object.keys(me.wheel ?? {}).length === 0;
@@ -23,7 +23,7 @@ export default async function WelcomePage() {
       </div>
       <p className="muted">
         {isCoach ? "This is what your members see when they first sign in." : me.team
-          ? `You're on the ${teamLabel(me.team)}. Only your teammates and ${coach} can see what you share.`
+          ? `You're on the ${teamLabel(me.team, names)}. Only your teammates and ${coach} can see what you share.`
           : `${coach} will add you to your team soon. Until then, you can fill in your profile.`}
       </p>
       <ol className="steps">

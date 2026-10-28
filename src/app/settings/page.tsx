@@ -20,7 +20,7 @@ const MESSAGES: Record<string, [string, boolean]> = {
 /** The signed-in person's own account: name, sign-in email, password, reminders, sign out. */
 export default async function SettingsPage({ searchParams: sp }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const searchParams = await sp;
-  const { supabase, me, user } = await requireProfile();
+  const { supabase, me, user, names } = await requireProfile();
   // Confirmed email changes land here; point reminders at the new address.
   const { data: contact } = await supabase.from("member_contacts").select("email").eq("id", me.id).maybeSingle();
   if (user.email && contact && contact.email !== user.email && process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -46,7 +46,7 @@ export default async function SettingsPage({ searchParams: sp }: { searchParams:
           <label>Name<input type="text" name="name" defaultValue={me.name} maxLength={60} required />
             <span className="hint">How you appear to your team.</span>
           </label>
-          <p className="hint" style={{ margin: 0 }}>{isCoach ? "You're the coach, so you can see every team." : `You're on the ${teamLabel(me.team)}. ${me.team ? "Your coach can move you to another team." : "Your coach will add you to a team."}`}</p>
+          <p className="hint" style={{ margin: 0 }}>{isCoach ? "You're the coach, so you can see every team." : `You're on the ${teamLabel(me.team, names)}. ${me.team ? "Your coach can move you to another team." : "Your coach will add you to a team."}`}</p>
         </fieldset>
         <fieldset>
           <legend>Weekly reminder</legend>

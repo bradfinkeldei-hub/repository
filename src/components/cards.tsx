@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AREAS, fmt, teamAverage, teamLabel, TEAMS, weekKey, type Profile, type Progress, type Team, type Wheel } from "@/lib/coaching";
+import { AREAS, fmt, teamAverage, teamLabel, teamOptions, weekKey, type Profile, type Progress, type Team, type TeamNames, type Wheel } from "@/lib/coaching";
 import { setTeam, toggleDone } from "@/app/actions";
 import { AutoSubmitSelect } from "@/components/client";
 import { Avatar } from "@/components/avatar";
@@ -38,15 +38,15 @@ export function Legend({ wheel, two = false }: { wheel: Partial<Record<string, n
   );
 }
 
-export function TeamWheel({ team, members, ownTeam }: { team: Team | null; members: Profile[]; ownTeam?: boolean }) {
+export function TeamWheel({ team, members, ownTeam, names }: { team: Team | null; members: Profile[]; ownTeam?: boolean; names?: TeamNames }) {
   const avg = teamAverage(members);
   const scored = AREAS.filter(([k]) => avg[k] != null).map(([k, l]) => ({ l, v: avg[k] as number })).sort((a, b) => b.v - a.v);
   const top = scored[0], bottom = scored[scored.length - 1];
   return (
     <section className="card teamwheel">
-      <WheelSvg wheel={avg} size={190} label={`${teamLabel(team)} average life wheel`} />
+      <WheelSvg wheel={avg} size={190} label={`${teamLabel(team, names)} average life wheel`} />
       <div style={{ flex: "1 1 320px", minWidth: 0 }}>
-        <h2>{ownTeam ? "Our team's life wheel" : `${teamLabel(team)} life wheel`}</h2>
+        <h2>{ownTeam ? "Our team's life wheel" : `${teamLabel(team, names)} life wheel`}</h2>
         <p className="sub">The average of {members.length} {members.length === 1 ? "member's wheel" : "members' wheels"}.</p>
         <Legend wheel={avg} two />
         {top && bottom && (
@@ -60,7 +60,7 @@ export function TeamWheel({ team, members, ownTeam }: { team: Team | null; membe
   );
 }
 
-function Who({ m, viewer, coachTools }: { m: Profile; viewer: Profile; coachTools?: boolean }) {
+function Who({ m, viewer, coachTools, names }: { m: Profile; viewer: Profile; coachTools?: boolean; names?: TeamNames }) {
   const isMe = m.id === viewer.id;
   const canEdit = isMe || viewer.role === "coach";
   return (
@@ -76,7 +76,7 @@ function Who({ m, viewer, coachTools }: { m: Profile; viewer: Profile; coachTool
             label={`${m.name}'s team`}
             value={m.team ?? ""}
             action={setTeam.bind(null, m.id)}
-            options={[...TEAMS.map((t) => [t, t] as [string, string]), ["", "No team"]]}
+            options={[...teamOptions(names), ["", "No team"]]}
           />
         )}
         {canEdit && <Link className="btn ghost small" href={isMe ? "/profile" : `/profile?id=${m.id}`}>{isMe ? "Edit my profile" : "Edit"}</Link>}
@@ -107,10 +107,10 @@ function DoneState({ m, viewer }: { m: Profile; viewer: Profile }) {
   return done ? <span className="pill done" style={{ alignSelf: "flex-start" }}>Done this week</span> : <span className="pill warn" style={{ alignSelf: "flex-start" }}>Not marked done yet</span>;
 }
 
-export function MemberCard({ m, viewer }: { m: Profile; viewer: Profile }) {
+export function MemberCard({ m, viewer, names }: { m: Profile; viewer: Profile; names?: TeamNames }) {
   return (
     <article className="card">
-      <Who m={m} viewer={viewer} coachTools />
+      <Who m={m} viewer={viewer} coachTools names={names} />
       <div className="wheelrow">
         <WheelSvg wheel={m.wheel as Wheel} label={`${m.name}'s life wheel`} />
         <Legend wheel={m.wheel as Wheel} />
@@ -148,8 +148,8 @@ export function MissionCard({ m, viewer }: { m: Profile; viewer: Profile }) {
 export type Tab = "team" | "accountability" | "missions";
 
 /** The Team, Accountability and Missions views for one or more teams. */
-export function TeamViews({ tab, groups, viewer, ownTeam, logs }: {
-  tab: Tab; groups: { team: Team | null; members: Profile[] }[]; viewer: Profile; ownTeam?: boolean; logs?: Record<string, Progress>;
+export function TeamViews({ tab, groups, viewer, ownTeam, logs, names }: {
+  tab: Tab; groups: { team: Team | null; members: Profile[] }[]; viewer: Profile; ownTeam?: boolean; logs?: Record<string, Progress>; names?: TeamNames;
 }) {
   const multi = groups.length > 1;
   return (
@@ -160,10 +160,10 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs }: {
         if (tab === "team") {
           body = members.length ? (
             <>
-              {team && <TeamWheel team={team} members={members} ownTeam={ownTeam} />}
-              <div className="grid">{members.map((m) => <MemberCard key={m.id} m={m} viewer={viewer} />)}</div>
+              {team && <TeamWheel team={team} members={members} ownTeam={ownTeam} names={names} />}
+              <div className="grid">{members.map((m) => <MemberCard key={m.id} m={m} viewer={viewer} names={names} />)}</div>
             </>
-          ) : <EmptyTeam team={team} coach={viewer.role === "coach"} />;
+          ) : <EmptyTeam label={teamLabel(team, names)} coach={viewer.role === "coach"} />;
         } else if (tab === "accountability") {
           const list = members.filter((m) => m.accountability);
           body = list.length ? <div className="grid">{list.map((m) => <AcctCard key={m.id} m={m} viewer={viewer} p={logs?.[m.id]} />)}</div>
@@ -175,7 +175,7 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs }: {
         }
         return (
           <section key={key} className="team-block">
-            {multi && <h2>{teamLabel(team)}</h2>}
+            {multi && <h2>{teamLabel(team, names)}</h2>}
             {body}
           </section>
         );
@@ -184,10 +184,10 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs }: {
   );
 }
 
-function EmptyTeam({ team, coach }: { team: Team | null; coach: boolean }) {
+function EmptyTeam({ label, coach }: { label: string; coach: boolean }) {
   return (
     <div className="empty">
-      <h3>No one on the {teamLabel(team)} yet</h3>
+      <h3>No one on {label} yet</h3>
       <p>{coach ? "Use + Add member at the top to invite people, or move someone here with the team menu on their card." : "Your teammates show up here as they join."}</p>
     </div>
   );

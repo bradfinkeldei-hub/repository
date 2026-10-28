@@ -138,4 +138,12 @@ await check("only the coach can remove members", async () => {
   await as(mon1, `delete from public.profiles where id = $1`, [tue1]);
   assert.equal((await db.query(`select count(*)::int as n from public.profiles`)).rows[0].n, 5);
 });
+await check("everyone sees team names, only the coach renames them", async () => {
+  assert.equal((await as(tue1, `select name from public.team_names where team = 'Monday'`))[0].name, "Monday team");
+  await as(mon1, `update public.team_names set name = 'Hacked' where team = 'Monday'`);
+  await assert.rejects(as(mon1, `insert into public.team_names values ('Example', 'Hacked')`));
+  await as(coach, `insert into public.team_names values ('Monday', 'Trailblazers') on conflict (team) do update set name = excluded.name`);
+  assert.equal((await as(mon1, `select name from public.team_names where team = 'Monday'`))[0].name, "Trailblazers");
+  await assert.rejects(as(coach, `update public.team_names set name = '  ' where team = 'Monday'`));
+});
 console.log(`\n${passed} checks passed`);

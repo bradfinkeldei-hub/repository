@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addWeeks, coachActions, meetingDate, monthKey, progress, teamAverage, weekKey, weekdayName } from "./coaching.ts";
+import { addWeeks, coachActions, meetingDate, monthKey, progress, teamAverage, teamLabel, teamOptions, weekKey, weekdayName } from "./coaching.ts";
 
 const TZ = "America/Chicago";
 const base = {
@@ -78,4 +78,13 @@ test("progress fills gaps, carries commitments and counts streaks", () => {
   assert.equal(p.total, 5);
   assert.equal(progress([row("2026-W44", false, "x")], "2026-W45").streak, 0);
   assert.deepEqual(progress([], "2026-W45").weeks, []);
+});
+
+test("team names: the coach's name wins, blanks fall back to the day", () => {
+  const names = { Monday: "Trailblazers", Tuesday: "  " };
+  assert.equal(teamLabel("Monday", names), "Trailblazers");
+  assert.equal(teamLabel("Tuesday", names), "Tuesday team");
+  assert.equal(teamLabel("Wednesday"), "Wednesday team");
+  assert.equal(teamLabel(null, names), "Not on a team");
+  assert.deepEqual(teamOptions(names)[0], ["Monday", "Trailblazers"]);
 });

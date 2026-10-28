@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCoach, requireProfile } from "@/lib/session";
-import { AREAS, BOOKING_ENABLED, DAYS, isTeam, monthKey, weekKey, type Wheel } from "@/lib/coaching";
+import { AREAS, BOOKING_ENABLED, DAYS, firstName, isTeam, monthKey, TEAMS, weekKey, type Wheel } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 const str = (v: FormDataEntryValue | null, max: number) => String(v ?? "").trim().slice(0, max);
@@ -117,20 +117,38 @@ export async function setTeam(memberId: string, team: string) {
   revalidatePath("/", "layout");
 }
 
+/** Saves the coach's names for the teams. A blank name goes back to "Monday team" and so on. */
+export async function renameTeams(formData: FormData) {
+  const { supabase } = await requireCoach();
+  const rows = TEAMS.map((team) => ({ team, name: str(formData.get(`name_${team}`), 40) || `${team} team` }));
+  const { error } = await supabase.from("team_names").upsert(rows);
+  revalidatePath("/", "layout");
+  redirect(error ? "/coach/members?error=rename#team-names" : "/coach/members?renamed=1#team-names");
+}
+
+/** Sends Supabase's invite email. The name fills {{ .Data.name }} in the Invite user template and becomes their profile name. */
+function sendInvite(email: string, name: string) {
+  const site = process.env.SITE_URL ?? "";
+  return createAdminClient().auth.admin.inviteUserByEmail(email, {
+    redirectTo: `${site}/auth/callback`,
+    data: { name, first_name: name ? firstName(name) : "" },
+  });
+}
+
 export async function inviteMember(formData: FormData) {
   const { supabase } = await requireCoach();
+  const name = str(formData.get("name"), 60);
   const email = str(formData.get("email"), 200).toLowerCase();
   const team = formData.get("team");
-  if (!/^\S+@\S+\.\S+$/.test(email) || !isTeam(team)) redirect("/coach/members?error=invite");
+  if (!name || !/^\S+@\S+\.\S+$/.test(email) || !isTeam(team)) redirect("/coach/members?error=invite");
   await supabase.from("invites").delete().ilike("email", email).is("accepted_at", null);
-  const { error } = await supabase.from("invites").insert({ email, team });
+  const { error } = await supabase.from("invites").insert({ email, team, name });
   if (error) redirect("/coach/members?error=invite");
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) redirect("/coach/members?error=setup");
-  // Sends Supabase's invite email. That fails when the person already has an
-  // account, so in that case move them onto the team directly.
+  // The invite fails when the person already has an account, so in that case
+  // move them onto the team directly.
   const admin = createAdminClient();
-  const site = process.env.SITE_URL ?? "";
-  const { error: sendError } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${site}/auth/callback` });
+  const { error: sendError } = await sendInvite(email, name);
   if (sendError) {
     const { data: contact } = await admin.from("member_contacts").select("id").ilike("email", email).maybeSingle();
     if (contact) {
@@ -153,10 +171,9 @@ export async function cancelInvite(id: string) {
 
 export async function resendInvite(id: string) {
   const { supabase } = await requireCoach();
-  const { data } = await supabase.from("invites").select("email").eq("id", id).single();
+  const { data } = await supabase.from("invites").select("email, name").eq("id", id).single();
   if (data && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    const site = process.env.SITE_URL ?? "";
-    await createAdminClient().auth.admin.inviteUserByEmail(data.email, { redirectTo: `${site}/auth/callback` });
+    await sendInvite(data.email, data.name ?? "");
     await supabase.from("invites").update({ invited_at: new Date().toISOString() }).eq("id", id);
   }
   revalidatePath("/coach/members");
