@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AREAS, fmt, teamAverage, teamLabel, TEAMS, weekKey, type Profile, type Team, type Wheel } from "@/lib/coaching";
 import { setTeam, toggleDone } from "@/app/actions";
 import { AutoSubmitSelect } from "@/components/client";
+import { Avatar } from "@/components/avatar";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 
@@ -58,16 +59,12 @@ export function TeamWheel({ team, members, ownTeam }: { team: Team | null; membe
   );
 }
 
-function initials(name: string) {
-  return name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "?";
-}
-
 function Who({ m, viewer, coachTools }: { m: Profile; viewer: Profile; coachTools?: boolean }) {
   const isMe = m.id === viewer.id;
   const canEdit = isMe || viewer.role === "coach";
   return (
     <div className="who">
-      <div className="avatar">{initials(m.name)}</div>
+      <Avatar name={m.name} url={m.avatar_url} />
       <div style={{ minWidth: 0 }}>
         <h3>{m.name}</h3>
         {isMe && <div className="meta">You</div>}

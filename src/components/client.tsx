@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export function AutoSubmitSelect({ label, value, options, action }: {
   label: string;
@@ -72,4 +73,50 @@ export function ReminderFields({ enabled, day }: { enabled: boolean; day: string
       {!on && <input type="hidden" name="reminder_day" value={day} />}
     </>
   );
+}
+
+/** Picks a photo, crops it square, shrinks it to 320px and uploads it. */
+export function PhotoPicker({ userId, hasPhoto, save, remove }: {
+  userId: string;
+  hasPhoto: boolean;
+  save: (path: string) => Promise<{ error?: string }>;
+  remove: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    setBusy(true);
+    setError("");
+    try {
+      const blob = await squareJpeg(file, 320);
+      const path = `${userId}/${crypto.randomUUID()}.jpg`;
+      const { error: upErr } = await createClient().storage.from("avatars").upload(path, blob, { contentType: "image/jpeg" });
+      if (upErr) throw upErr;
+      const res = await save(path);
+      if (res.error) setError(res.error);
+    } catch {
+      setError("That photo didn't upload. Try a different one.");
+    }
+    setBusy(false);
+  }
+  return (
+    <div className="row">
+      <label className="btn ghost small" style={{ cursor: busy ? "wait" : "pointer" }}>
+        {busy ? "Uploading…" : hasPhoto ? "Change photo" : "Add a photo"}
+        <input type="file" accept="image/*" hidden disabled={busy} onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
+      </label>
+      {hasPhoto && !busy && <button className="linkbtn" type="button" onClick={() => { setBusy(true); remove().finally(() => setBusy(false)); }}>Remove photo</button>}
+      {error && <span className="hint" role="alert" style={{ color: "var(--alert)" }}>{error}</span>}
+    </div>
+  );
+}
+
+async function squareJpeg(file: File, size: number): Promise<Blob> {
+  const img = await createImageBitmap(file);
+  const side = Math.min(img.width, img.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  canvas.getContext("2d")!.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode"))), "image/jpeg", 0.85));
 }

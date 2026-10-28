@@ -38,7 +38,7 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
 
   return (
     <>
-      <Header sub="Coach view" tabs={[{ key: "team", label: "Back to teams", href: "/coach" }]} current="" right={<Link className="btn ghost small" href="/profile">My profile</Link>} />
+      <Header me={me} sub="Coach view" tabs={[{ key: "team", label: "Back to teams", href: "/coach" }]} current="" />
       <div className="wrap layout coach">
         <TeamColumn members={members} current="members" />
         <main>

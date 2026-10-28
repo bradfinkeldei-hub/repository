@@ -41,7 +41,7 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
 
   return (
     <>
-      <Header
+      <Header me={me}
         sub="Coach view"
         tabs={[
           { key: "team", label: "Team", href: href("team") },
@@ -50,7 +50,7 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
           { key: "actions", label: "Coaches actions", href: href("actions"), count: openCount },
         ]}
         current={tab}
-        right={<><Link className="btn small" href="/coach/members">+ Add member</Link><Link className="btn ghost small" href="/profile">My profile</Link></>}
+        right={<Link className="btn small" href="/coach/members">+ Add member</Link>}
       />
       <div className="wrap layout coach">
         <TeamColumn members={members} selected={sel} tab={tab} actions={tab === "actions" ? actions : undefined} />

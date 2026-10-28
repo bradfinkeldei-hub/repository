@@ -20,7 +20,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
   if (!me.team) {
     return (
       <>
-        <Header sub="Group life coaching" tabs={[]} current="" />
+        <Header me={me} sub="Group life coaching" tabs={[]} current="" />
         <div className="wrap layout"><main>
           <div className="empty">
             <h2>You&apos;re signed in, but not on a team yet</h2>
@@ -40,7 +40,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
 
   return (
     <>
-      <Header
+      <Header me={me}
         sub={teamLabel(me.team)}
         tabs={TABS.map((t) => ({ ...t, href: `/team?tab=${t.key}` }))}
         current={tab}

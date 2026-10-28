@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/session";
-import { saveProfile } from "@/app/actions";
-import { RangeField, ReminderFields } from "@/components/client";
+import { removeAvatar, saveProfile, setAvatar } from "@/app/actions";
+import { PhotoPicker, RangeField, ReminderFields } from "@/components/client";
+import { Avatar } from "@/components/avatar";
+import { AccountTabs } from "@/components/account-tabs";
 import { AREAS, TEAMS, teamLabel, type Profile } from "@/lib/coaching";
 
 export default async function ProfilePage({ searchParams: sp }: { searchParams: Promise<{ id?: string; error?: string }> }) {
@@ -21,9 +23,15 @@ export default async function ProfilePage({ searchParams: sp }: { searchParams: 
 
   return (
     <div className="wrap" style={{ paddingBlock: "32px 64px" }}>
-      <Link href={back} className="linkbtn">← Back</Link>
-      <h1 style={{ fontFamily: "var(--display)", fontWeight: 400, fontSize: "2rem", margin: "12px 0 4px" }}>{own ? "Your profile" : `Edit ${m.name}`}</h1>
+      {own ? <AccountTabs current="profile" back={back} /> : <Link href={back} className="linkbtn">← Back</Link>}
+      <h1 style={{ fontFamily: "var(--display)", fontWeight: 400, fontSize: "2rem", margin: own ? "0 0 4px" : "12px 0 4px" }}>{own ? "Your profile" : `Edit ${m.name}`}</h1>
       <p className="muted" style={{ margin: "0 0 24px" }}>{own && !isCoach ? `Your ${teamLabel(m.team)} sees what you share here.` : "Changes show up for the member's team right away."}</p>
+      <div className="row" style={{ gap: 16, marginBottom: 20 }}>
+        <Avatar name={m.name} url={m.avatar_url} size={88} />
+        {own
+          ? <PhotoPicker userId={me.id} hasPhoto={!!m.avatar_url} save={setAvatar} remove={removeAvatar} />
+          : <span className="hint">Only {m.name || "they"} can change their photo.</span>}
+      </div>
       {searchParams.error && <div className="notice" style={{ marginBottom: 16 }}>That didn&apos;t save. Check your connection and try again.</div>}
       <form action={saveProfile} className="form">
         {!own && <input type="hidden" name="id" value={m.id} />}
@@ -54,16 +62,19 @@ export default async function ProfilePage({ searchParams: sp }: { searchParams: 
           <span className="hint">The mission you&apos;re living into.</span>
           <textarea name="mission" defaultValue={m.mission} maxLength={600} />
         </label>
-        <fieldset>
-          <legend>Weekly reminder</legend>
-          <ReminderFields enabled={m.reminder_enabled} day={m.reminder_day} />
-        </fieldset>
+        {own ? (
+          <p className="hint" style={{ margin: 0 }}>Your weekly reminder, email and password are in <Link href="/settings">Settings</Link>.</p>
+        ) : (
+          <fieldset>
+            <legend>Weekly reminder</legend>
+            <ReminderFields enabled={m.reminder_enabled} day={m.reminder_day} />
+          </fieldset>
+        )}
         <div className="row">
           <button className="btn" type="submit">Save</button>
           <Link className="btn ghost" href={back}>Cancel</Link>
         </div>
       </form>
-      {own && <p style={{ marginTop: 24 }}><Link className="linkbtn" href="/set-password">Set or change your password</Link></p>}
     </div>
   );
 }

@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     // New members and password resets go straight to choosing a password.
     if (!error && type === "invite") return NextResponse.redirect(`${origin}/set-password?welcome=1`);
     if (!error && type === "recovery") return NextResponse.redirect(`${origin}/set-password`);
+    if (!error && type === "email_change") return NextResponse.redirect(`${origin}/settings?email=done`);
     if (!error) return NextResponse.redirect(`${origin}/`);
   }
   return NextResponse.redirect(`${origin}/login?error=link`);

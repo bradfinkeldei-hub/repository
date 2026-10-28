@@ -22,16 +22,15 @@ export async function saveProfile(formData: FormData) {
     const n = Math.round(Number(formData.get(`wheel_${k}`)));
     if (n >= 1 && n <= 10) wheel[k] = n;
   }
-  const day = str(formData.get("reminder_day"), 12);
   const update: Record<string, unknown> = {
     name: str(formData.get("name"), 60) || me.name,
     wheel,
     creating: str(formData.get("creating"), 400),
     accountability: str(formData.get("accountability"), 400),
     mission: str(formData.get("mission"), 600),
-    reminder_enabled: formData.get("reminder_enabled") === "on",
-    reminder_day: (DAYS as readonly string[]).includes(day) ? day : "Monday",
   };
+  // Your own reminder lives on the Settings page; the coach edits others' here.
+  if (formData.has("reminder_day")) Object.assign(update, reminderUpdate(formData));
   if (isCoach && formData.has("team")) {
     const team = formData.get("team");
     update.team = isTeam(team) ? team : null;
@@ -40,6 +39,38 @@ export async function saveProfile(formData: FormData) {
   if (error) redirect(`/profile?${id !== me.id ? `id=${id}&` : ""}error=save`);
   revalidatePath("/", "layout");
   redirect(isCoach ? (id === me.id ? "/coach" : `/coach?team=${update.team ?? "none"}`) : "/team");
+}
+
+function reminderUpdate(formData: FormData) {
+  const day = str(formData.get("reminder_day"), 12);
+  return {
+    reminder_enabled: formData.get("reminder_enabled") === "on",
+    reminder_day: (DAYS as readonly string[]).includes(day) ? day : "Monday",
+  };
+}
+
+/** Settings page: the signed-in person's name and weekly reminder. */
+export async function saveSettings(formData: FormData) {
+  const { supabase, me } = await requireProfile();
+  const { error } = await supabase.from("profiles").update({
+    name: str(formData.get("name"), 60) || me.name,
+    ...reminderUpdate(formData),
+  }).eq("id", me.id);
+  if (error) redirect("/settings?error=save");
+  revalidatePath("/", "layout");
+  redirect("/settings?saved=1");
+}
+
+/** Starts a sign-in email change. Supabase emails a link to confirm it. */
+export async function changeEmail(formData: FormData) {
+  const { supabase, user } = await requireProfile();
+  const email = str(formData.get("email"), 200).toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(email)) redirect("/settings?error=email");
+  if (email === user.email?.toLowerCase()) redirect("/settings");
+  const site = process.env.SITE_URL ?? "";
+  const { error } = await supabase.auth.updateUser({ email }, { emailRedirectTo: `${site}/auth/callback?next=/settings` });
+  if (error) redirect(`/settings?error=${/already/i.test(error.message) ? "taken" : "email"}`);
+  redirect("/settings?email=sent");
 }
 
 export async function toggleDone(memberId: string) {
@@ -160,10 +191,36 @@ export async function setPassword(formData: FormData) {
   if (password !== formData.get("confirm")) redirect(`${back}error=match`);
   const { error } = await supabase.auth.updateUser({ password });
   if (error) redirect(`${back}error=save`);
-  redirect("/");
+  redirect(formData.get("welcome") === "1" ? "/" : "/settings?password=1");
 }
 
 export async function signOut() {
   await (await createClient()).auth.signOut();
   redirect("/login");
+}
+
+/** Saves a photo the browser already uploaded to avatars/<my id>/, and clears out older ones. */
+export async function setAvatar(path: string) {
+  const { supabase, me } = await requireProfile();
+  if (!new RegExp(`^${me.id}/[\\w-]+\\.jpg$`).test(path)) return { error: "That photo didn't upload. Try again." };
+  const bucket = supabase.storage.from("avatars");
+  const { error } = await supabase.from("profiles").update({ avatar_url: bucket.getPublicUrl(path).data.publicUrl }).eq("id", me.id);
+  if (error) return { error: "That photo didn't save. Try again." };
+  await removeAvatarFiles(me.id, path);
+  revalidatePath("/", "layout");
+  return {};
+}
+
+export async function removeAvatar() {
+  const { supabase, me } = await requireProfile();
+  await supabase.from("profiles").update({ avatar_url: "" }).eq("id", me.id);
+  await removeAvatarFiles(me.id);
+  revalidatePath("/", "layout");
+}
+
+async function removeAvatarFiles(id: string, keep?: string) {
+  const bucket = (await createClient()).storage.from("avatars");
+  const { data } = await bucket.list(id);
+  const old = (data ?? []).map((f) => `${id}/${f.name}`).filter((p) => p !== keep);
+  if (old.length) await bucket.remove(old);
 }

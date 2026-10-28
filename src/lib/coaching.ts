@@ -25,6 +25,8 @@ export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Sa
 export type Profile = {
   id: string;
   name: string;
+  /** Public URL of their photo in the "avatars" bucket, or "" for initials. */
+  avatar_url: string;
   role: "coach" | "member";
   team: Team | null;
   wheel: Wheel;
