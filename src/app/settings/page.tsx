@@ -20,18 +20,20 @@ const MESSAGES: Record<string, [string, boolean]> = {
 /** The signed-in person's own account: name, sign-in email, password, reminders, sign out. */
 export default async function SettingsPage({ searchParams: sp }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const searchParams = await sp;
-  const { supabase, me, user, names } = await requireProfile();
+  const { supabase, me, user, names, viewing } = await requireProfile();
   // Confirmed email changes land here; point reminders at the new address.
   const { data: contact } = await supabase.from("member_contacts").select("email").eq("id", me.id).maybeSingle();
-  if (user.email && contact && contact.email !== user.email && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!viewing && user.email && contact && contact.email !== user.email && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     await createAdminClient().from("member_contacts").update({ email: user.email }).eq("id", me.id);
   }
   const isCoach = me.role === "coach";
   const back = isCoach ? "/coach" : "/team";
   const key = searchParams.error ?? searchParams.email ?? (searchParams.saved ? "saved" : searchParams.password ? "password" : undefined);
   const msg = key ? MESSAGES[key] : undefined;
-  const providers = (user.app_metadata?.providers as string[] | undefined) ?? [];
-  const pending = user.new_email;
+  // While the coach views as a member, show the member's address, not the coach's.
+  const email = viewing ? contact?.email ?? "" : user.email ?? "";
+  const providers = viewing ? [] : (user.app_metadata?.providers as string[] | undefined) ?? [];
+  const pending = viewing ? undefined : user.new_email;
 
   return (
     <div className="wrap" style={{ paddingBlock: "32px 64px", maxWidth: 720 }}>
@@ -60,7 +62,7 @@ export default async function SettingsPage({ searchParams: sp }: { searchParams:
           <legend>Signing in</legend>
           <form action={changeEmail} className="form" style={{ gap: 10 }}>
             <label>Email address
-              <input type="email" name="email" defaultValue={user.email ?? ""} maxLength={200} required autoComplete="email" />
+              <input type="email" name="email" defaultValue={email} maxLength={200} required autoComplete="email" />
               <span className="hint">
                 {pending ? `Waiting for you to confirm ${pending}. ` : ""}
                 You sign in and get reminders with this address. To change it, type the new one and we&apos;ll email you a link to confirm.

@@ -9,7 +9,7 @@ import { AREAS, teamOptions, type Profile } from "@/lib/coaching";
 
 export default async function ProfilePage({ searchParams: sp }: { searchParams: Promise<{ id?: string; error?: string }> }) {
   const searchParams = await sp;
-  const { supabase, me, names } = await requireProfile();
+  const { viewing, supabase, me, names } = await requireProfile();
   const isCoach = me.role === "coach";
   let m: Profile = me;
   if (searchParams.id && searchParams.id !== me.id) {
@@ -28,12 +28,13 @@ export default async function ProfilePage({ searchParams: sp }: { searchParams: 
       <p className="muted" style={{ margin: "0 0 24px" }}>{own && !isCoach ? "Your team sees what you share here." : "Changes show up for the member's team right away."}</p>
       <div className="row" style={{ gap: 16, marginBottom: 20 }}>
         <Avatar name={m.name} url={m.avatar_url} size={88} />
-        {own
+        {own && !viewing
           ? <PhotoPicker userId={me.id} hasPhoto={!!m.avatar_url} save={setAvatar} remove={removeAvatar} />
           : <span className="hint">Only {m.name || "they"} can change their photo.</span>}
       </div>
       {searchParams.error && <div className="notice" style={{ marginBottom: 16 }}>That didn&apos;t save. Check your connection and try again.</div>}
       <form action={saveProfile} className="form">
+        <fieldset disabled={viewing} className="bare">
         {!own && <input type="hidden" name="id" value={m.id} />}
         <label>Name<input type="text" name="name" defaultValue={m.name} maxLength={60} required /></label>
         {isCoach && !own && (
@@ -74,6 +75,7 @@ export default async function ProfilePage({ searchParams: sp }: { searchParams: 
           <button className="btn" type="submit">Save</button>
           <Link className="btn ghost" href={back}>Cancel</Link>
         </div>
+        </fieldset>
       </form>
     </div>
   );

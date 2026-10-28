@@ -3,7 +3,7 @@ import { requireCoach } from "@/lib/session";
 import { Header } from "@/components/header";
 import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitSelect } from "@/components/client";
-import { cancelInvite, inviteMember, removeMember, renameTeams, resendInvite, resetFreeCall, setTeam } from "@/app/actions";
+import { cancelInvite, inviteMember, removeMember, renameTeams, resendInvite, resetFreeCall, setTeam, startViewAs } from "@/app/actions";
 import { BOOKING_ENABLED, isTeam, monthKey, teamLabel, teamOptions, TEAMS, type Booking, type Profile, type Team } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
@@ -79,7 +79,7 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
                     <tr key={m.id}>
                       <td>
                         <b>{m.name}</b><div className="muted" style={{ fontSize: "0.82rem" }}>{email.get(m.id)}</div>
-                        <Link className="linkbtn" href={`/team?as=${m.id}`} style={{ fontSize: "0.82rem" }}>View as {m.name.split(" ")[0]}</Link>
+                        <form action={startViewAs.bind(null, m.id)} style={{ display: "inline" }}><button className="linkbtn" type="submit" style={{ fontSize: "0.82rem" }}>View as {m.name.split(" ")[0]}</button></form>
                       </td>
                       <td>
                         <AutoSubmitSelect label={`${m.name}'s team`} value={m.team ?? ""} action={setTeam.bind(null, m.id)}

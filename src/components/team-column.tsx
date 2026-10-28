@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { teamOptions, type Profile, type Suggestion, type TeamNames } from "@/lib/coaching";
+import { startViewAs } from "@/app/actions";
+import { AutoSubmitSelect } from "@/components/client";
+import { teamLabel, teamOptions, type Profile, type Suggestion, type TeamNames } from "@/lib/coaching";
 
 /** The coach's team list. Members never see this. */
 export function TeamColumn({ members, names, selected, tab, actions, current }: {
@@ -31,6 +33,17 @@ export function TeamColumn({ members, names, selected, tab, actions, current }: 
       <hr />
       <Link href="/coach/members" aria-current={current === "members" ? "page" : undefined}>Add or manage members<span>›</span></Link>
       <Link href="/coach/members#team-names">Rename teams<span>›</span></Link>
+      {members.length > 0 && (
+        <label className="viewas-pick">
+          <span className="label">See the app as a member</span>
+          <AutoSubmitSelect
+            label="View the app as a member"
+            value=""
+            action={startViewAs}
+            options={[["", "Pick a member…"], ...members.map((m) => [m.id, `${m.name || "No name"}${m.team ? ` (${teamLabel(m.team, names)})` : ""}`] as [string, string])]}
+          />
+        </label>
+      )}
       <p className="note">Only you see this column. Members see just their own team.</p>
     </nav>
   );

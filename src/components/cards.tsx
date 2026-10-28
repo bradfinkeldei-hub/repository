@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AREAS, fmt, teamAverage, teamLabel, teamOptions, weekKey, type Profile, type Progress, type Team, type TeamNames, type Wheel } from "@/lib/coaching";
-import { setTeam, toggleDone } from "@/app/actions";
+import { setTeam, startViewAs, toggleDone } from "@/app/actions";
 import { AutoSubmitSelect } from "@/components/client";
 import { Avatar } from "@/components/avatar";
 import { MiniProgress } from "@/components/progress";
@@ -79,7 +79,9 @@ function Who({ m, viewer, coachTools, names }: { m: Profile; viewer: Profile; co
             options={[...teamOptions(names), ["", "No team"]]}
           />
         )}
-        {coachTools && viewer.role === "coach" && <Link className="linkbtn" href={`/team?as=${m.id}`} title={`See the app the way ${m.name} sees it`}>View as</Link>}
+        {coachTools && viewer.role === "coach" && (
+          <form action={startViewAs.bind(null, m.id)}><button className="linkbtn" type="submit" title={`See the app the way ${m.name} sees it`}>View as</button></form>
+        )}
         {canEdit && <Link className="btn ghost small" href={isMe ? "/profile" : `/profile?id=${m.id}`}>{isMe ? "Edit my profile" : "Edit"}</Link>}
       </div>
     </div>
