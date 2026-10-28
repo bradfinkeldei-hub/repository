@@ -61,7 +61,7 @@ export default async function ProgressPage({ searchParams: sp }: { searchParams:
           <>
             <ProgressStats p={p} />
             <section className="card">
-              <h2 style={{ margin: 0, fontFamily: "var(--display)", fontWeight: 400, fontSize: "1.35rem" }}>Meeting by meeting</h2>
+              <h2 style={{ margin: 0, fontFamily: "var(--display)", fontWeight: 600, letterSpacing: "-0.02em", fontSize: "1.35rem" }}>Meeting by meeting</h2>
               <WeekStrip p={p} team={m.team} last={16} />
               <StripKey />
             </section>

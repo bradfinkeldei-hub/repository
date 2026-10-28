@@ -24,7 +24,7 @@ export default async function ProfilePage({ searchParams: sp }: { searchParams: 
   return (
     <div className="wrap" style={{ paddingBlock: "32px 64px" }}>
       {own ? <AccountTabs current="profile" back={back} /> : <Link href={back} className="linkbtn">← Back</Link>}
-      <h1 style={{ fontFamily: "var(--display)", fontWeight: 400, fontSize: "2rem", margin: own ? "0 0 4px" : "12px 0 4px" }}>{own ? "Your profile" : `Edit ${m.name}`}</h1>
+      <h1 style={{ fontFamily: "var(--display)", fontWeight: 600, letterSpacing: "-0.02em", fontSize: "2rem", margin: own ? "0 0 4px" : "12px 0 4px" }}>{own ? "Your profile" : `Edit ${m.name}`}</h1>
       <p className="muted" style={{ margin: "0 0 24px" }}>{own && !isCoach ? "Your team sees what you share here." : "Changes show up for the member's team right away."}</p>
       <div className="row" style={{ gap: 16, marginBottom: 20 }}>
         <Avatar name={m.name} url={m.avatar_url} size={88} />

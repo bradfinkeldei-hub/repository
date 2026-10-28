@@ -16,7 +16,7 @@ export default async function SetPasswordPage({ searchParams: sp }: { searchPara
   return (
     <div className="wrap" style={{ paddingBlock: "32px 64px", maxWidth: 520 }}>
       {!welcome && <Link href="/settings" className="linkbtn">← Back</Link>}
-      <h1 style={{ fontFamily: "var(--display)", fontWeight: 400, fontSize: "2rem", margin: "12px 0 4px" }}>
+      <h1 style={{ fontFamily: "var(--display)", fontWeight: 600, letterSpacing: "-0.02em", fontSize: "2rem", margin: "12px 0 4px" }}>
         {welcome ? `Welcome${me.name ? `, ${me.name.split(" ")[0]}` : ""}! Choose a password` : "Set your password"}
       </h1>
       <p className="muted" style={{ margin: "0 0 24px" }}>Next time, sign in with your email and this password.</p>

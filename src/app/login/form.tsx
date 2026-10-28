@@ -114,7 +114,7 @@ export function LoginForm({ error, googleClientId }: { error?: string; googleCli
       </div>
       <div className="panel">
         <form onSubmit={submit}>
-          <h2 style={{ margin: "0 0 4px", fontFamily: "var(--display)", fontWeight: 400, fontSize: "1.9rem" }}>{title}</h2>
+          <h2 style={{ margin: "0 0 4px", fontFamily: "var(--display)", fontWeight: 600, letterSpacing: "-0.02em", fontSize: "1.9rem" }}>{title}</h2>
           <p className="muted" style={{ margin: "0 0 10px" }}>
             {mode === "forgot" ? "We'll email you a link to choose a new password." : "Use the email your coach invited."}
           </p>
