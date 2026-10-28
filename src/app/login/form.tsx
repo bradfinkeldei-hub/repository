@@ -33,33 +33,16 @@ export function LoginForm({ error, googleClientId }: { error?: string; googleCli
   useEffect(() => {
     if (!ownGoogleButton || mode === "forgot") return;
     let cancelled = false;
-    (async () => {
-      // Google gets the hashed nonce, Supabase the raw one, so a token can't be replayed.
-      const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(24))));
-      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(nonce));
-      const hashed = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
-      await loadGoogleScript();
+    loadGoogleScript().then(() => {
       if (cancelled || !googleButton.current) return;
       const gsi = (window as unknown as { google: GoogleIdentity }).google.accounts.id;
-      gsi.initialize({
-        client_id: googleClientId!,
-        nonce: hashed,
-        use_fedcm_for_prompt: true,
-        callback: async ({ credential }) => {
-          setState("busy");
-          const { error } = await createClient().auth.signInWithIdToken({ provider: "google", token: credential, nonce });
-          if (error) {
-            setState("idle");
-            return setGoogleError(/database error/i.test(error.message) ? ERRORS.invite : ERRORS.google);
-          }
-          router.replace("/");
-          router.refresh();
-        },
-      });
-      gsi.renderButton(googleButton.current, { theme: "outline", size: "large", text: "continue_with", shape: "rectangular", width: googleButton.current.offsetWidth || 320 });
-    })();
+      // A full-page redirect, not a popup: on phones the popup can't switch
+      // Google accounts. Google posts the result to /auth/google.
+      gsi.initialize({ client_id: googleClientId!, ux_mode: "redirect", login_uri: `${window.location.origin}/auth/google` });
+      gsi.renderButton(googleButton.current, { theme: "outline", size: "large", text: "continue_with", shape: "rectangular", width: Math.min(googleButton.current.offsetWidth || 320, 400) });
+    }).catch(() => setGoogleError(ERRORS.google));
     return () => { cancelled = true; };
-  }, [ownGoogleButton, mode, googleClientId, router]);
+  }, [ownGoogleButton, mode, googleClientId]);
 
   function switchTo(m: Mode) {
     setMode(m);
@@ -161,7 +144,7 @@ export function LoginForm({ error, googleClientId }: { error?: string; googleCli
 type GoogleIdentity = {
   accounts: {
     id: {
-      initialize(options: { client_id: string; nonce: string; use_fedcm_for_prompt?: boolean; callback: (r: { credential: string }) => void }): void;
+      initialize(options: { client_id: string; ux_mode: "redirect"; login_uri: string }): void;
       renderButton(el: HTMLElement, options: Record<string, unknown>): void;
     };
   };
