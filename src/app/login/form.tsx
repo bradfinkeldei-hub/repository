@@ -64,6 +64,11 @@ export function LoginForm({ error, googleClientId }: { error?: string; googleCli
     const auth = createClient().auth;
     if (mode === "password") {
       const { error } = await auth.signInWithPassword({ email, password });
+      // Archived members' accounts are blocked; say so instead of "wrong password".
+      if (error && /banned/i.test(error.message)) {
+        setState("idle");
+        return router.replace("/login?error=archived");
+      }
       if (error) return setState("error");
       router.replace("/");
       router.refresh();

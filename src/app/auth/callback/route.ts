@@ -15,5 +15,5 @@ export async function GET(request: NextRequest) {
   if (dest === "/settings" && searchParams.get("message")) return NextResponse.redirect(`${origin}/settings?email=half`);
   // A new Google account that wasn't invited is turned away by the database.
   const why = searchParams.get("error_description") ?? "";
-  return NextResponse.redirect(`${origin}/login?error=${/database error/i.test(why) ? "invite" : "link"}`);
+  return NextResponse.redirect(`${origin}/login?error=${/database error/i.test(why) ? "invite" : /banned/i.test(why) ? "archived" : "link"}`);
 }

@@ -13,6 +13,8 @@ const MESSAGES: Record<string, [string, boolean]> = {
   invite: ["Add their name and check the email address, then send again.", false],
   setup: ["Invites can't send yet: the app is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Cloudflare under the Worker's Settings > Variables and Secrets (type Secret), then try again.", false],
   send: ["The invite was saved but the email didn't send. Try Resend below.", false],
+  resent: ["Invite sent again.", true],
+  resend: ["The invite email didn't send. Wait a minute and try Resend again (Supabase limits how often it can email the same person).", false],
 };
 
 function ago(iso: string) {
@@ -24,12 +26,14 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
   const searchParams = await sp;
   const { supabase, me, names } = await requireCoach();
   const month = monthKey(new Date(), TZ);
-  const [{ data: profiles }, { data: contacts }, { data: invites }, { data: bookings }] = await Promise.all([
+  const [{ data: profiles, error }, { data: contacts }, { data: invites }, { data: bookings }] = await Promise.all([
     supabase.from("profiles").select("*").neq("role", "coach").order("name"),
     supabase.from("member_contacts").select("id, email"),
     supabase.from("invites").select("*").is("accepted_at", null).order("invited_at", { ascending: false }),
     supabase.from("bookings").select("*").eq("month", month),
   ]);
+  // An empty list here would look like everyone vanished; show the error page instead.
+  if (error) throw new Error(`Couldn't load members: ${error.message}`);
   const everyone = (profiles ?? []) as Profile[];
   const members = everyone.filter((m) => !m.archived_at);
   const archived = everyone.filter((m) => m.archived_at);

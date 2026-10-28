@@ -48,8 +48,9 @@ export default async function ProfilePage({ searchParams: sp }: { searchParams: 
         )}
         <fieldset>
           <legend>Life wheel</legend>
-          <span className="hint">Rate how satisfied you are in each area today, from 1 to 10.</span>
-          {AREAS.map(([k, label]) => <RangeField key={k} name={`wheel_${k}`} label={label} initial={Number(m.wheel?.[k]) || 5} />)}
+          <span className="hint">{own ? "Rate how satisfied you are in each area today, from 1 to 10." : "Their own ratings, from 1 to 10. Areas showing – aren't rated yet and stay that way unless you move the slider."}</span>
+          {/* The coach editing someone's name or team shouldn't fill in scores they never gave. */}
+          {AREAS.map(([k, label]) => <RangeField key={k} name={`wheel_${k}`} label={label} initial={Number(m.wheel?.[k]) || 5} unrated={!own && !m.wheel?.[k]} />)}
         </fieldset>
         <label>What I&apos;m actively creating
           <span className="hint">The one thing in your life you&apos;re bringing into being right now.</span>
