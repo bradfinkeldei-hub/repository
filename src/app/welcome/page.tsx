@@ -3,10 +3,17 @@ import { requireProfile } from "@/lib/session";
 import { BOOKING_ENABLED, teamLabel } from "@/lib/coaching";
 
 const STEPS: [string, string][] = [
-  ["Fill in your profile", "Rate 8 areas of your life from 1 to 10 (your life wheel), write who you're going to be, and the one thing you're creating right now."],
-  ["Pick your commitment", "Name one specific thing you'll do before the next meeting, like \"Work out 4 mornings\", so your team can check in on it. Turn on a weekly email reminder in Settings if you'd like one."],
-  ["Check in each week", "On the Accountability tab, tap \"Mark this week done\" when you've shown up for it. My progress shows your streak and every commitment, meeting by meeting."],
-  ["Share your mission", "Write the bigger \"why\" you're living into. Your team's missions are on the Missions tab."],
+  ["Start with who you're going to be", "A way of being, not a to-do: \"I am going to be calm, a leader, joyful.\" It comes first because everything you do grows out of it."],
+  ["Name what you're creating", "The one thing you're building right now. Then rate 8 areas of your life from 1 to 10 to see your life wheel."],
+  ["Make up to 3 commitments a week", "Specific things you'll do before the next meeting, like \"Walk 4 mornings\". Tap each one when it's done. Done weeks build your streak and earn milestones."],
+  ["Cheer each other on", "Every card has Kudos & comments underneath. A \"new\" badge shows when someone writes to you, and you can close your own thread anytime."],
+];
+
+const MORE: [string, string][] = [
+  ["Meeting check-in", "Tap In or Out for the next meeting, join it, or add it to your calendar."],
+  ["Our week", "How the whole team is showing up this week."],
+  ["My progress", "Your streak and every commitment, meeting by meeting."],
+  ["Missions", "The bigger \"why\" you and your teammates are living into."],
 ];
 
 /** First screen for new members, and the "How it works" guide. */
@@ -30,6 +37,10 @@ export default async function WelcomePage() {
         {STEPS.map(([title, text]) => <li key={title}><b>{title}</b><span>{text}</span></li>)}
         {BOOKING_ENABLED && <li><b>Feeling stuck? Book a call</b><span>You get one free one-on-one call with {coach} each month. Extra sessions are $150.</span></li>}
       </ol>
+      <div className="welcome-more">
+        <span className="label">Also on your team page</span>
+        <ul>{MORE.map(([title, text]) => <li key={title}><b>{title}:</b> {text}</li>)}</ul>
+      </div>
       <div className="row">
         <Link className="btn" href="/profile">{empty ? "Fill in my profile" : "Edit my profile"}</Link>
         <Link className="linkbtn" href={isCoach ? "/coach" : "/team"}>{empty ? "Just look around first" : "Back to my team"}</Link>
