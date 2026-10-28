@@ -79,6 +79,7 @@ function Who({ m, viewer, coachTools, names }: { m: Profile; viewer: Profile; co
             options={[...teamOptions(names), ["", "No team"]]}
           />
         )}
+        {coachTools && viewer.role === "coach" && <Link className="linkbtn" href={`/team?as=${m.id}`} title={`See the app the way ${m.name} sees it`}>View as</Link>}
         {canEdit && <Link className="btn ghost small" href={isMe ? "/profile" : `/profile?id=${m.id}`}>{isMe ? "Edit my profile" : "Edit"}</Link>}
       </div>
     </div>

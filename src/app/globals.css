@@ -243,3 +243,9 @@ tr:last-child td { border-bottom: 0; }
 .tl .end { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
 @media (max-width: 520px) { .tl { flex-wrap: wrap; } .tl .end { width: 100%; justify-content: flex-start; } }
 .progtable td:first-child a { font-weight: 600; text-decoration: none; }
+
+/* The coach's "View as" member preview. */
+.preview-bar { background: var(--sun-soft); color: var(--ink); border-bottom: 2px solid var(--sun-line); padding: 8px 0; font-size: 0.9rem; }
+.preview-bar .row { gap: 10px 16px; flex-wrap: wrap; align-items: center; }
+.preview-bar nav a { color: var(--ink); font-weight: 600; text-decoration: none; padding: 2px 6px; border-radius: 6px; }
+.preview-bar nav a[aria-current="page"] { background: var(--surface); }
