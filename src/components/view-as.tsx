@@ -16,7 +16,7 @@ export async function ViewAsBanner() {
   const member = await viewedMember(supabase, me as Profile);
   if (!member) return null;
   const [{ data }, { data: teams }] = await Promise.all([
-    supabase.from("profiles").select("id, name, team").neq("role", "coach").order("name"),
+    supabase.from("profiles").select("id, name, team").neq("role", "coach").is("archived_at", null).order("name"),
     supabase.from("team_names").select("team, name"),
   ]);
   const names = Object.fromEntries((teams ?? []).map((t) => [t.team, t.name])) as TeamNames;

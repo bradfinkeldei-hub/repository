@@ -27,7 +27,7 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
   const tab = (["team", "accountability", "missions", "progress", "actions"].includes(searchParams.tab ?? "") ? searchParams.tab : "team") as CoachTab;
 
   const [{ data: profiles }, { data: rows }, { data: bookings }, { data: log }] = await Promise.all([
-    supabase.from("profiles").select("*").neq("role", "coach").order("name"),
+    supabase.from("profiles").select("*").neq("role", "coach").is("archived_at", null).order("name"),
     supabase.from("coach_actions").select("*"),
     supabase.from("bookings").select("*").gte("created_at", new Date(Date.now() - 7 * 864e5).toISOString()),
     supabase.from("commitment_log").select("member_id, week, commitment, done"),

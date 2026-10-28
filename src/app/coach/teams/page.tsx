@@ -9,7 +9,7 @@ import { teamLabel, TEAMS, type Profile } from "@/lib/coaching";
 export default async function TeamsPage({ searchParams: sp }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
   const searchParams = await sp;
   const { supabase, me, names } = await requireCoach();
-  const { data } = await supabase.from("profiles").select("*").neq("role", "coach").order("name");
+  const { data } = await supabase.from("profiles").select("*").neq("role", "coach").is("archived_at", null).order("name");
   const members = (data ?? []) as Profile[];
 
   return (

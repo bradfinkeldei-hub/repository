@@ -38,6 +38,8 @@ export type Profile = {
   done_week: string;
   last_reminder_week: string;
   updated_at: string;
+  /** Set while the coach has archived them: off their team and signed out, history kept. */
+  archived_at: string | null;
 };
 
 export type CoachActionRow = {

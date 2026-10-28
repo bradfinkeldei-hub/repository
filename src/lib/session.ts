@@ -15,6 +15,7 @@ async function signedIn() {
     supabase.from("team_names").select("team, name"),
   ]);
   if (!data) redirect("/login?error=profile");
+  if (data.archived_at && data.role !== "coach") redirect("/login?error=archived");
   const names = Object.fromEntries((teams ?? []).map((t) => [t.team, t.name])) as TeamNames;
   return { supabase, user, me: data as Profile, names };
 }

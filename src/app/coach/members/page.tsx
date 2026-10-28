@@ -3,7 +3,7 @@ import { requireCoach } from "@/lib/session";
 import { Header } from "@/components/header";
 import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitSelect } from "@/components/client";
-import { cancelInvite, inviteMember, removeMember, resendInvite, resetFreeCall, setTeam, startViewAs } from "@/app/actions";
+import { archiveMember, cancelInvite, inviteMember, removeMember, resendInvite, restoreMember, resetFreeCall, setTeam, startViewAs } from "@/app/actions";
 import { BOOKING_ENABLED, isTeam, monthKey, teamLabel, teamOptions, type Booking, type Profile, type Team } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
@@ -30,7 +30,9 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
     supabase.from("invites").select("*").is("accepted_at", null).order("invited_at", { ascending: false }),
     supabase.from("bookings").select("*").eq("month", month),
   ]);
-  const members = (profiles ?? []) as Profile[];
+  const everyone = (profiles ?? []) as Profile[];
+  const members = everyone.filter((m) => !m.archived_at);
+  const archived = everyone.filter((m) => m.archived_at);
   const email = new Map((contacts ?? []).map((c) => [c.id as string, c.email as string]));
   const monthBookings = (bookings ?? []) as Booking[];
   const msg = Object.keys(MESSAGES).find((k) => searchParams[k] || searchParams.error === k);
@@ -44,7 +46,7 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
         <main>
           <div className="intro"><div>
             <h1>Add and manage members</h1>
-            <p>Invite people onto a team and move them between teams. A person&apos;s team decides what they can see.</p>
+            <p>Invite people onto a team and move them between teams. A person&apos;s team decides what they can see. Archive someone to take them out of the circle without losing their history.</p>
           </div>
           <Link className="btn ghost" href="/coach/teams">Rename teams</Link>
           </div>
@@ -93,9 +95,10 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
                       <td className="muted">{ago(m.updated_at)}</td>
                       <td>
                         <details>
-                          <summary className="linkbtn" style={{ listStyle: "none" }}>Remove</summary>
-                          <form action={removeMember.bind(null, m.id)} style={{ marginTop: 6 }}>
-                            <button className="btn danger small" type="submit">Yes, remove {m.name.split(" ")[0]}</button>
+                          <summary className="linkbtn" style={{ listStyle: "none" }}>Archive</summary>
+                          <form action={archiveMember.bind(null, m.id)} style={{ marginTop: 6 }}>
+                            <p className="muted" style={{ fontSize: "0.82rem", margin: "0 0 6px", maxWidth: 220 }}>Takes {m.name.split(" ")[0]} off the team and stops their emails and sign-in. You can restore them anytime.</p>
+                            <button className="btn small" type="submit">Yes, archive {m.name.split(" ")[0]}</button>
                           </form>
                         </details>
                       </td>
@@ -105,6 +108,26 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
               </tbody>
             </table>
           </div>
+
+          {archived.length > 0 && (
+            <section className="team-block" id="archived">
+              <h2>Archived</h2>
+              <p className="muted" style={{ margin: "0 0 8px", fontSize: "0.9rem" }}>Off their team, no emails, can&apos;t sign in. Their profile and history are kept. Restore puts them back on the team they were on.</p>
+              {archived.map((m) => (
+                <div key={m.id} className="empty" style={{ display: "flex", flexWrap: "wrap", gap: "10px 20px", alignItems: "center" }}>
+                  <b>{m.name}</b><span className="muted">{email.get(m.id) ? `${email.get(m.id)} · ` : ""}{teamLabel(m.team, names)} · archived {ago(m.archived_at!).toLowerCase()}</span>
+                  <span className="spacer" />
+                  <form action={restoreMember.bind(null, m.id)}><button className="btn ghost small" type="submit">Restore</button></form>
+                  <details>
+                    <summary className="linkbtn" style={{ listStyle: "none" }}>Delete for good</summary>
+                    <form action={removeMember.bind(null, m.id)} style={{ marginTop: 6 }}>
+                      <button className="btn danger small" type="submit">Yes, delete {m.name.split(" ")[0]} and their history</button>
+                    </form>
+                  </details>
+                </div>
+              ))}
+            </section>
+          )}
 
           {(invites ?? []).length > 0 && (
             <section className="team-block">
