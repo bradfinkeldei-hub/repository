@@ -110,7 +110,7 @@ export function LoginForm({ error, googleClientId }: { error?: string; googleCli
           <h1>The Coaching Circle</h1>
           <p>Your team&apos;s life wheels, what each of you is creating, and the commitments you&apos;re holding each other to.</p>
         </div>
-        <p style={{ fontSize: "0.9rem" }}>Monday, Tuesday, Wednesday and Thursday teams</p>
+        <blockquote style={{ margin: 0, fontFamily: "var(--display)", fontStyle: "italic", fontSize: "1.25rem" }}>&ldquo;Life is a creation you get to make up!&rdquo;</blockquote>
       </div>
       <div className="panel">
         <form onSubmit={submit}>
