@@ -415,3 +415,92 @@ export function autoMilestones(p: Progress | undefined, kudos: number): { earned
   goals.sort((a, b) => a[0] - b[0]);
   return { earned, next: goals[0]?.[1] ?? null };
 }
+
+export type PulseNudge = { id: string; name: string; why: string };
+
+/** The team-level summary at the top of the Team tab. */
+export type Pulse = {
+  /** Commitments ticked off this week, out of everyone's commitments. */
+  kept: number;
+  total: number;
+  /** Members who've finished all of this week's commitments, out of those with any. */
+  allDone: number;
+  committed: number;
+  /** The team's follow-through for each of the last weeks before this one, oldest first. Null where no one was tracked. */
+  weeks: { week: string; rate: number | null }[];
+  rate: number | null;
+  streaks: { id: string; name: string; weeks: number }[];
+  kudos: number;
+  milestones: { id: string; name: string; title: string }[];
+  nudges: PulseNudge[];
+};
+
+/**
+ * Works out the team pulse from what the Team tab already loads: this week's
+ * ticks, the commitment log, kudos and milestones. Milestones count if they're
+ * from the last two weeks.
+ */
+export function teamPulse(
+  members: Profile[],
+  opts: {
+    logs?: Record<string, Progress>;
+    checked?: Record<string, string[]>;
+    kudos?: Record<string, { week: string }[]>;
+    milestones?: Record<string, { member_id: string; title: string; achieved_on: string }[]>;
+    now?: Date;
+    timeZone?: string;
+    history?: number;
+  } = {},
+): Pulse {
+  const now = opts.now ?? new Date();
+  const wk = weekKey(now, opts.timeZone);
+  const history = opts.history ?? 8;
+  let kept = 0, total = 0, allDone = 0, committed = 0;
+  const nudges: PulseNudge[] = [];
+  for (const m of members) {
+    const items = commitmentList(m.accountability);
+    const p = opts.logs?.[m.id];
+    const fn = firstName(m.name);
+    if (!items.length) {
+      nudges.push({ id: m.id, name: m.name, why: `${fn} hasn't set a commitment yet` });
+      continue;
+    }
+    committed++;
+    const weekDone = m.done_week === wk;
+    const ticked = weekDone ? items.length : items.filter((t) => opts.checked?.[m.id]?.includes(t)).length;
+    kept += ticked;
+    total += items.length;
+    if (ticked === items.length) allDone++;
+    const last = p?.weeks.find((w) => w.week === addWeeks(wk, -1));
+    if (last?.status === "missed" && !weekDone) nudges.push({ id: m.id, name: m.name, why: `${fn} didn't mark last week done` });
+  }
+  const weeks = Array.from({ length: history }, (_, i) => {
+    const week = addWeeks(wk, i - history);
+    let done = 0, seen = 0;
+    for (const m of members) {
+      const w = opts.logs?.[m.id]?.weeks.find((x) => x.week === week);
+      if (!w || w.status === "open") continue;
+      seen++;
+      if (w.status === "done") done++;
+    }
+    return { week, rate: seen ? done / seen : null, done, seen };
+  });
+  const seen = weeks.reduce((n, w) => n + w.seen, 0);
+  const rate = seen ? weeks.reduce((n, w) => n + w.done, 0) / seen : null;
+  const streaks = members
+    .map((m) => ({ id: m.id, name: m.name, weeks: opts.logs?.[m.id]?.streak ?? 0 }))
+    .filter((s) => s.weeks >= 2)
+    .sort((a, b) => b.weeks - a.weeks || a.name.localeCompare(b.name));
+  const kudos = members.reduce((n, m) => n + (opts.kudos?.[m.id] ?? []).filter((k) => k.week === wk).length, 0);
+  const since = dateKey(new Date(now.getTime() - 14 * 864e5), opts.timeZone);
+  const names = new Map(members.map((m) => [m.id, m.name]));
+  const milestones = members
+    .flatMap((m) => opts.milestones?.[m.id] ?? [])
+    .filter((x) => x.achieved_on >= since)
+    .sort((a, b) => b.achieved_on.localeCompare(a.achieved_on))
+    .map((x) => ({ id: x.member_id, name: names.get(x.member_id) ?? "", title: x.title }));
+  return {
+    kept, total, allDone, committed, rate, streaks, kudos, milestones, nudges,
+    weeks: weeks.map(({ week, rate }) => ({ week, rate })),
+  };
+}

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addWeeks, calendarEvent, clockLabel, coachActions, googleCalendarUrl, meetingIcs, dateKey, meetingDate, meetingWhen, nextMeeting, monthKey, progress, teamAverage, teamLabel, teamOptions, weekKey, weekdayName } from "./coaching.ts";
+import { addWeeks, calendarEvent, clockLabel, coachActions, googleCalendarUrl, meetingIcs, dateKey, meetingDate, meetingWhen, nextMeeting, monthKey, progress, teamAverage, teamLabel, teamOptions, teamPulse, weekKey, weekdayName } from "./coaching.ts";
 
 const TZ = "America/Chicago";
 const base = {
@@ -157,4 +157,29 @@ test("a team's weekly meeting becomes a repeating calendar event", () => {
   assert.match(ics, /\r\nUID:team-thursday-meeting@coaching-circle\r\n/);
   assert.equal(clockLabel("19:05"), "7:05 PM");
   assert.equal(clockLabel("00:30"), "12:30 AM");
+});
+
+test("team pulse counts this week's ticks, follow-through, streaks and nudges", () => {
+  const now = new Date("2026-10-28T18:00:00Z");
+  const wk = weekKey(now, TZ);
+  const log = (id, weeks) => weeks.map((done, i) => ({ member_id: id, week: addWeeks(wk, i - weeks.length), commitment: "Run", done }));
+  const rows = [...log("a", [true, true, true]), ...log("b", [true, false, false])];
+  const logs = Object.fromEntries(["a", "b"].map((id) => [id, progress(rows.filter((r) => r.member_id === id), wk)]));
+  const p = teamPulse([
+    member({ id: "a", name: "Ann Lee", team: "Monday", accountability: "Run\nRead" }),
+    member({ id: "b", name: "Bo", team: "Monday", accountability: "Walk", done_week: wk }),
+    member({ id: "c", name: "Cy", team: "Monday", accountability: "" }),
+  ], {
+    logs, checked: { a: ["Read"] }, now, timeZone: TZ, history: 3,
+    kudos: { a: [{ week: wk }, { week: addWeeks(wk, -1) }], b: [{ week: wk }] },
+    milestones: { a: [{ member_id: "a", title: "First 10k", achieved_on: "2026-10-20" }, { member_id: "a", title: "Old", achieved_on: "2026-09-01" }] },
+  });
+  assert.deepEqual([p.kept, p.total, p.allDone, p.committed], [2, 3, 1, 2]);
+  assert.deepEqual(p.weeks.map((w) => w.rate), [1, 0.5, 0.5]);
+  assert.equal(p.rate, 4 / 6);
+  assert.deepEqual(p.streaks.map((s) => [s.id, s.weeks]), [["a", 3]]);
+  assert.equal(p.kudos, 2);
+  assert.deepEqual(p.milestones.map((m) => m.title), ["First 10k"]);
+  // Bo missed last week but is done now, so only Cy needs a nudge.
+  assert.deepEqual(p.nudges.map((n) => n.id), ["c"]);
 });

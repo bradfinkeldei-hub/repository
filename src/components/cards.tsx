@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AREAS, commitmentList, fmt, isVagueCommitment, MAX_COMMITMENTS, teamAverage, teamLabel, teamOptions, weekKey, type Profile, type Progress, type Team, type TeamNames, type Wheel } from "@/lib/coaching";
+import { AREAS, commitmentList, fmt, isVagueCommitment, MAX_COMMITMENTS, teamLabel, teamOptions, teamPulse, weekKey, type Profile, type Progress, type Team, type TeamNames, type Wheel } from "@/lib/coaching";
 import { addCommitment, setTeam, startViewAs, toggleCommitment } from "@/app/actions";
 import { AutoSubmitSelect } from "@/components/client";
 import { Avatar } from "@/components/avatar";
@@ -7,6 +7,7 @@ import { MiniProgress } from "@/components/progress";
 import { MeetingCheckin } from "@/components/attendance";
 import { Milestones, Thread } from "@/components/thread";
 import { CoachNotes } from "@/components/notes";
+import { TeamPulse } from "@/components/pulse";
 import type { Checkin } from "@/lib/checkin";
 import type { CoachNote, Social } from "@/lib/social";
 
@@ -40,28 +41,6 @@ export function Legend({ wheel, two = false }: { wheel: Partial<Record<string, n
         <li key={k}><i style={{ background: `var(--w${i + 1})` }} /><span>{label}</span><b>{fmt(wheel?.[k] ?? null)}</b></li>
       ))}
     </ul>
-  );
-}
-
-export function TeamWheel({ team, members, ownTeam, names }: { team: Team | null; members: Profile[]; ownTeam?: boolean; names?: TeamNames }) {
-  const avg = teamAverage(members);
-  const scored = AREAS.filter(([k]) => avg[k] != null).map(([k, l]) => ({ l, v: avg[k] as number })).sort((a, b) => b.v - a.v);
-  const top = scored[0], bottom = scored[scored.length - 1];
-  return (
-    <section className="card teamwheel">
-      <WheelSvg wheel={avg} size={190} label={`${teamLabel(team, names)} average life wheel`} />
-      <div style={{ flex: "1 1 320px", minWidth: 0 }}>
-        <h2>{ownTeam ? "Our team's life wheel" : `${teamLabel(team, names)} life wheel`}</h2>
-        <p className="sub">The average of {members.length} {members.length === 1 ? "member's wheel" : "members' wheels"}.</p>
-        <Legend wheel={avg} two />
-        {top && bottom && (
-          <div className="row" style={{ marginTop: 10 }}>
-            <span className="pill done">Strongest: {top.l} {fmt(top.v)}</span>
-            <span className="pill warn">Growth edge: {bottom.l} {fmt(bottom.v)}</span>
-          </div>
-        )}
-      </div>
-    </section>
   );
 }
 
@@ -230,7 +209,8 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins,
           body = members.length ? (
             <>
               {team && checkins?.[team] && <MeetingCheckin team={team} label={teamLabel(team, names)} members={members} viewer={viewer} c={checkins[team]} />}
-              {team && <TeamWheel team={team} members={members} ownTeam={ownTeam} names={names} />}
+              {team && <TeamPulse team={team} names={names} ownTeam={ownTeam} coach={viewer.role === "coach"}
+                p={teamPulse(members, { logs, checked, kudos: social?.kudos, milestones: social?.milestones, timeZone: TZ })} />}
               <div className="grid">{members.map((m) => <MemberCard key={m.id} m={m} viewer={viewer} names={names} p={logs?.[m.id]} social={social} avatars={avatars} checked={checked?.[m.id]} notes={notes ? notes[m.id] ?? [] : undefined} />)}</div>
             </>
           ) : <EmptyTeam label={teamLabel(team, names)} coach={viewer.role === "coach"} />;

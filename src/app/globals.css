@@ -235,9 +235,22 @@ span.tick { cursor: default; width: 22px; height: 22px; border-radius: 7px; }
 .pill.done::before { content: "\2713"; font-weight: 800; }
 .pill.warn { background: var(--sun-soft); border-color: transparent; color: var(--sun); }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.teamwheel { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 24px; padding: 24px 26px; background: linear-gradient(135deg, var(--surface) 55%, color-mix(in srgb, var(--accent-soft) 70%, var(--surface))); }
-.teamwheel h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1.4rem; }
-.teamwheel .sub { margin: 2px 0 10px; color: var(--muted); font-size: 0.88rem; }
+.pulse { padding: 22px 24px; background: linear-gradient(135deg, var(--surface) 55%, color-mix(in srgb, var(--accent-soft) 70%, var(--surface))); }
+.pulse h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1.4rem; }
+.pulse .sub { margin: 2px 0 0; color: var(--muted); font-size: 0.88rem; }
+.pulse-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.pulse-stats .stat { display: flex; flex-direction: column; gap: 6px; }
+.pulse-stats .muted { font-size: 0.8rem; }
+.meter { height: 10px; border-radius: 999px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); }
+.meter i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent-bright), var(--ok)); }
+.bars { list-style: none; margin: 0; padding: 0; display: flex; align-items: flex-end; gap: 4px; height: 34px; }
+.bars li { flex: 1; height: 100%; display: flex; align-items: flex-end; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.bars i { display: block; width: 100%; background: var(--sun-fill); border-radius: 4px; }
+.pulse-wins, .pulse-nudge { display: grid; gap: 6px; }
+.pulse-wins ul, .pulse-nudge ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.pulse-wins li { background: var(--ok-soft); border-radius: 999px; padding: 5px 12px; font-size: 0.88rem; }
+.pulse-nudge li { background: var(--sun-soft); border-radius: 999px; padding: 5px 12px; font-size: 0.88rem; }
+.pulse-cheer { margin: 0; font-size: 0.9rem; color: var(--muted); }
 .mission blockquote { margin: 0; font-family: var(--display); font-weight: 500; font-size: 1.3rem; line-height: 1.35; overflow-wrap: anywhere; }
 .mission blockquote::before { content: "\201C"; color: var(--sun-line); }
 .mission blockquote::after { content: "\201D"; color: var(--sun-line); }
@@ -422,8 +435,9 @@ tr:last-child td { border-bottom: 0; }
   .intro { align-items: stretch; }
   .intro > .btn, .intro > a.btn { width: 100%; }
   .card { padding: 16px; border-radius: 18px; }
-  .teamwheel { padding: 18px; gap: 16px; }
-  .teamwheel .wheel { margin-inline: auto; }
+  .pulse { padding: 18px; }
+  .pulse-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .pulse-stats .stat:first-child { grid-column: 1 / -1; }
   .who .end { flex-wrap: nowrap; }
   .coach-tools { padding: 10px; }
   .team-pick { flex-basis: 100%; }
