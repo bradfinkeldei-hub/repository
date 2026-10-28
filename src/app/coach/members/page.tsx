@@ -3,16 +3,14 @@ import { requireCoach } from "@/lib/session";
 import { Header } from "@/components/header";
 import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitSelect } from "@/components/client";
-import { cancelInvite, inviteMember, removeMember, renameTeams, resendInvite, resetFreeCall, setTeam, startViewAs } from "@/app/actions";
-import { BOOKING_ENABLED, isTeam, monthKey, teamLabel, teamOptions, TEAMS, type Booking, type Profile, type Team } from "@/lib/coaching";
+import { cancelInvite, inviteMember, removeMember, resendInvite, resetFreeCall, setTeam, startViewAs } from "@/app/actions";
+import { BOOKING_ENABLED, isTeam, monthKey, teamLabel, teamOptions, type Booking, type Profile, type Team } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 const MESSAGES: Record<string, [string, boolean]> = {
   sent: ["Invite sent.", true],
   moved: ["That person already had an account, so they've been moved onto the team.", true],
   invite: ["Add their name and check the email address, then send again.", false],
-  renamed: ["Team names saved. Everyone sees the new names right away.", true],
-  rename: ["The team names didn't save. Try again.", false],
   setup: ["Invites can't send yet: the app is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Cloudflare under the Worker's Settings > Variables and Secrets (type Secret), then try again.", false],
   send: ["The invite was saved but the email didn't send. Try Resend below.", false],
 };
@@ -47,7 +45,9 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
           <div className="intro"><div>
             <h1>Add and manage members</h1>
             <p>Invite people onto a team and move them between teams. A person&apos;s team decides what they can see.</p>
-          </div></div>
+          </div>
+          <Link className="btn ghost" href="/coach/teams">Rename teams</Link>
+          </div>
           {msg && <div className={`notice${MESSAGES[msg][1] ? " good" : ""}`}>{MESSAGES[msg][0]}</div>}
 
           <form action={inviteMember} className="card" style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "flex-end", gap: 12 }}>
@@ -119,19 +119,6 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
               ))}
             </section>
           )}
-          <form id="team-names" action={renameTeams} className="card" style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "flex-end", gap: 12, scrollMarginTop: 80 }}>
-            <div style={{ flex: "1 1 100%" }}>
-              <h2 style={{ margin: 0, fontSize: "1.05rem" }}>Team names</h2>
-              <p className="muted" style={{ margin: "2px 0 0", fontSize: "0.9rem" }}>Rename a team whenever you like. Members see the new name on their screens; nobody changes team. Leave a box empty to go back to the day name.</p>
-            </div>
-            {TEAMS.map((t) => (
-              <label key={t} style={{ flex: "1 1 180px", display: "flex", flexDirection: "column", gap: 4, fontWeight: 600 }}>{t === "Example" ? "Example (demo) team" : `${t} team`}
-                <input className="input" type="text" name={`name_${t}`} maxLength={40} defaultValue={teamLabel(t, names)} placeholder={`${t} team`} />
-              </label>
-            ))}
-            <button className="btn" type="submit" style={{ minHeight: 42 }}>Save team names</button>
-          </form>
-
           <p className="muted" style={{ fontSize: "0.85rem" }}>Signed in as {me.name}, coach.</p>
         </main>
       </div>

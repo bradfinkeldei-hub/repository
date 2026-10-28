@@ -64,7 +64,10 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
                   <h1>{tab === "team" ? selLabel : tab === "accountability" ? `${selLabel}: commitments` : `${selLabel}: missions`}</h1>
                   <p>{sel === "all" ? `${members.length} members across all teams.` : `${groups[0].members.length} ${groups[0].members.length === 1 ? "member" : "members"}.`} Only you can see other teams.</p>
                 </div>
-                <Link className="btn" href={isTeam(sel) ? `/coach/members?team=${sel}` : "/coach/members"}>{isTeam(sel) ? `Add a member to ${selLabel}` : "Add a member"}</Link>
+                <div className="row intro-actions">
+                  <Link className="btn ghost" href="/coach/teams">{isTeam(sel) ? "Rename team" : "Rename teams"}</Link>
+                  <Link className="btn" href={isTeam(sel) ? `/coach/members?team=${sel}` : "/coach/members"}>{isTeam(sel) ? `Add a member to ${selLabel}` : "Add a member"}</Link>
+                </div>
               </div>
               <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} names={names} />
             </>
