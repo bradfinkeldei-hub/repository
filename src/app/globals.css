@@ -561,6 +561,9 @@ tr:last-child td { border-bottom: 0; }
 .team-set legend { font-weight: 700; padding: 0 4px; }
 .team-set label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 0.9rem; min-width: 0; }
 .team-set-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rsvp-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.rsvp-send .save-link { flex: 1 1 100%; display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+.rsvp-send .save-link input { width: 18px; height: 18px; accent-color: var(--accent); }
 .rsvp-send .hint { flex: 1 1 100%; color: var(--muted); font-size: 0.82rem; }
 .rsvp-big { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 2rem; font-weight: 800; color: #fff; }
 .rsvp-big.in { background: var(--ok); }

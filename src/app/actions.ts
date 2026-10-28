@@ -223,8 +223,21 @@ export async function askAttendance(team: string, formData: FormData) {
   if (sent === null) back("asked=nomail");
   if (emails.length && !sent.length) back("asked=fail");
   await supabase.from("roll_calls").upsert({ team, meeting, sent_at: new Date().toISOString(), meeting_url: url });
+  if (url && formData.get("save_link")) await supabase.from("team_names").update({ meeting_url: url }).eq("team", team);
   revalidatePath("/", "layout");
   back(`asked=${sent.length}`);
+}
+
+/** Coach only: keeps the link in the box as the team's link for every meeting (the same one Teams and meeting times sets). An empty box clears it. */
+export async function saveMeetingLink(team: string, formData: FormData) {
+  const { supabase } = await requireCoach();
+  if (!isTeam(team)) redirect("/coach");
+  const back: (q: string) => never = (q) => redirect(`/coach?team=${team}&${q}#meeting-${team}`);
+  const url = str(formData.get("meeting_url"), 500);
+  if (url && !/^https?:\/\/\S+$/.test(url)) back("asked=badlink");
+  const { error } = await supabase.from("team_names").update({ meeting_url: url }).eq("team", team);
+  revalidatePath("/", "layout");
+  back(error ? "asked=linkfail" : url ? "asked=linksaved" : "asked=linkcleared");
 }
 
 function attendanceEmail(m: Profile, to: string, o: { when: string; team: string; coach: string; site: string; url: string; yes: string; no: string }) {
