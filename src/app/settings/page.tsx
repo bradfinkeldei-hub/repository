@@ -38,7 +38,7 @@ export default async function SettingsPage({ searchParams: sp }: { searchParams:
   return (
     <div className="wrap" style={{ paddingBlock: "32px 64px", maxWidth: 720 }}>
       <AccountTabs current="settings" back={back} />
-      <h1 style={{ fontFamily: "var(--display)", fontWeight: 400, fontSize: "2rem", margin: "0 0 4px" }}>Settings</h1>
+      <h1 style={{ fontFamily: "var(--display)", fontWeight: 600, letterSpacing: "-0.02em", fontSize: "2rem", margin: "0 0 4px" }}>Settings</h1>
       <p className="muted" style={{ margin: "0 0 24px" }}>Only you{isCoach ? "" : " and your coach"} can see these.</p>
       {msg && <div className={`notice${msg[1] ? " good" : ""}`} style={{ marginBottom: 16 }}>{msg[0]}</div>}
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export function AutoSubmitSelect({ label, value, options, action }: {
@@ -119,4 +119,25 @@ async function squareJpeg(file: File, size: number): Promise<Blob> {
   canvas.width = canvas.height = size;
   canvas.getContext("2d")!.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode"))), "image/jpeg", 0.85));
+}
+
+/** The account menu in the header. Closes on a pick, a tap outside, or Escape. */
+export function Menu({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const close = (e: Event) => {
+      const el = ref.current;
+      if (!el?.open) return;
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !el.contains(e.target as Node)) el.open = false;
+    };
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", close);
+    return () => { document.removeEventListener("click", close); document.removeEventListener("keydown", close); };
+  }, []);
+  return (
+    <details className="menu" ref={ref}>
+      <summary aria-label="Account menu">{label}<span className="caret" aria-hidden="true" /></summary>
+      <div className="menu-list" onClick={(e) => { if ((e.target as HTMLElement).closest("a")) ref.current!.open = false; }}>{children}</div>
+    </details>
+  );
 }
