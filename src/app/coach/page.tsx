@@ -1,17 +1,19 @@
 import Link from "next/link";
 import { requireCoach } from "@/lib/session";
-import { Header } from "@/components/header";
+import { coachTabs, Header } from "@/components/header";
+import { StripKey, WeekStrip } from "@/components/progress";
+import { Avatar } from "@/components/avatar";
 import { TeamViews, type Tab } from "@/components/cards";
 import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitCheckbox } from "@/components/client";
 import { addAction, deleteAction, setActionDone } from "@/app/actions";
 import {
-  BOOKING_ENABLED, coachActions, isTeam, teamLabel, TEAMS,
-  type Booking, type CoachActionRow, type Profile, type Suggestion, type Team,
+  BOOKING_ENABLED, coachActions, isTeam, progressByMember, teamLabel, TEAMS, weekKey,
+  type Booking, type CoachActionRow, type LogRow, type Profile, type Progress, type Suggestion, type Team,
 } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
-type CoachTab = Tab | "actions";
+type CoachTab = Tab | "progress" | "actions";
 const KIND: Record<Suggestion["kind"], string> = {
   checkin: "Check in", commit: "Commitment", wheel: "Life wheel", team: "Team",
   remind: "Reminder", refresh: "Refresh", call: "Call", custom: "Your action",
@@ -21,13 +23,15 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
   const searchParams = await sp;
   const { supabase, me } = await requireCoach();
   const sel = searchParams.team === "all" || searchParams.team === "none" || isTeam(searchParams.team) ? searchParams.team : "Monday";
-  const tab = (["team", "accountability", "missions", "actions"].includes(searchParams.tab ?? "") ? searchParams.tab : "team") as CoachTab;
+  const tab = (["team", "accountability", "missions", "progress", "actions"].includes(searchParams.tab ?? "") ? searchParams.tab : "team") as CoachTab;
 
-  const [{ data: profiles }, { data: rows }, { data: bookings }] = await Promise.all([
+  const [{ data: profiles }, { data: rows }, { data: bookings }, { data: log }] = await Promise.all([
     supabase.from("profiles").select("*").neq("role", "coach").order("name"),
     supabase.from("coach_actions").select("*"),
     supabase.from("bookings").select("*").gte("created_at", new Date(Date.now() - 7 * 864e5).toISOString()),
+    supabase.from("commitment_log").select("member_id, week, commitment, done"),
   ]);
+  const logs = progressByMember((log ?? []) as LogRow[], weekKey(new Date(), TZ));
   const members = (profiles ?? []) as Profile[];
   const actions = coachActions(members, (rows ?? []) as CoachActionRow[], (bookings ?? []) as Booking[], new Date(), TZ);
   const openCount = actions.filter((a) => !a.done).length;
@@ -37,18 +41,12 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
     : [sel === "none" ? null : (sel as Team)];
   const groups = teamsShown.map((team) => ({ team, members: members.filter((m) => m.team === team) }));
   const selLabel = sel === "all" ? "All teams" : teamLabel(sel === "none" ? null : (sel as Team));
-  const href = (t: string) => `/coach?team=${sel}&tab=${t}`;
 
   return (
     <>
       <Header me={me}
         sub="Coach view"
-        tabs={[
-          { key: "team", label: "Team", href: href("team") },
-          { key: "accountability", label: "Accountability", href: href("accountability") },
-          { key: "missions", label: "Missions", href: href("missions") },
-          { key: "actions", label: "Coaches actions", href: href("actions"), count: openCount },
-        ]}
+        tabs={coachTabs(sel, openCount)}
         current={tab}
         right={<Link className="btn small" href="/coach/members">+ Add member</Link>}
       />
@@ -57,6 +55,8 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
         <main>
           {tab === "actions" ? (
             <ActionsView actions={actions} teams={teamsShown} members={members} title={sel === "all" ? "Coaches actions" : `Coaches actions: ${selLabel}`} showGeneral={sel === "all"} />
+          ) : tab === "progress" ? (
+            <ProgressView groups={groups} logs={logs} title={sel === "all" ? "Progress: all teams" : `${selLabel}: progress`} />
           ) : (
             <>
               <div className="intro">
@@ -66,7 +66,7 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
                 </div>
                 <Link className="btn" href={isTeam(sel) ? `/coach/members?team=${sel}` : "/coach/members"}>{isTeam(sel) ? `Add a member to ${sel} team` : "Add a member"}</Link>
               </div>
-              <TeamViews tab={tab} groups={groups} viewer={me} />
+              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} />
             </>
           )}
         </main>
@@ -147,5 +147,51 @@ function ActionRow({ a }: { a: Suggestion }) {
         {a.custom && <form action={deleteAction.bind(null, a.id)}><button className="linkbtn" style={{ fontSize: "0.8rem" }} type="submit">Delete</button></form>}
       </div>
     </li>
+  );
+}
+
+function ProgressView({ groups, logs, title }: { groups: { team: Team | null; members: Profile[] }[]; logs: Record<string, Progress>; title: string }) {
+  const all = groups.flatMap((g) => g.members);
+  const tracked = all.map((m) => logs[m.id]).filter((p): p is Progress => !!p && p.weeks.length > 0);
+  const done = tracked.reduce((n, p) => n + p.done, 0), total = tracked.reduce((n, p) => n + p.total, 0);
+  return (
+    <>
+      <div className="intro"><div>
+        <h1>{title}</h1>
+        <p>Each member&apos;s commitments meeting by meeting. Open someone to see every commitment or fix a week they forgot to mark.</p>
+      </div></div>
+      <div className="stats">
+        <div className="stat"><b>{total ? `${Math.round((done / total) * 100)}%` : "–"}</b><span>follow-through rate</span></div>
+        <div className="stat"><b>{tracked.filter((p) => p.streak >= 3).length}</b><span>on a 3+ week streak</span></div>
+        <div className="stat"><b>{tracked.filter((p) => p.weeks.length > 1 && p.weeks.at(-2)?.status === "missed").length}</b><span>missed last week</span></div>
+      </div>
+      <StripKey />
+      {groups.map(({ team, members }) => (
+        <section key={team ?? "none"} className="team-block">
+          {groups.length > 1 && <h2>{teamLabel(team)}</h2>}
+          {members.length ? (
+            <div className="tablebox">
+              <table className="progtable">
+                <thead><tr><th>Member</th><th>Committed to</th><th>Last 8 meetings</th><th>Streak</th><th>Done</th></tr></thead>
+                <tbody>
+                  {members.map((m) => {
+                    const p = logs[m.id];
+                    return (
+                      <tr key={m.id}>
+                        <td><Link href={`/progress?id=${m.id}`} className="row" style={{ flexWrap: "nowrap" }}><Avatar name={m.name} url={m.avatar_url} size={30} />{m.name}</Link></td>
+                        <td style={{ maxWidth: 280 }}>{m.accountability || <span className="muted">Not set</span>}</td>
+                        <td>{p ? <WeekStrip p={p} team={m.team} last={8} small /> : <span className="muted">No weeks yet</span>}</td>
+                        <td>{p ? `${p.streak} wk` : "–"}</td>
+                        <td>{p?.total ? `${p.done} of ${p.total}` : "–"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : <div className="empty"><h3>No one on the {teamLabel(team)} yet</h3></div>}
+        </section>
+      ))}
+    </>
   );
 }

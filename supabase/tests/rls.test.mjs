@@ -120,6 +120,20 @@ await check("one free call per month, own bookings only", async () => {
   assert.equal((await as(tue1, `select * from public.bookings`)).length, 0);
   assert.equal((await as(coach, `select * from public.bookings`)).length, 2);
 });
+await check("accountability history: own and own team only, writes only your own", async () => {
+  await as(mon1, `insert into public.commitment_log (member_id, week, commitment, done) values ($1, '2026-W44', 'Run 3x', true)`, [mon1]);
+  await as(tue1, `insert into public.commitment_log (member_id, week, commitment) values ($1, '2026-W44', 'Read')`, [tue1]);
+  await assert.rejects(as(mon1, `insert into public.commitment_log (member_id, week) values ($1, '2026-W45')`, [tue1]));
+  await as(mon1, `update public.commitment_log set done = true where member_id = $1`, [tue1]);
+  assert.equal((await db.query(`select done from public.commitment_log where member_id = $1`, [tue1])).rows[0].done, false);
+  // Priya is on Tuesday now, so she sees Sam's history but not Jordan's.
+  assert.equal((await as(mon2, `select * from public.commitment_log`)).length, 1);
+  assert.equal((await as(mon1, `select * from public.commitment_log`)).length, 1);
+  assert.equal((await as(stranger, `select * from public.commitment_log`)).length, 0);
+  assert.equal((await as(coach, `select * from public.commitment_log`)).length, 2);
+  await as(coach, `update public.commitment_log set done = true where member_id = $1`, [tue1]);
+  await assert.rejects(as(mon1, `insert into public.commitment_log (member_id, week) values ($1, 'week 1')`, [mon1]));
+});
 await check("only the coach can remove members", async () => {
   await as(mon1, `delete from public.profiles where id = $1`, [tue1]);
   assert.equal((await db.query(`select count(*)::int as n from public.profiles`)).rows[0].n, 5);

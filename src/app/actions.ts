@@ -35,8 +35,16 @@ export async function saveProfile(formData: FormData) {
     const team = formData.get("team");
     update.team = isTeam(team) ? team : null;
   }
+  const { data: before } = await supabase.from("profiles").select("accountability").eq("id", id).single();
   const { error } = await supabase.from("profiles").update(update).eq("id", id);
   if (error) redirect(`/profile?${id !== me.id ? `id=${id}&` : ""}error=save`);
+  // A new commitment becomes this week's entry in the accountability tracker.
+  if (update.accountability && update.accountability !== before?.accountability) {
+    await supabase.from("commitment_log").upsert(
+      { member_id: id, week: weekKey(new Date(), TZ), commitment: update.accountability, updated_at: new Date().toISOString() },
+      { onConflict: "member_id,week" },
+    );
+  }
   revalidatePath("/", "layout");
   redirect(isCoach ? (id === me.id ? "/coach" : `/coach?team=${update.team ?? "none"}`) : "/team");
 }
@@ -74,11 +82,32 @@ export async function changeEmail(formData: FormData) {
 }
 
 export async function toggleDone(memberId: string) {
-  const { supabase, me } = await requireProfile();
-  if (memberId !== me.id && me.role !== "coach") return;
+  const { supabase } = await requireProfile();
   const wk = weekKey(new Date(), TZ);
   const { data } = await supabase.from("profiles").select("done_week").eq("id", memberId).single();
-  await supabase.from("profiles").update({ done_week: data?.done_week === wk ? "" : wk }).eq("id", memberId);
+  await setWeekDone(memberId, wk, data?.done_week !== wk);
+}
+
+/** Marks one meeting week done or not done in the accountability tracker. */
+export async function setWeekDone(memberId: string, week: string, done: boolean) {
+  const { supabase, me } = await requireProfile();
+  if (memberId !== me.id && me.role !== "coach") return;
+  const current = weekKey(new Date(), TZ);
+  if (!/^\d{4}-W\d{2}$/.test(week) || week > current) return;
+  const { data: profile } = await supabase.from("profiles").select("accountability, done_week").eq("id", memberId).single();
+  if (!profile) return;
+  const { data: row } = await supabase.from("commitment_log").select("week").eq("member_id", memberId).eq("week", week).maybeSingle();
+  if (row) {
+    await supabase.from("commitment_log").update({ done, updated_at: new Date().toISOString() }).eq("member_id", memberId).eq("week", week);
+  } else {
+    // A week nobody logged keeps the commitment from before it.
+    const { data: prev } = await supabase.from("commitment_log").select("commitment").eq("member_id", memberId)
+      .lt("week", week).neq("commitment", "").order("week", { ascending: false }).limit(1).maybeSingle();
+    const commitment = week === current ? profile.accountability : prev?.commitment ?? "";
+    await supabase.from("commitment_log").insert({ member_id: memberId, week, commitment, done });
+  }
+  // The profile's done_week still drives the coach's check-ins and the team cards.
+  if (week === current) await supabase.from("profiles").update({ done_week: done ? week : "" }).eq("id", memberId);
   revalidatePath("/", "layout");
 }
 

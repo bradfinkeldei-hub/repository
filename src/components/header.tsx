@@ -3,6 +3,26 @@ import { signOut } from "@/app/actions";
 import { Avatar } from "@/components/avatar";
 import type { Profile } from "@/lib/coaching";
 
+/** The member's top tabs. Team, Accountability and Missions live on /team. */
+export const MEMBER_TABS = [
+  { key: "team", label: "Team", href: "/team?tab=team" },
+  { key: "accountability", label: "Accountability", href: "/team?tab=accountability" },
+  { key: "missions", label: "Missions", href: "/team?tab=missions" },
+  { key: "progress", label: "My progress", href: "/progress" },
+];
+
+/** The coach's top tabs for the selected team. */
+export function coachTabs(team: string, openCount?: number) {
+  const href = (t: string) => `/coach?team=${team}&tab=${t}`;
+  return [
+    { key: "team", label: "Team", href: href("team") },
+    { key: "accountability", label: "Accountability", href: href("accountability") },
+    { key: "missions", label: "Missions", href: href("missions") },
+    { key: "progress", label: "Progress", href: href("progress") },
+    { key: "actions", label: "Coaches actions", href: href("actions"), count: openCount },
+  ];
+}
+
 export function Header({ me, sub, tabs, current, right }: {
   me: Pick<Profile, "name" | "avatar_url">;
   sub: string;
