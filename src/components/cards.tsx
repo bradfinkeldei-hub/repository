@@ -160,7 +160,7 @@ export function MemberCard({ m, viewer, names, p, social, avatars, checked, note
       <Field label="Actively creating" value={m.creating} className="creating" />
       <Commitments m={m} viewer={viewer} checked={checked} />
       {social && <Milestones m={m} viewer={viewer} p={p} items={social.milestones[m.id] ?? []} kudos={kudos.length} />}
-      {social && <Thread m={m} viewer={viewer} comments={social.comments[m.id] ?? []} kudos={kudos} avatars={avatars ?? {}} />}
+      {social && <Thread m={m} viewer={viewer} comments={social.comments[m.id] ?? []} kudos={kudos} avatars={avatars ?? {}} fresh={social.fresh?.memberId === m.id ? social.fresh : undefined} />}
       {notes && viewer.role === "coach" && <CoachNotes m={m} notes={notes} />}
     </article>
   );

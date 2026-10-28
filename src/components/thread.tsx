@@ -1,4 +1,5 @@
-import { addComment, addMilestone, deleteComment, deleteMilestone, setThreadOpen, toggleKudos } from "@/app/actions";
+import { addComment, addMilestone, deleteComment, deleteMilestone, markThreadSeen, setThreadOpen, toggleKudos } from "@/app/actions";
+import { SeenOnOpen } from "@/components/client";
 import { Avatar } from "@/components/avatar";
 import { autoMilestones, firstName, weekKey, type Profile, type Progress } from "@/lib/coaching";
 import type { CardComment, Kudo, Milestone } from "@/lib/social";
@@ -74,8 +75,9 @@ export function Milestones({ m, viewer, p, items, kudos }: { m: Profile; viewer:
  * Kudos and comments under a member's card, folded away until tapped open.
  * Teammates post while it's open; the member and the coach always can.
  */
-export function Thread({ m, viewer, comments, kudos, avatars }: {
+export function Thread({ m, viewer, comments, kudos, avatars, fresh }: {
   m: Profile; viewer: Profile; comments: CardComment[]; kudos: Kudo[]; avatars: Record<string, string>;
+  fresh?: { comments: number; kudos: number };
 }) {
   const isMe = m.id === viewer.id;
   const isCoach = viewer.role === "coach";
@@ -85,12 +87,14 @@ export function Thread({ m, viewer, comments, kudos, avatars }: {
   const thisWeek = kudos.filter((k) => k.week === week);
   const gave = thisWeek.some((k) => k.author_id === viewer.id);
   const canPost = open || isMe || isCoach;
+  const newCount = (fresh?.comments ?? 0) + (fresh?.kudos ?? 0);
   const fromNames = [...new Set(thisWeek.map((k) => (k.author_id === viewer.id ? "you" : firstName(k.author_name))))];
 
   return (
     <details className="fold thread" id={`thread-${m.id}`}>
       <summary aria-label={`Kudos and comments for ${m.name}`}>
         <h4>Kudos &amp; comments</h4>
+        {newCount > 0 && <span className="new-badge" data-new-for={`thread-${m.id}`}>{newCount} new</span>}
         <span className="fold-counts">
           <span><span aria-hidden="true">{"\u{1F44F}"}</span> {kudos.length}<span className="sr"> kudos</span></span>
           <span><span aria-hidden="true">{"\u{1F4AC}"}</span> {comments.length}<span className="sr"> {comments.length === 1 ? "comment" : "comments"}</span></span>
@@ -98,6 +102,7 @@ export function Thread({ m, viewer, comments, kudos, avatars }: {
         </span>
         <span className="chev" aria-hidden="true" />
       </summary>
+      {isMe && fresh && <SeenOnOpen id={`thread-${m.id}`} unseen={newCount > 0} mark={markThreadSeen} />}
       <div className="fold-body">
       {(isMe || isCoach) && (
         <form action={setThreadOpen.bind(null, m.id, !open)} className="thread-toggle">

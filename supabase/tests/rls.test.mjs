@@ -232,6 +232,15 @@ await check("members tick off their own commitments, not a teammate's", async ()
   await as(mon2, `update public.commitment_log set checked = '{}' where member_id = $1`, [tue1]);
   assert.deepEqual((await db.query(`select checked from public.commitment_log where member_id = $1 and week = '2026-W44'`, [tue1])).rows[0].checked, ["Run 3x"]);
 });
+await check("members mark only their own comments as seen", async () => {
+  await as(tue1, `insert into public.thread_seen (member_id) values ($1)`, [tue1]);
+  await assert.rejects(as(mon2, `insert into public.thread_seen (member_id) values ($1)`, [tue1]));
+  await assert.rejects(as(mon2, `insert into public.thread_seen (member_id) values ($1)`, [mon1]));
+  await as(mon2, `update public.thread_seen set seen_at = now() - interval '1 year' where member_id = $1`, [tue1]);
+  assert.equal((await as(mon2, `select * from public.thread_seen`)).length, 0);
+  assert.equal((await as(tue1, `select * from public.thread_seen`)).length, 1);
+  assert.equal((await as(coach, `select * from public.thread_seen`)).length, 1);
+});
 await check("an archived member's card, comments and kudos are hidden until they're restored", async () => {
   await as(coach, `update public.profiles set archived_at = now() where id = $1`, [mon2]);
   // Priya's comment and kudos on Sam's card disappear for Sam, and for the coach too.
