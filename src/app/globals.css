@@ -204,7 +204,7 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
 .legend.two { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
 .field p { margin: 3px 0 0; overflow-wrap: anywhere; }
 .field p.empty { color: var(--muted); font-style: italic; background: none; border: 0; padding: 0; display: block; }
-.creating p { font-family: var(--display); font-weight: 500; font-size: 1.1rem; line-height: 1.35; }
+.becoming p, .creating p { font-family: var(--display); font-weight: 500; font-size: 1.1rem; line-height: 1.35; }
 .acct { background: var(--accent-soft); border-radius: var(--r); padding: 12px 14px; }
 .acct-tip { margin: 8px 0 0; font-size: 0.84rem; color: var(--sun); }
 .acct .empty { margin: 3px 0 0; color: var(--muted); font-style: italic; }

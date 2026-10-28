@@ -178,6 +178,7 @@ export function MemberCard({ m, viewer, names, p, social, avatars, checked, note
         <WheelSvg wheel={m.wheel as Wheel} label={`${m.name}'s life wheel`} />
         <Legend wheel={m.wheel as Wheel} />
       </div>
+      <Field label="Who I'm going to be" value={m.becoming} className="becoming" />
       <Field label="Actively creating" value={m.creating} className="creating" />
       <Commitments m={m} viewer={viewer} checked={checked} />
       {social && <Milestones m={m} viewer={viewer} p={p} items={social.milestones[m.id] ?? []} kudos={kudos.length} />}

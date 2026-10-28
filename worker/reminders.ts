@@ -24,6 +24,7 @@ export function reminderText(p: Profile, site: string, coach: string) {
     `Hi ${firstName(p.name)},`,
     "",
     commitment ? `This is your weekly reminder of what you're being held accountable to:\n\n${commitment}` : "This is your weekly reminder to set the commitment your team will hold you to.",
+    p.becoming?.trim() ? `\nWho you're going to be: ${p.becoming.trim()}` : "",
     p.creating?.trim() ? `\nWhat you're creating: ${p.creating.trim()}` : "",
     "",
     `When you've done your part this week, mark it done: ${site}/team?tab=accountability`,

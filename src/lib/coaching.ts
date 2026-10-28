@@ -30,6 +30,8 @@ export type Profile = {
   role: "coach" | "member";
   team: Team | null;
   wheel: Wheel;
+  /** "Who am I going to be?": the person they're choosing to be. */
+  becoming: string;
   creating: string;
   accountability: string;
   mission: string;

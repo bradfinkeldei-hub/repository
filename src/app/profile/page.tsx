@@ -67,6 +67,10 @@ export default async function ProfilePage({ searchParams: sp }: { searchParams: 
           {/* The coach editing someone's name or team shouldn't fill in scores they never gave. */}
           {AREAS.map(([k, label]) => <RangeField key={k} name={`wheel_${k}`} label={label} initial={Number(m.wheel?.[k]) || 5} unrated={!own && !m.wheel?.[k]} />)}
         </fieldset>
+        <label>Who am I going to be?
+          <span className="hint">The person you&apos;re choosing to be, in your own words. For example: &ldquo;Someone who keeps their word to themselves.&rdquo;</span>
+          <textarea name="becoming" defaultValue={m.becoming ?? ""} maxLength={400} />
+        </label>
         <label>What I&apos;m actively creating
           <span className="hint">The one thing in your life you&apos;re bringing into being right now.</span>
           <textarea name="creating" defaultValue={m.creating} maxLength={400} />

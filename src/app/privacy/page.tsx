@@ -13,7 +13,7 @@ export default function PrivacyPage() {
       <h2>Information we collect</h2>
       <ul>
         <li>Sign-in details: your email address and, if you choose one, a password (stored only in scrambled form). If you sign in with Google, we receive your name and email address from Google. We do not receive your Google password or any other Google data.</li>
-        <li>Profile information you choose to share: name, life wheel ratings, what you are creating, your accountability commitment, and your mission.</li>
+        <li>Profile information you choose to share: name, life wheel ratings, who you are going to be, what you are creating, your accountability commitment, and your mission.</li>
         <li>Reminder preferences: whether you want a weekly email reminder and which day.</li>
       </ul>
       <h2>How we use information</h2>

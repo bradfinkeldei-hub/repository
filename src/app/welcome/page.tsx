@@ -3,7 +3,7 @@ import { requireProfile } from "@/lib/session";
 import { BOOKING_ENABLED, teamLabel } from "@/lib/coaching";
 
 const STEPS: [string, string][] = [
-  ["Fill in your profile", "Rate 8 areas of your life from 1 to 10 (your life wheel), and write the one thing you're creating right now."],
+  ["Fill in your profile", "Rate 8 areas of your life from 1 to 10 (your life wheel), write who you're going to be, and the one thing you're creating right now."],
   ["Pick your commitment", "Name one specific thing you'll do before the next meeting, like \"Work out 4 mornings\", so your team can check in on it. Turn on a weekly email reminder in Settings if you'd like one."],
   ["Check in each week", "On the Accountability tab, tap \"Mark this week done\" when you've shown up for it. My progress shows your streak and every commitment, meeting by meeting."],
   ["Share your mission", "Write the bigger \"why\" you're living into. Your team's missions are on the Missions tab."],
