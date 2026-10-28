@@ -161,10 +161,10 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
 .inline-form textarea.input { resize: vertical; min-height: 44px; }
 .xbtn { border: 0; background: none; color: var(--muted); font-size: 1.15rem; line-height: 1; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; flex: none; }
 .xbtn:hover { background: var(--alert-soft); color: var(--alert); }
-.fold summary { list-style: none; display: flex; align-items: center; gap: 10px; cursor: pointer; min-height: 40px; margin: -6px -8px; padding: 6px 8px; border-radius: 12px; -webkit-tap-highlight-color: transparent; }
-.fold summary::-webkit-details-marker { display: none; }
-.fold summary:hover { background: var(--accent-soft); }
-.fold summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent-bright) 45%, transparent); }
+.fold > summary { list-style: none; display: flex; align-items: center; gap: 10px; cursor: pointer; min-height: 40px; margin: -6px -8px; padding: 6px 8px; border-radius: 12px; -webkit-tap-highlight-color: transparent; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary:hover { background: var(--accent-soft); }
+.fold > summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent-bright) 45%, transparent); }
 .fold-counts { display: flex; align-items: center; gap: 12px; margin-left: auto; font-size: 0.86rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .closed-tag { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
 .chev { flex: none; width: 9px; height: 9px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg) translate(-2px, -2px); transition: transform 0.18s; margin: 0 4px; }
@@ -192,6 +192,21 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
 .bubble .by { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 0.84rem; }
 .bubble time { color: var(--muted); font-size: 0.76rem; }
 .bubble p { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.94rem; }
+/* Tap "Edit" under a comment, milestone or note to change it in place. */
+.edit-fold summary { list-style: none; display: inline-block; cursor: pointer; color: var(--accent); font-weight: 650; font-size: 0.8rem; padding: 4px 0 0; }
+.edit-fold summary::-webkit-details-marker { display: none; }
+.edit-fold summary .opened, .edit-fold[open] summary .shut { display: none; }
+.edit-fold[open] summary .opened { display: inline; color: var(--muted); }
+.edit-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-top: 6px; }
+.edit-form .input { flex: 1 1 180px; min-width: 0; min-height: 40px; padding: 8px 12px; font-size: 0.92rem; }
+.edit-form textarea.input { flex-basis: 100%; resize: vertical; }
+.edit-form .input.date { flex: 0 1 160px; }
+.edit-fold .quiet { margin-top: 6px; font-size: 0.8rem; }
+.kudos-row .edit-fold { flex: 1 1 100%; }
+.kudos-row .edit-fold summary { padding-top: 0; }
+.edited { color: var(--muted); font-size: 0.74rem; font-style: italic; }
+.kudos-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 0.88rem; }
+.kudos-notes li { background: var(--sun-soft); border-radius: 10px; padding: 6px 10px; overflow-wrap: anywhere; }
 .closed-note { margin: 0; font-size: 0.84rem; color: var(--muted); background: var(--surface-2); border-radius: 10px; padding: 8px 12px; }
 .avatar { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--sun-soft) 70%, var(--accent-soft))); color: var(--accent); flex: none; box-shadow: 0 0 0 2px var(--surface); }
 .wheelrow { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
@@ -413,7 +428,7 @@ tr:last-child td { border-bottom: 0; }
 @media (max-width: 760px) {
   /* 16px stops iPhones zooming in when a field is tapped. */
   body { font-size: 16px; }
-  .input, .addact input, .addact select, .form input, .form textarea, .form select, .inline-select, .signin input, .inline-form .input { font-size: 16px; }
+  .input, .addact input, .addact select, .form input, .form textarea, .form select, .inline-select, .signin input, .inline-form .input, .edit-form .input { font-size: 16px; }
   .bar { gap: 10px 12px; padding-block: 10px; }
   .brand { font-size: 1.12rem; }
   .brand .mark { width: 30px; height: 30px; border-radius: 10px; }

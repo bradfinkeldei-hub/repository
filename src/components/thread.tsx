@@ -1,5 +1,5 @@
-import { addComment, addMilestone, deleteComment, deleteMilestone, markThreadSeen, setThreadOpen, toggleKudos } from "@/app/actions";
-import { SeenOnOpen } from "@/components/client";
+import { addComment, addMilestone, deleteComment, deleteMilestone, editComment, editMilestone, markThreadSeen, setKudosNote, setThreadOpen, toggleKudos } from "@/app/actions";
+import { EditFold, SeenOnOpen } from "@/components/client";
 import { Avatar } from "@/components/avatar";
 import { autoMilestones, firstName, weekKey, type Profile, type Progress } from "@/lib/coaching";
 import type { CardComment, Kudo, Milestone } from "@/lib/social";
@@ -16,6 +16,16 @@ function day(date: string) {
 
 function list(names: string[]) {
   return names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/**
+ * "edited", or "edited by coach" when someone other than owner changed it. owner is the comment's
+ * author, or the member whose card a milestone is on; the access rules only let the coach edit those.
+ */
+function editedTag(r: { edited_at?: string | null; edited_by?: string | null }, owner: string) {
+  if (!r.edited_at) return null;
+  const byCoach = !!r.edited_by && r.edited_by !== owner;
+  return <span className="edited" title={`Edited ${when(r.edited_at)}`}>{byCoach ? "edited by coach" : "edited"}</span>;
 }
 
 /** Wins on a member's card, folded away until tapped open: the ones the app works out, then the ones they or the coach added. */
@@ -46,7 +56,16 @@ export function Milestones({ m, viewer, p, items, kudos }: { m: Profile; viewer:
               <span className="trophy" aria-hidden="true">{"\u{1F3C6}"}</span>
               <div>
                 <p>{w.title}</p>
-                <small>{day(w.achieved_on)}{w.author_id !== m.id && w.author_name ? ` · added by ${firstName(w.author_name)}` : ""}</small>
+                <small>{day(w.achieved_on)}{w.author_id !== m.id && w.author_name ? ` · added by ${firstName(w.author_name)}` : ""}{w.edited_at && <> · {editedTag(w, m.id)}</>}</small>
+                {canEdit && (
+                  <EditFold title={`Edit milestone: ${w.title}`}>
+                    <form className="edit-form" action={editMilestone.bind(null, w.id)}>
+                      <input className="input" name="title" maxLength={120} required defaultValue={w.title} aria-label="Milestone" />
+                      <input className="input date" type="date" name="achieved_on" required defaultValue={w.achieved_on} aria-label="Date" />
+                      <button className="btn small" type="submit">Save</button>
+                    </form>
+                  </EditFold>
+                )}
               </div>
               {canEdit && (
                 <form action={deleteMilestone.bind(null, w.id)}>
@@ -85,7 +104,9 @@ export function Thread({ m, viewer, comments, kudos, avatars, fresh }: {
   const first = firstName(m.name);
   const week = weekKey(new Date(), TZ);
   const thisWeek = kudos.filter((k) => k.week === week);
-  const gave = thisWeek.some((k) => k.author_id === viewer.id);
+  const mine = thisWeek.find((k) => k.author_id === viewer.id);
+  const gave = !!mine;
+  const notes = kudos.filter((k) => k.note);
   const canPost = open || isMe || isCoach;
   const newCount = (fresh?.comments ?? 0) + (fresh?.kudos ?? 0);
   const fromNames = [...new Set(thisWeek.map((k) => (k.author_id === viewer.id ? "you" : firstName(k.author_name))))];
@@ -123,7 +144,27 @@ export function Thread({ m, viewer, comments, kudos, avatars, fresh }: {
           {kudos.length ? <><b>{kudos.length}</b> kudos{fromNames.length > 0 && <> · this week from {list(fromNames)}</>}</>
             : isMe ? "Kudos from your team show up here." : "No kudos yet."}
         </span>
+        {mine && (
+          <EditFold label={mine.note ? "Change your note" : "Add a note"} title={`A note with your kudos for ${first}`}>
+            <form className="edit-form" action={setKudosNote.bind(null, m.id)}>
+              <input className="input" name="note" maxLength={140} defaultValue={mine.note ?? ""} aria-label="Note with your kudos"
+                placeholder={`What ${first} did that stood out`} />
+              <button className="btn small" type="submit">Save</button>
+            </form>
+            <p className="quiet">Leave it empty to remove the note. Tap &ldquo;Kudos given&rdquo; to take the kudos back.</p>
+          </EditFold>
+        )}
       </div>
+
+      {notes.length > 0 && (
+        <ul className="kudos-notes">
+          {notes.map((k) => (
+            <li key={`${k.author_id}-${k.week}`}>
+              <span aria-hidden="true">{"\u{1F44F}"}</span> <b>{k.author_id === viewer.id ? "You" : firstName(k.author_name) || "Someone"}</b>: {k.note}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {comments.length > 0 && (
         <ul className="comments">
@@ -131,8 +172,16 @@ export function Thread({ m, viewer, comments, kudos, avatars, fresh }: {
             <li key={c.id}>
               <Avatar name={c.author_name} url={avatars[c.author_id]} size={30} />
               <div className="bubble">
-                <div className="by"><b>{c.author_id === viewer.id ? "You" : c.author_name || "Someone"}</b><time dateTime={c.created_at}>{when(c.created_at)}</time></div>
+                <div className="by"><b>{c.author_id === viewer.id ? "You" : c.author_name || "Someone"}</b><time dateTime={c.created_at}>{when(c.created_at)}</time>{editedTag(c, c.author_id)}</div>
                 <p>{c.body}</p>
+                {(c.author_id === viewer.id || isCoach) && (
+                  <EditFold title="Edit comment">
+                    <form className="edit-form" action={editComment.bind(null, c.id)}>
+                      <textarea className="input" name="body" rows={2} maxLength={1000} required defaultValue={c.body} aria-label="Edit comment" />
+                      <button className="btn small" type="submit">Save</button>
+                    </form>
+                  </EditFold>
+                )}
               </div>
               {(c.author_id === viewer.id || isMe || isCoach) && (
                 <form action={deleteComment.bind(null, c.id)}>
