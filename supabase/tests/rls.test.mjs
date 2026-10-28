@@ -261,6 +261,42 @@ await check("only the coach can read or write private notes", async () => {
   await as(mon1, `update public.coach_notes set body = 'changed'`);
   assert.equal((await db.query(`select body from public.coach_notes`)).rows[0].body, "New job stress, check in on Career");
 });
+await check("authors and the coach edit comments, members and the coach edit milestones, givers change their kudos note", async () => {
+  // Priya edits her own comment on Sam's card; the database marks it edited by her.
+  await as(mon2, `update public.card_comments set body = 'So proud of you' where body = 'Proud of you'`);
+  const [c] = (await db.query(`select body, edited_at, edited_by, author_id from public.card_comments where body = 'So proud of you'`)).rows;
+  assert.ok(c.edited_at);
+  assert.equal(c.edited_by, mon2);
+  // Sam can't reword Priya's comment even though it's on his card, and Jordan can't either.
+  await as(tue1, `update public.card_comments set body = 'Sam wrote this' where body = 'So proud of you'`);
+  await as(mon1, `update public.card_comments set body = 'Jordan wrote this' where body = 'So proud of you'`);
+  assert.equal((await db.query(`select count(*)::int as n from public.card_comments where body = 'So proud of you'`)).rows[0].n, 1);
+  // Only the words change: who wrote it, whose card and when stay put.
+  await as(mon2, `update public.card_comments set author_id = $1, author_name = 'Brad', member_id = $2, created_at = '2020-01-01', body = 'Edited again' where body = 'So proud of you'`, [coach, mon2]);
+  const [after] = (await db.query(`select author_id, author_name, member_id, created_at from public.card_comments where body = 'Edited again'`)).rows;
+  assert.deepEqual([after.author_id, after.author_name, after.member_id], [mon2, "Priya", tue1]);
+  assert.notEqual(new Date(after.created_at).getFullYear(), 2020);
+  // The coach can edit anyone's comment.
+  await as(coach, `update public.card_comments set body = 'Kept it kind' where body = 'Edited again'`);
+  assert.equal((await db.query(`select edited_by from public.card_comments where body = 'Kept it kind'`)).rows[0].edited_by, coach);
+
+  // Milestones: Sam on his own card and the coach; not teammates.
+  await as(tue1, `update public.milestones set title = 'Ran my first 10k', achieved_on = '2026-10-20' where title = 'Ran my first 5k'`);
+  await as(mon2, `update public.milestones set title = 'Nope' where member_id = $1`, [tue1]);
+  await as(coach, `update public.milestones set title = 'Half a year in the circle' where title = 'Six months in the circle'`);
+  assert.deepEqual((await db.query(`select title from public.milestones order by title`)).rows.map((r) => r.title), ["Half a year in the circle", "Ran my first 10k"]);
+
+  // Kudos: the giver can add a note; nobody else can change it or move the kudos to another week.
+  await as(mon2, `update public.kudos set note = 'Loved your share tonight', week = '2026-W01' where author_id = $1`, [mon2]);
+  await as(tue1, `update public.kudos set note = 'Hacked' where author_id = $1`, [mon2]);
+  await as(coach, `update public.kudos set note = 'Coach changed it' where author_id = $1`, [mon2]);
+  assert.deepEqual((await db.query(`select note, week from public.kudos where author_id = $1`, [mon2])).rows.map((r) => [r.note, r.week]), [["Loved your share tonight", "2026-W44"]]);
+  await assert.rejects(as(mon2, `update public.kudos set note = repeat('x', 141) where author_id = $1`, [mon2]));
+
+  // Private notes: the coach edits and it's marked; members still can't.
+  await as(coach, `update public.coach_notes set body = 'New job going better'`);
+  assert.ok((await db.query(`select edited_at from public.coach_notes`)).rows[0].edited_at);
+});
 await check("only the coach sets meeting times; everyone can read them", async () => {
   await as(coach, `update public.team_names set meeting_time = '19:00', meeting_url = 'https://meet.google.com/abc' where team = 'Monday'`);
   await as(mon1, `update public.team_names set meeting_time = '06:00' where team = 'Monday'`);

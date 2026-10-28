@@ -1,10 +1,12 @@
 import type { createClient } from "@/lib/supabase/server";
 
-export type CardComment = { id: string; member_id: string; author_id: string; author_name: string; body: string; created_at: string };
-export type Kudo = { member_id: string; author_id: string; author_name: string; week: string; created_at: string };
-export type Milestone = { id: string; member_id: string; author_id: string; author_name: string; title: string; achieved_on: string };
+/** edited_at and edited_by are set by the database when someone changes the words; null until then. */
+type Edited = { edited_at?: string | null; edited_by?: string | null };
+export type CardComment = { id: string; member_id: string; author_id: string; author_name: string; body: string; created_at: string } & Edited;
+export type Kudo = { member_id: string; author_id: string; author_name: string; week: string; created_at: string; note?: string };
+export type Milestone = { id: string; member_id: string; author_id: string; author_name: string; title: string; achieved_on: string } & Edited;
 
-export type CoachNote = { id: string; member_id: string; body: string; created_at: string };
+export type CoachNote = { id: string; member_id: string; body: string; created_at: string } & Edited;
 
 /** Comments, kudos and milestones under each member's card, by member id. */
 export type Social = {
@@ -29,9 +31,9 @@ function byMember<T extends { member_id: string }>(rows: T[] | null) {
 export async function loadSocial(supabase: Awaited<ReturnType<typeof createClient>>, ids: string[]): Promise<Social | null> {
   if (!ids.length) return { comments: {}, kudos: {}, milestones: {} };
   const [c, k, m] = await Promise.all([
-    supabase.from("card_comments").select("id, member_id, author_id, author_name, body, created_at").in("member_id", ids).order("created_at"),
-    supabase.from("kudos").select("member_id, author_id, author_name, week, created_at").in("member_id", ids).order("created_at", { ascending: false }),
-    supabase.from("milestones").select("id, member_id, author_id, author_name, title, achieved_on").in("member_id", ids).order("achieved_on", { ascending: false }),
+    supabase.from("card_comments").select("id, member_id, author_id, author_name, body, created_at, edited_at, edited_by").in("member_id", ids).order("created_at"),
+    supabase.from("kudos").select("member_id, author_id, author_name, week, created_at, note").in("member_id", ids).order("created_at", { ascending: false }),
+    supabase.from("milestones").select("id, member_id, author_id, author_name, title, achieved_on, edited_at, edited_by").in("member_id", ids).order("achieved_on", { ascending: false }),
   ]);
   if (c.error || k.error || m.error) return null;
   return { comments: byMember(c.data), kudos: byMember(k.data), milestones: byMember(m.data) };
@@ -48,7 +50,7 @@ export async function loadChecked(supabase: Awaited<ReturnType<typeof createClie
 /** The coach's private notes, newest first, by member id. Access rules return none to members. Null if the table isn't there yet. */
 export async function loadNotes(supabase: Awaited<ReturnType<typeof createClient>>, ids: string[]): Promise<Record<string, CoachNote[]> | null> {
   if (!ids.length) return {};
-  const { data, error } = await supabase.from("coach_notes").select("id, member_id, body, created_at").in("member_id", ids).order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("coach_notes").select("id, member_id, body, created_at, edited_at").in("member_id", ids).order("created_at", { ascending: false });
   return error ? null : byMember(data);
 }
 

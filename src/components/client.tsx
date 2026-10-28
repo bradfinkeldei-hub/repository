@@ -198,3 +198,14 @@ export function SeenOnOpen({ id, unseen, mark }: { id: string; unseen: boolean; 
   }, [id, unseen, mark]);
   return null;
 }
+
+/** A tap-to-open "Edit" with a form inside that closes itself again once the form is sent. */
+export function EditFold({ label = "Edit", title, children }: { label?: string; title?: string; children: React.ReactNode }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  return (
+    <details className="edit-fold" ref={ref} onSubmit={() => setTimeout(() => { if (ref.current) ref.current.open = false; })}>
+      <summary aria-label={title}><span className="shut">{label}</span><span className="opened">Cancel</span></summary>
+      {children}
+    </details>
+  );
+}
