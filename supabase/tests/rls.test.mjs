@@ -164,4 +164,17 @@ await check("meeting check-in: answer for yourself, see your own team, coach sen
   assert.equal((await as(coach, `select * from public.roll_calls`)).length, 2);
   await assert.rejects(as(coach, `insert into public.roll_calls (team, meeting, meeting_url) values ('Wednesday', '2026-10-28', 'javascript:alert(1)')`));
 });
+await check("archived members drop out of their team until the coach restores them", async () => {
+  await assert.rejects(as(tue1, `update public.profiles set archived_at = now() where id = $1`, [tue1]));
+  await as(mon2, `update public.profiles set archived_at = now() where id = $1`, [tue1]);
+  await as(coach, `update public.profiles set archived_at = now() where id = $1`, [tue1]);
+  // Priya no longer sees Sam, and Sam no longer sees his team, its answers or its roll calls.
+  assert.deepEqual(names(await as(mon2, `select name from public.profiles`)), ["Priya"]);
+  assert.deepEqual(names(await as(tue1, `select name from public.profiles`)), ["Sam"]);
+  assert.equal((await as(tue1, `select * from public.roll_calls`)).length, 0);
+  await assert.rejects(as(tue1, `update public.profiles set archived_at = null where id = $1`, [tue1]));
+  assert.equal((await as(coach, `select * from public.profiles where archived_at is not null`)).length, 1);
+  await as(coach, `update public.profiles set archived_at = null where id = $1`, [tue1]);
+  assert.deepEqual(names(await as(mon2, `select name from public.profiles`)), ["Priya", "Sam"]);
+});
 console.log(`\n${passed} checks passed`);

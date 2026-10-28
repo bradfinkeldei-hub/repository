@@ -43,7 +43,7 @@ export async function sendReminders(env: ReminderEnv, now = new Date()) {
   });
 
   const { data: due, error } = await admin.from("profiles").select("*")
-    .eq("reminder_enabled", true).eq("reminder_day", today).neq("last_reminder_week", week);
+    .eq("reminder_enabled", true).is("archived_at", null).eq("reminder_day", today).neq("last_reminder_week", week);
   if (error) throw new Error(error.message);
   const people = (due ?? []) as Profile[];
   if (!people.length) return { sent: 0, failed: 0, today, week };

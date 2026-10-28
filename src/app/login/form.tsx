@@ -12,6 +12,7 @@ const ERRORS: Record<string, string> = {
   link: "That sign-in link has expired or was already used. Request a new one below.",
   profile: "We couldn't load your profile. Try signing in again.",
   google: "Google sign-in didn't work. Try again, or use your email and password.",
+  archived: "Your membership is paused. Ask your coach if you'd like to come back.",
   invite: "That account hasn't been invited yet. Ask your coach for an invite, then sign in with the email it was sent to.",
 };
 

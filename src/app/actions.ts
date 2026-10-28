@@ -140,7 +140,7 @@ export async function askAttendance(team: string, formData: FormData) {
   const meeting = nextMeeting(team, new Date(), TZ);
 
   const [{ data: members }, { data: answers }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("team", team).neq("role", "coach"),
+    supabase.from("profiles").select("*").eq("team", team).neq("role", "coach").is("archived_at", null),
     supabase.from("attendance").select("member_id").eq("meeting", meeting),
   ]);
   const answered = new Set((answers ?? []).map((a) => a.member_id as string));
@@ -248,7 +248,9 @@ export async function inviteMember(formData: FormData) {
   if (sendError) {
     const { data: contact } = await admin.from("member_contacts").select("id").ilike("email", email).maybeSingle();
     if (contact) {
-      await admin.from("profiles").update({ team }).eq("id", contact.id);
+      // Inviting someone you archived brings them back.
+      await admin.from("profiles").update({ team, archived_at: null }).eq("id", contact.id);
+      await admin.auth.admin.updateUserById(contact.id, { ban_duration: "none" });
       await admin.from("invites").update({ accepted_at: new Date().toISOString() }).ilike("email", email).is("accepted_at", null);
       revalidatePath("/", "layout");
       redirect("/coach/members?moved=1");
@@ -280,6 +282,31 @@ export async function removeMember(memberId: string) {
   const { me } = await requireCoach();
   if (memberId === me.id) return;
   await createAdminClient().auth.admin.deleteUser(memberId);
+  revalidatePath("/", "layout");
+}
+
+/**
+ * Takes a member out of the circle without deleting anything. They leave their
+ * team's views, check-ins and reminders, and can't sign in, until restored.
+ */
+export async function archiveMember(memberId: string) {
+  const { supabase, me } = await requireCoach();
+  if (memberId === me.id) return;
+  const { error } = await supabase.from("profiles").update({ archived_at: new Date().toISOString() }).eq("id", memberId).neq("role", "coach");
+  // The app turns archived members away on its own; blocking the account also ends any session they still have.
+  if (!error && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    await createAdminClient().auth.admin.updateUserById(memberId, { ban_duration: "876000h" });
+  }
+  revalidatePath("/", "layout");
+}
+
+/** Brings an archived member back onto their team, able to sign in again. */
+export async function restoreMember(memberId: string) {
+  const { supabase } = await requireCoach();
+  const { error } = await supabase.from("profiles").update({ archived_at: null }).eq("id", memberId);
+  if (!error && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    await createAdminClient().auth.admin.updateUserById(memberId, { ban_duration: "none" });
+  }
   revalidatePath("/", "layout");
 }
 

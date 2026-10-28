@@ -30,7 +30,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
   }
 
   // The database only returns profiles on this person's team.
-  const { data } = await supabase.from("profiles").select("*").eq("team", me.team).neq("role", "coach").order("name");
+  const { data } = await supabase.from("profiles").select("*").eq("team", me.team).neq("role", "coach").is("archived_at", null).order("name");
   const members = (data ?? []) as Profile[];
   const { data: log } = await supabase.from("commitment_log").select("member_id, week, commitment, done")
     .in("member_id", members.map((m) => m.id));
