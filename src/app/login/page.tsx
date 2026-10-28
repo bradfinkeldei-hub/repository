@@ -114,6 +114,7 @@ export default function Login({ searchParams: sp }: { searchParams: Promise<{ er
           <p className="muted" style={{ margin: "8px 0 0", fontSize: "0.9rem" }}>
             New here? Joining starts with an invite from your coach. Your invite puts you on your team automatically.
           </p>
+          <a className="muted" href="/privacy" style={{ fontSize: "0.85rem" }}>Privacy policy and terms</a>
         </form>
       </div>
     </div>
