@@ -1,7 +1,7 @@
 import type { createClient } from "@/lib/supabase/server";
 
 export type CardComment = { id: string; member_id: string; author_id: string; author_name: string; body: string; created_at: string };
-export type Kudo = { member_id: string; author_id: string; author_name: string; week: string };
+export type Kudo = { member_id: string; author_id: string; author_name: string; week: string; created_at: string };
 export type Milestone = { id: string; member_id: string; author_id: string; author_name: string; title: string; achieved_on: string };
 
 export type CoachNote = { id: string; member_id: string; body: string; created_at: string };
@@ -11,6 +11,8 @@ export type Social = {
   comments: Record<string, CardComment[]>;
   kudos: Record<string, Kudo[]>;
   milestones: Record<string, Milestone[]>;
+  /** For the signed-in member's own card: what's new since they last opened their comments. */
+  fresh?: { memberId: string; comments: number; kudos: number };
 };
 
 function byMember<T extends { member_id: string }>(rows: T[] | null) {
@@ -28,7 +30,7 @@ export async function loadSocial(supabase: Awaited<ReturnType<typeof createClien
   if (!ids.length) return { comments: {}, kudos: {}, milestones: {} };
   const [c, k, m] = await Promise.all([
     supabase.from("card_comments").select("id, member_id, author_id, author_name, body, created_at").in("member_id", ids).order("created_at"),
-    supabase.from("kudos").select("member_id, author_id, author_name, week").in("member_id", ids).order("created_at", { ascending: false }),
+    supabase.from("kudos").select("member_id, author_id, author_name, week, created_at").in("member_id", ids).order("created_at", { ascending: false }),
     supabase.from("milestones").select("id, member_id, author_id, author_name, title, achieved_on").in("member_id", ids).order("achieved_on", { ascending: false }),
   ]);
   if (c.error || k.error || m.error) return null;
@@ -48,4 +50,19 @@ export async function loadNotes(supabase: Awaited<ReturnType<typeof createClient
   if (!ids.length) return {};
   const { data, error } = await supabase.from("coach_notes").select("id, member_id, body, created_at").in("member_id", ids).order("created_at", { ascending: false });
   return error ? null : byMember(data);
+}
+
+/** When a member last opened their own comments. undefined if that can't be read yet, null if never. */
+export async function loadThreadSeen(supabase: Awaited<ReturnType<typeof createClient>>, memberId: string): Promise<string | null | undefined> {
+  const { data, error } = await supabase.from("thread_seen").select("seen_at").eq("member_id", memberId).maybeSingle();
+  return error ? undefined : data?.seen_at ?? null;
+}
+
+/** Comments and kudos others left on a member's card since they last looked. */
+export function unseen(social: Social, memberId: string, seenAt: string | null) {
+  const since = (r: { author_id: string; created_at: string }) => r.author_id !== memberId && (!seenAt || r.created_at > seenAt);
+  return {
+    comments: (social.comments[memberId] ?? []).filter(since).length,
+    kudos: (social.kudos[memberId] ?? []).filter(since).length,
+  };
 }

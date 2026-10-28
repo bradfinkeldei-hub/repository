@@ -532,3 +532,6 @@ tr:last-child td { border-bottom: 0; }
   .btn.rsvp { width: 100%; min-width: 0; }
 }
 .progtable td:nth-child(2) { white-space: pre-line; }
+.new-badge { font-size: 0.72rem; font-weight: 800; color: #fff; background: var(--coral, #ef6a4c); border-radius: 999px; padding: 2px 8px; letter-spacing: 0.02em; }
+.new-note a { font-weight: 700; }
+.fold { scroll-margin-top: 120px; }
