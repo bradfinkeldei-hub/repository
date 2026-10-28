@@ -28,6 +28,7 @@ export async function saveProfile(formData: FormData) {
   const update: Record<string, unknown> = {
     name: str(formData.get("name"), 60) || me.name,
     wheel,
+    becoming: str(formData.get("becoming"), 400),
     creating: str(formData.get("creating"), 400),
     accountability: formData.has("commitment")
       ? joinCommitments(formData.getAll("commitment").map(String))

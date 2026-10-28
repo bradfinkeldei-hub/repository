@@ -67,6 +67,12 @@ export default async function ProfilePage({ searchParams: sp }: { searchParams: 
           {/* The coach editing someone's name or team shouldn't fill in scores they never gave. */}
           {AREAS.map(([k, label]) => <RangeField key={k} name={`wheel_${k}`} label={label} initial={Number(m.wheel?.[k]) || 5} unrated={!own && !m.wheel?.[k]} />)}
         </fieldset>
+        <label>Who am I going to be?
+          <span className="hint">This is a state of being, not a goal or a to-do. It&apos;s who you choose to be as you walk into your week, whatever happens. Finish the sentence <b>&ldquo;I am going to be&hellip;&rdquo;</b> with one to three words that describe how you&apos;ll show up.</span>
+          <textarea name="becoming" defaultValue={m.becoming ?? ""} maxLength={400} placeholder="I am going to be proactive, a leader, and happy." />
+          <span className="hint">Ideas: proactive · a leader · happy · productive · patient · courageous · present · generous · calm · playful</span>
+          <span className="hint"><b>Why it comes first:</b> what you do flows from who you&apos;re being. Decide who you&apos;re going to be, and what you create and the commitments you keep become the natural next steps.</span>
+        </label>
         <label>What I&apos;m actively creating
           <span className="hint">The one thing in your life you&apos;re bringing into being right now.</span>
           <textarea name="creating" defaultValue={m.creating} maxLength={400} />
