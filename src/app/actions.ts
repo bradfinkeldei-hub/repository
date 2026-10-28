@@ -6,7 +6,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCoach, requireEditor, requireRealCoach, VIEW_AS_COOKIE } from "@/lib/session";
-import { AREAS, BOOKING_ENABLED, DAYS, firstName, isTeam, monthKey, TEAMS, weekKey, type Wheel } from "@/lib/coaching";
+import { AREAS, BOOKING_ENABLED, DAYS, firstName, isTeam, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, type Profile, type Wheel } from "@/lib/coaching";
+import { sendEmails } from "@/lib/mail";
+import { rsvpLink } from "@/lib/rsvp";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 const str = (v: FormDataEntryValue | null, max: number) => String(v ?? "").trim().slice(0, max);
@@ -110,6 +112,99 @@ export async function setWeekDone(memberId: string, week: string, done: boolean)
   // The profile's done_week still drives the coach's check-ins and the team cards.
   if (week === current) await supabase.from("profiles").update({ done_week: done ? week : "" }).eq("id", memberId);
   revalidatePath("/", "layout");
+}
+
+/** A member's answer for their team's next meeting. The coach can answer for anyone. */
+export async function setAttendance(memberId: string, going: boolean) {
+  const { supabase, me } = await requireEditor();
+  if (memberId !== me.id && me.role !== "coach") return;
+  const { data: m } = await supabase.from("profiles").select("team").eq("id", memberId).single();
+  if (!isTeam(m?.team)) return;
+  const meeting = nextMeeting(m.team, new Date(), TZ);
+  await supabase.from("attendance").upsert({ member_id: memberId, meeting, going, updated_at: new Date().toISOString() });
+  revalidatePath("/", "layout");
+}
+
+/**
+ * Coach only: emails everyone on the team who hasn't answered yet, asking if
+ * they'll be at the next meeting, with one-tap In and Out links and the meeting link.
+ */
+export async function askAttendance(team: string, formData: FormData) {
+  const { supabase, names } = await requireCoach();
+  if (!isTeam(team)) redirect("/coach");
+  const back: (q: string) => never = (q) => redirect(`/coach?team=${team}&${q}#meeting-${team}`);
+  const url = str(formData.get("meeting_url"), 500);
+  if (url && !/^https?:\/\/\S+$/.test(url)) back("asked=badlink");
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret) back("asked=setup");
+  const meeting = nextMeeting(team, new Date(), TZ);
+
+  const [{ data: members }, { data: answers }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("team", team).neq("role", "coach"),
+    supabase.from("attendance").select("member_id").eq("meeting", meeting),
+  ]);
+  const answered = new Set((answers ?? []).map((a) => a.member_id as string));
+  const waiting = ((members ?? []) as Profile[]).filter((m) => !answered.has(m.id));
+  const { data: contacts } = waiting.length
+    ? await supabase.from("member_contacts").select("id, email").in("id", waiting.map((m) => m.id))
+    : { data: [] };
+  const email = new Map((contacts ?? []).map((c) => [c.id as string, c.email as string]));
+  const site = (process.env.SITE_URL ?? "").replace(/\/$/, "");
+  const coach = process.env.COACH_NAME || "your coach";
+  const when = meetingWhen(meeting, new Date(), TZ);
+
+  const emails = [];
+  for (const m of waiting) {
+    const to = email.get(m.id);
+    // @example.com is the made-up Example team; those addresses can't receive mail.
+    if (!to || to.toLowerCase().endsWith("@example.com")) continue;
+    emails.push(attendanceEmail(m, to, {
+      when, team: teamLabel(team, names), coach, site, url,
+      yes: await rsvpLink(site, secret, m.id, meeting, true),
+      no: await rsvpLink(site, secret, m.id, meeting, false),
+    }));
+  }
+  let sent: string[] | null = [];
+  try {
+    sent = await sendEmails(emails);
+  } catch (e) {
+    console.error("attendance email failed", e);
+    back("asked=fail");
+  }
+  if (sent === null) back("asked=nomail");
+  if (emails.length && !sent.length) back("asked=fail");
+  await supabase.from("roll_calls").upsert({ team, meeting, sent_at: new Date().toISOString(), meeting_url: url });
+  revalidatePath("/", "layout");
+  back(`asked=${sent.length}`);
+}
+
+function attendanceEmail(m: Profile, to: string, o: { when: string; team: string; coach: string; site: string; url: string; yes: string; no: string }) {
+  const q = `Will you be at ${o.team}'s meeting ${o.when}?`;
+  const text = [
+    `Hi ${firstName(m.name)},`,
+    "",
+    q,
+    "",
+    `I'll be there: ${o.yes}`,
+    `Can't make it: ${o.no}`,
+    o.url ? `\nJoin the meeting: ${o.url}` : "",
+    "",
+    `See who's coming: ${o.site}/team`,
+    "",
+    o.coach,
+  ].join("\n");
+  const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const button = (href: string, label: string, bg: string) =>
+    `<a href="${esc(href)}" style="display:inline-block;padding:12px 22px;margin:0 8px 8px 0;border-radius:10px;background:${bg};color:#fff;font-weight:700;text-decoration:none">${label}</a>`;
+  const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:16px;line-height:1.5;color:#15302b">
+<p>Hi ${esc(firstName(m.name))},</p>
+<p style="font-size:18px;font-weight:700">${esc(q)}</p>
+<p>${button(o.yes, "I'm in", "#16803c")}${button(o.no, "I'm out", "#c23b25")}</p>
+${o.url ? `<p><a href="${esc(o.url)}" style="color:#0b7d6e;font-weight:700">Join the meeting</a><br><span style="color:#5a6b66;font-size:14px">${esc(o.url)}</span></p>` : ""}
+<p><a href="${esc(o.site)}/team" style="color:#0b7d6e">See who's coming</a></p>
+<p>${esc(o.coach)}</p>
+</div>`;
+  return { to, subject: `${o.when === "tonight" ? "Tonight" : o.when}: are you coming?`, text, html };
 }
 
 export async function setTeam(memberId: string, team: string) {

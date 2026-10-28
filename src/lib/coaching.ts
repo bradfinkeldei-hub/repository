@@ -104,6 +104,32 @@ export function monthName(date = new Date(), timeZone?: string) {
   return new Intl.DateTimeFormat("en-US", { month: "long", timeZone }).format(date);
 }
 
+/** "2026-10-28" for the date as seen in timeZone. */
+export function dateKey(date = new Date(), timeZone?: string) {
+  const { year, month, day } = zonedParts(date, timeZone);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/**
+ * The date of a team's next meeting, counting today, like "2026-10-28".
+ * Teams without a weekday (Example) always meet today.
+ */
+export function nextMeeting(team: Team, now = new Date(), timeZone?: string) {
+  const { year, month, day, weekday } = zonedParts(now, timeZone);
+  const ahead = DAY_INDEX[team] ? (DAY_INDEX[team] - DAY_INDEX[weekday] + 7) % 7 : 0;
+  return new Date(Date.UTC(year, month - 1, day + ahead)).toISOString().slice(0, 10);
+}
+
+/** "tonight" for today's date, otherwise "Thursday, Oct 30". */
+export function meetingWhen(meeting: string, now = new Date(), timeZone?: string) {
+  if (meeting === dateKey(now, timeZone)) return "tonight";
+  return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })
+    .format(new Date(`${meeting}T12:00:00Z`));
+}
+
+/** A member's answer to "Will you be at the meeting?" (table attendance). */
+export type Rsvp = { member_id: string; meeting: string; going: boolean };
+
 export function teamAverage(list: Pick<Profile, "wheel">[]): Record<AreaKey, number | null> {
   const avg = {} as Record<AreaKey, number | null>;
   for (const [k] of AREAS) {

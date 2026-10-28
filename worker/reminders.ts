@@ -1,7 +1,7 @@
 // Weekly reminder emails. Runs from the Worker's daily schedule (custom-worker.ts),
 // outside Next.js, because sending through Gmail uses Cloudflare's TCP sockets.
 import { createClient } from "@supabase/supabase-js";
-import { WorkerMailer } from "worker-mailer";
+import { connectMailer } from "./mail";
 import { firstName, weekdayName, weekKey, type Profile } from "../src/lib/coaching";
 
 export type ReminderEnv = {
@@ -51,15 +51,7 @@ export async function sendReminders(env: ReminderEnv, now = new Date()) {
   const { data: contacts } = await admin.from("member_contacts").select("id, email").in("id", people.map((p) => p.id));
   const email = new Map((contacts ?? []).map((c) => [c.id as string, c.email as string]));
 
-  const port = Number(env.SMTP_PORT || 465);
-  const mailer = await WorkerMailer.connect({
-    host: env.SMTP_HOST || "smtp.gmail.com",
-    port,
-    secure: port === 465,
-    credentials: { username: env.SMTP_USER, password: env.SMTP_PASS },
-    authType: "plain",
-  });
-  const from = { name: env.REMINDER_FROM_NAME || "The Coaching Circle", email: env.SMTP_USER };
+  const mailer = await connectMailer(env);
   const site = (env.SITE_URL || "").replace(/\/$/, "");
   const coach = env.COACH_NAME || "your coach";
 
@@ -69,7 +61,7 @@ export async function sendReminders(env: ReminderEnv, now = new Date()) {
     // @example.com is the made-up Example team; those addresses can't receive mail.
     if (!to || to.toLowerCase().endsWith("@example.com")) continue;
     try {
-      await mailer.send({ from, to: { email: to }, subject: "Your weekly accountability reminder", text: reminderText(p, site, coach) });
+      await mailer.send({ to, subject: "Your weekly accountability reminder", text: reminderText(p, site, coach) });
       await admin.from("profiles").update({ last_reminder_week: week }).eq("id", p.id);
       sent++;
     } catch (e) {
@@ -77,6 +69,6 @@ export async function sendReminders(env: ReminderEnv, now = new Date()) {
       console.error("reminder failed", p.id, e);
     }
   }
-  await mailer.close().catch(() => {});
+  await mailer.close();
   return { sent, failed, today, week };
 }

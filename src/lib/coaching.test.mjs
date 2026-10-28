@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addWeeks, coachActions, meetingDate, monthKey, progress, teamAverage, teamLabel, teamOptions, weekKey, weekdayName } from "./coaching.ts";
+import { addWeeks, coachActions, dateKey, meetingDate, meetingWhen, nextMeeting, monthKey, progress, teamAverage, teamLabel, teamOptions, weekKey, weekdayName } from "./coaching.ts";
 
 const TZ = "America/Chicago";
 const base = {
@@ -87,4 +87,16 @@ test("team names: the coach's name wins, blanks fall back to the day", () => {
   assert.equal(teamLabel("Wednesday"), "Wednesday team");
   assert.equal(teamLabel(null, names), "Not on a team");
   assert.deepEqual(teamOptions(names)[0], ["Monday", "Trailblazers"]);
+});
+
+test("the next meeting counts today, follows the team's day, and Example meets today", () => {
+  // Tuesday Oct 27, 2026, 9pm Chicago (02:00 UTC Wednesday).
+  const tueNight = new Date("2026-10-28T02:00:00Z");
+  assert.equal(dateKey(tueNight, TZ), "2026-10-27");
+  assert.equal(nextMeeting("Tuesday", tueNight, TZ), "2026-10-27");
+  assert.equal(nextMeeting("Wednesday", tueNight, TZ), "2026-10-28");
+  assert.equal(nextMeeting("Monday", tueNight, TZ), "2026-11-02");
+  assert.equal(nextMeeting("Example", tueNight, TZ), "2026-10-27");
+  assert.equal(meetingWhen("2026-10-27", tueNight, TZ), "tonight");
+  assert.equal(meetingWhen("2026-11-02", tueNight, TZ), "Monday, Nov 2");
 });
