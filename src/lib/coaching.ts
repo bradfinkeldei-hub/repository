@@ -7,7 +7,7 @@ export const AREAS = [
   ["health", "Health"],
   ["career", "Career"],
   ["money", "Money"],
-  ["love", "Love"],
+  ["love", "Romance"],
   ["family", "Family & friends"],
   ["fun", "Fun"],
   ["growth", "Growth"],
