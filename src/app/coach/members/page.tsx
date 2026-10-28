@@ -77,7 +77,10 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
                   const free = b.some((x) => x.kind === "free"), paid = b.filter((x) => x.kind === "paid").length;
                   return (
                     <tr key={m.id}>
-                      <td><b>{m.name}</b><div className="muted" style={{ fontSize: "0.82rem" }}>{email.get(m.id)}</div></td>
+                      <td>
+                        <b>{m.name}</b><div className="muted" style={{ fontSize: "0.82rem" }}>{email.get(m.id)}</div>
+                        <Link className="linkbtn" href={`/team?as=${m.id}`} style={{ fontSize: "0.82rem" }}>View as {m.name.split(" ")[0]}</Link>
+                      </td>
                       <td>
                         <AutoSubmitSelect label={`${m.name}'s team`} value={m.team ?? ""} action={setTeam.bind(null, m.id)}
                           options={[...teamOptions(names), ["", "No team"]]} />

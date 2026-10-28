@@ -7,16 +7,29 @@ import { BOOKING_ENABLED, monthKey, monthName, progressByMember, teamLabel, week
 
 const TZ = process.env.REMINDER_TIMEZONE;
 
-export default async function TeamPage({ searchParams: sp }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function TeamPage({ searchParams: sp }: { searchParams: Promise<{ tab?: string; as?: string }> }) {
   const searchParams = await sp;
-  const { supabase, me, names } = await requireProfile();
-  if (me.role === "coach") redirect("/coach");
+  const session = await requireProfile();
+  const { supabase, names } = session;
+  let me = session.me;
+  // The coach can preview the page as any member (?as=<id>), read only.
+  let preview = false;
+  if (me.role === "coach") {
+    if (!searchParams.as) redirect("/coach");
+    const { data: member } = await supabase.from("profiles").select("*").eq("id", searchParams.as).single();
+    if (!member) redirect("/coach/members");
+    me = member as Profile;
+    preview = true;
+  }
   const tab = (["team", "accountability", "missions"].includes(searchParams.tab ?? "") ? searchParams.tab : "team") as Tab;
   const coach = process.env.COACH_NAME || "your coach";
+  const banner = preview && <PreviewBanner member={me} label={teamLabel(me.team, names)} tab={tab} />;
 
   if (!me.team) {
     return (
       <>
+        {banner}
+        <div inert={preview}>
         <Header me={me} sub="Group life coaching" tabs={[]} current="" />
         <div className="wrap layout"><main>
           <div className="empty">
@@ -24,6 +37,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
             <p>Ask {coach} to add you to your team. Once you&apos;re on a team, you&apos;ll see your teammates here.</p>
           </div>
         </main></div>
+        </div>
       </>
     );
   }
@@ -40,6 +54,8 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
 
   return (
     <>
+      {banner}
+      <div inert={preview}>
       <Header me={me}
         sub={teamLabel(me.team, names)}
         tabs={MEMBER_TABS}
@@ -65,6 +81,26 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
         )}
         <TeamViews tab={tab} groups={[{ team: me.team, members }]} viewer={me} logs={logs} names={names} ownTeam />
       </main></div>
+      </div>
     </>
+  );
+}
+
+/** Shown to the coach above a member preview. The page below it can't be clicked. */
+function PreviewBanner({ member, label, tab }: { member: Profile; label: string; tab: Tab }) {
+  const href = (t: Tab) => `/team?as=${member.id}&tab=${t}`;
+  return (
+    <div className="preview-bar">
+      <div className="wrap row">
+        <span><b>Viewing as {member.name}</b> · {label}. This is exactly what they see; nothing here can be changed.</span>
+        <span className="spacer" />
+        <nav className="row" aria-label="Preview sections">
+          {(["team", "accountability", "missions"] as Tab[]).map((t) => (
+            <Link key={t} href={href(t)} aria-current={t === tab ? "page" : undefined}>{t[0].toUpperCase() + t.slice(1)}</Link>
+          ))}
+        </nav>
+        <Link className="btn small" href={member.team ? `/coach?team=${member.team}` : "/coach/members"}>Back to coach view</Link>
+      </div>
+    </div>
   );
 }
