@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCoach, requireEditor, requireRealCoach, VIEW_AS_COOKIE } from "@/lib/session";
-import { AREAS, BOOKING_ENABLED, DAYS, firstName, isTeam, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, type Profile, type Wheel } from "@/lib/coaching";
+import { AREAS, BOOKING_ENABLED, dateKey, DAYS, firstName, isTeam, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, type Profile, type Wheel } from "@/lib/coaching";
 import { sendEmails } from "@/lib/mail";
 import { rsvpLink } from "@/lib/rsvp";
 
@@ -413,4 +413,54 @@ export async function stopViewAs() {
   jar.delete(VIEW_AS_COOKIE);
   const { data } = id ? await supabase.from("profiles").select("team").eq("id", id).maybeSingle() : { data: null };
   redirect(`/coach?team=${data?.team ?? "all"}`);
+}
+
+/** A comment under a member's card. The access rules decide who may post; a closed thread only takes the member's and the coach's. */
+export async function addComment(memberId: string, formData: FormData) {
+  const { supabase } = await requireEditor();
+  const body = str(formData.get("body"), 1000);
+  if (!body) return;
+  await supabase.from("card_comments").insert({ member_id: memberId, body });
+  revalidatePath("/", "layout");
+}
+
+/** Takes a comment down: your own, any on your card, or any as coach. */
+export async function deleteComment(id: string) {
+  const { supabase } = await requireEditor();
+  await supabase.from("card_comments").delete().eq("id", id);
+  revalidatePath("/", "layout");
+}
+
+/** Gives a teammate kudos for this meeting week, or takes it back if you already did. */
+export async function toggleKudos(memberId: string) {
+  const { supabase, me } = await requireEditor();
+  if (memberId === me.id) return;
+  const week = weekKey(new Date(), TZ);
+  const { data } = await supabase.from("kudos").delete().eq("member_id", memberId).eq("author_id", me.id).eq("week", week).select("week");
+  if (!data?.length) await supabase.from("kudos").insert({ member_id: memberId, week });
+  revalidatePath("/", "layout");
+}
+
+/** Opens or closes a member's thread to new comments. Their own choice, or the coach's. */
+export async function setThreadOpen(memberId: string, open: boolean) {
+  const { supabase, me } = await requireEditor();
+  if (memberId !== me.id && me.role !== "coach") return;
+  await supabase.from("profiles").update({ thread_open: open }).eq("id", memberId);
+  revalidatePath("/", "layout");
+}
+
+/** A win added to a member's card, by them or the coach. */
+export async function addMilestone(memberId: string, formData: FormData) {
+  const { supabase, me } = await requireEditor();
+  if (memberId !== me.id && me.role !== "coach") return;
+  const title = str(formData.get("title"), 120);
+  if (!title) return;
+  await supabase.from("milestones").insert({ member_id: memberId, title, achieved_on: dateKey(new Date(), TZ) });
+  revalidatePath("/", "layout");
+}
+
+export async function deleteMilestone(id: string) {
+  const { supabase } = await requireEditor();
+  await supabase.from("milestones").delete().eq("id", id);
+  revalidatePath("/", "layout");
 }

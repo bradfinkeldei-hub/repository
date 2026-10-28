@@ -143,3 +143,4 @@ export function Menu({ label, children }: { label: React.ReactNode; children: Re
     </details>
   );
 }
+

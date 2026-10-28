@@ -100,3 +100,15 @@ test("the next meeting counts today, follows the team's day, and Example meets t
   assert.equal(meetingWhen("2026-10-27", tueNight, TZ), "tonight");
   assert.equal(meetingWhen("2026-11-02", tueNight, TZ), "Monday, Nov 2");
 });
+
+test("milestones come from streaks, kept commitments and kudos", async () => {
+  const { autoMilestones } = await import("./coaching.ts");
+  assert.deepEqual(autoMilestones(undefined, 0), { earned: [], next: "Mark a week done to earn a first milestone" });
+  const p = { weeks: [], streak: 2, best: 4, done: 7, total: 9 };
+  const { earned, next } = autoMilestones(p, 12);
+  assert.deepEqual(earned.map((m) => m.label), ["Kept a first commitment", "3-week streak", "5 commitments kept", "10 kudos received"]);
+  // A 5-week streak is 3 weeks away from a current streak of 2; 10 kept is 3 away too, streak wins the tie.
+  assert.equal(next, "3 more weeks to a 5-week streak");
+  assert.equal(autoMilestones({ ...p, streak: 4, best: 4, done: 9 }, 0).next, "1 more week to a 5-week streak");
+  assert.equal(autoMilestones({ ...p, streak: 0, best: 4, done: 9 }, 0).next, "1 more to 10 commitments kept");
+});

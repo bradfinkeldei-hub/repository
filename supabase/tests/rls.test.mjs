@@ -177,4 +177,63 @@ await check("archived members drop out of their team until the coach restores th
   await as(coach, `update public.profiles set archived_at = null where id = $1`, [tue1]);
   assert.deepEqual(names(await as(mon2, `select name from public.profiles`)), ["Priya", "Sam"]);
 });
+await check("teammates comment on and give kudos to each other's cards, and the member can close their thread", async () => {
+  // Sam is on Tuesday with Priya; Jordan is on Monday.
+  await as(mon2, `insert into public.card_comments (member_id, body) values ($1, 'Proud of you')`, [tue1]);
+  await assert.rejects(as(mon1, `insert into public.card_comments (member_id, body) values ($1, 'Hi')`, [tue1]));
+  // The author is always whoever is signed in, whatever the request says.
+  await as(mon2, `insert into public.card_comments (member_id, author_id, author_name, body) values ($1, $2, 'Brad', 'Fake')`, [tue1, coach]);
+  assert.deepEqual((await db.query(`select author_name from public.card_comments where body = 'Fake'`)).rows.map((r) => r.author_name), ["Priya"]);
+  await as(coach, `insert into public.card_comments (member_id, body) values ($1, 'Great week')`, [tue1]);
+  const seen = await as(mon2, `select author_name from public.card_comments where member_id = $1 order by created_at`, [tue1]);
+  assert.deepEqual(seen.map((r) => r.author_name).sort(), ["Brad", "Priya", "Priya"]);
+  assert.equal((await as(mon1, `select * from public.card_comments`)).length, 0);
+
+  // Sam closes his thread: Priya can't add more, Sam and the coach still can, Priya can't reopen it.
+  await as(tue1, `update public.profiles set thread_open = false where id = $1`, [tue1]);
+  await assert.rejects(as(mon2, `insert into public.card_comments (member_id, body) values ($1, 'One more')`, [tue1]));
+  await as(tue1, `insert into public.card_comments (member_id, body) values ($1, 'Thanks all')`, [tue1]);
+  await as(coach, `insert into public.card_comments (member_id, body) values ($1, 'Still here')`, [tue1]);
+  await as(mon2, `update public.profiles set thread_open = true where id = $1`, [tue1]);
+  assert.equal((await db.query(`select thread_open from public.profiles where id = $1`, [tue1])).rows[0].thread_open, false);
+  await as(tue1, `update public.profiles set thread_open = true where id = $1`, [tue1]);
+
+  // Sam can take down a comment on his card; Priya can't take down the coach's.
+  await as(mon2, `delete from public.card_comments where author_name = 'Brad'`);
+  assert.equal((await db.query(`select count(*)::int as n from public.card_comments where author_name = 'Brad'`)).rows[0].n, 2);
+  await as(tue1, `delete from public.card_comments where body = 'Still here'`);
+  assert.equal((await db.query(`select count(*)::int as n from public.card_comments where author_name = 'Brad'`)).rows[0].n, 1);
+
+  // Kudos: once a week, never to yourself, only to teammates.
+  await as(mon2, `insert into public.kudos (member_id, week) values ($1, '2026-W44')`, [tue1]);
+  await assert.rejects(as(mon2, `insert into public.kudos (member_id, week) values ($1, '2026-W44')`, [tue1]));
+  await assert.rejects(as(tue1, `insert into public.kudos (member_id, week) values ($1, '2026-W44')`, [tue1]));
+  await assert.rejects(as(mon1, `insert into public.kudos (member_id, week) values ($1, '2026-W44')`, [tue1]));
+  await as(coach, `insert into public.kudos (member_id, week) values ($1, '2026-W44')`, [tue1]);
+  assert.deepEqual((await as(tue1, `select author_name from public.kudos`)).map((r) => r.author_name).sort(), ["Brad", "Priya"]);
+  await as(tue1, `delete from public.kudos`);
+  assert.equal((await db.query(`select count(*)::int as n from public.kudos`)).rows[0].n, 2);
+  await as(mon2, `delete from public.kudos where member_id = $1`, [tue1]);
+  assert.equal((await db.query(`select count(*)::int as n from public.kudos`)).rows[0].n, 1);
+  await as(mon2, `insert into public.kudos (member_id, week) values ($1, '2026-W44')`, [tue1]);
+
+  // Milestones: on your own card or by the coach; teammates can see but not add.
+  await as(tue1, `insert into public.milestones (member_id, title) values ($1, 'Ran my first 5k')`, [tue1]);
+  await as(coach, `insert into public.milestones (member_id, title, achieved_on) values ($1, 'Six months in the circle', '2026-10-01')`, [tue1]);
+  await assert.rejects(as(mon2, `insert into public.milestones (member_id, title) values ($1, 'Nope')`, [tue1]));
+  assert.equal((await as(mon2, `select * from public.milestones`)).length, 2);
+  assert.equal((await as(mon1, `select * from public.milestones`)).length, 0);
+  await as(mon2, `delete from public.milestones`);
+  assert.equal((await db.query(`select count(*)::int as n from public.milestones`)).rows[0].n, 2);
+});
+await check("an archived member's card, comments and kudos are hidden until they're restored", async () => {
+  await as(coach, `update public.profiles set archived_at = now() where id = $1`, [mon2]);
+  // Priya's comment and kudos on Sam's card disappear for Sam, and for the coach too.
+  assert.deepEqual((await as(tue1, `select author_name from public.card_comments`)).map((r) => r.author_name).sort(), ["Brad", "Sam"]);
+  assert.deepEqual((await as(tue1, `select author_name from public.kudos`)).map((r) => r.author_name), ["Brad"]);
+  assert.equal((await as(coach, `select * from public.kudos`)).length, 1);
+  await assert.rejects(as(mon2, `insert into public.card_comments (member_id, body) values ($1, 'Back?')`, [tue1]));
+  await as(coach, `update public.profiles set archived_at = null where id = $1`, [mon2]);
+  assert.equal((await as(tue1, `select * from public.kudos`)).length, 2);
+});
 console.log(`\n${passed} checks passed`);

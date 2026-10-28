@@ -40,6 +40,8 @@ export type Profile = {
   updated_at: string;
   /** Set while the coach has archived them: off their team and signed out, history kept. */
   archived_at: string | null;
+  /** The member's choice: false stops teammates adding comments under their card. */
+  thread_open?: boolean;
 };
 
 export type CoachActionRow = {
@@ -279,4 +281,43 @@ export function progressByMember(rows: LogRow[], currentWeek: string): Record<st
   const out: Record<string, LogRow[]> = {};
   for (const r of rows) (out[r.member_id] ??= []).push(r);
   return Object.fromEntries(Object.entries(out).map(([id, list]) => [id, progress(list, currentWeek)]));
+}
+
+export type EarnedMilestone = { key: string; label: string; icon: string };
+
+const STREAKS = [3, 5, 10, 26, 52];
+const KEPT = [5, 10, 25, 50, 100];
+const KUDOS = [5, 10, 25, 50, 100];
+
+/** The largest step in a ladder that n has reached, and the next one up. */
+function ladder(steps: number[], n: number) {
+  const hit = steps.filter((s) => n >= s).at(-1);
+  return { hit, next: steps.find((s) => n < s) };
+}
+
+/**
+ * Milestones worked out from the accountability tracker and kudos: a first
+ * kept commitment, then the highest streak, follow-through and kudos marks
+ * reached, plus the nearest next one to aim for.
+ */
+export function autoMilestones(p: Progress | undefined, kudos: number): { earned: EarnedMilestone[]; next: string | null } {
+  const earned: EarnedMilestone[] = [];
+  const best = p?.best ?? 0, kept = p?.done ?? 0;
+  if (kept >= 1) earned.push({ key: "first", label: "Kept a first commitment", icon: "\u2713" });
+  const s = ladder(STREAKS, best), k = ladder(KEPT, kept), u = ladder(KUDOS, kudos);
+  if (s.hit) earned.push({ key: `streak-${s.hit}`, label: `${s.hit}-week streak`, icon: "\u{1F525}" });
+  if (k.hit) earned.push({ key: `kept-${k.hit}`, label: `${k.hit} commitments kept`, icon: "\u2B50" });
+  if (u.hit) earned.push({ key: `kudos-${u.hit}`, label: `${u.hit} kudos received`, icon: "\u{1F44F}" });
+  // The closest goal: the current streak counts toward the next streak mark.
+  const goals: [number, string][] = [];
+  const streak = p?.streak ?? 0;
+  if (kept >= 1) {
+    const ns = STREAKS.find((n) => streak < n && n > best) ?? STREAKS.find((n) => streak < n);
+    if (ns) goals.push([ns - streak, `${ns - streak} more ${ns - streak === 1 ? "week" : "weeks"} to a ${ns}-week streak`]);
+  } else {
+    goals.push([1, "Mark a week done to earn a first milestone"]);
+  }
+  if (k.next && kept >= 1) goals.push([k.next - kept, `${k.next - kept} more to ${k.next} commitments kept`]);
+  goals.sort((a, b) => a[0] - b[0]);
+  return { earned, next: goals[0]?.[1] ?? null };
 }

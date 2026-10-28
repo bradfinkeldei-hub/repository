@@ -5,7 +5,9 @@ import { AutoSubmitSelect } from "@/components/client";
 import { Avatar } from "@/components/avatar";
 import { MiniProgress } from "@/components/progress";
 import { MeetingCheckin } from "@/components/attendance";
+import { Milestones, Thread } from "@/components/thread";
 import type { Checkin } from "@/lib/checkin";
+import type { Social } from "@/lib/social";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 
@@ -64,9 +66,7 @@ export function TeamWheel({ team, members, ownTeam, names }: { team: Team | null
 
 function Who({ m, viewer, coachTools, names }: { m: Profile; viewer: Profile; coachTools?: boolean; names?: TeamNames }) {
   const isMe = m.id === viewer.id;
-  const canEdit = isMe || viewer.role === "coach";
   const tools = coachTools && viewer.role === "coach" && !isMe;
-  const edit = canEdit && <Link className="btn ghost small" href={isMe ? "/profile" : `/profile?id=${m.id}`}>{isMe ? "Edit my profile" : "Edit profile"}</Link>;
   return (
     <>
       <div className="who">
@@ -75,26 +75,36 @@ function Who({ m, viewer, coachTools, names }: { m: Profile; viewer: Profile; co
           <h3>{m.name}</h3>
           {isMe && <div className="meta">You</div>}
         </div>
-        {!tools && edit && <div className="end">{edit}</div>}
+        {!tools && <div className="end"><EditLink m={m} viewer={viewer} /></div>}
       </div>
-      {tools && (
-        <div className="coach-tools">
-          <label className="team-pick">
-            <span>Team</span>
-            <AutoSubmitSelect
-              label={`Move ${m.name} to another team`}
-              value={m.team ?? ""}
-              action={setTeam.bind(null, m.id)}
-              options={[...teamOptions(names), ["", "No team"]]}
-            />
-          </label>
-          <div className="coach-btns">
-            <form action={startViewAs.bind(null, m.id)}><button className="btn ghost small" type="submit" title={`See the app the way ${m.name} sees it`}><span className="clip">View as {m.name.split(" ")[0]}</span></button></form>
-            {edit}
-          </div>
-        </div>
-      )}
+      {tools && <CoachTools m={m} viewer={viewer} names={names} />}
     </>
+  );
+}
+
+function EditLink({ m, viewer }: { m: Profile; viewer: Profile }) {
+  const isMe = m.id === viewer.id;
+  if (!isMe && viewer.role !== "coach") return null;
+  return <Link className="btn ghost small" href={isMe ? "/profile" : `/profile?id=${m.id}`}>{isMe ? "Edit my profile" : "Edit profile"}</Link>;
+}
+
+function CoachTools({ m, viewer, names }: { m: Profile; viewer: Profile; names?: TeamNames }) {
+  return (
+    <div className="coach-tools">
+      <label className="team-pick">
+        <span>Team</span>
+        <AutoSubmitSelect
+          label={`Move ${m.name} to another team`}
+          value={m.team ?? ""}
+          action={setTeam.bind(null, m.id)}
+          options={[...teamOptions(names), ["", "No team"]]}
+        />
+      </label>
+      <div className="coach-btns">
+        <form action={startViewAs.bind(null, m.id)}><button className="btn ghost small" type="submit" title={`See the app the way ${m.name} sees it`}><span className="clip">View as {m.name.split(" ")[0]}</span></button></form>
+        <EditLink m={m} viewer={viewer} />
+      </div>
+    </div>
   );
 }
 
@@ -120,7 +130,10 @@ function DoneState({ m, viewer }: { m: Profile; viewer: Profile }) {
   return done ? <span className="pill done" style={{ alignSelf: "flex-start" }}>Done this week</span> : <span className="pill warn" style={{ alignSelf: "flex-start" }}>Not marked done yet</span>;
 }
 
-export function MemberCard({ m, viewer, names }: { m: Profile; viewer: Profile; names?: TeamNames }) {
+export function MemberCard({ m, viewer, names, p, social, avatars }: {
+  m: Profile; viewer: Profile; names?: TeamNames; p?: Progress; social?: Social | null; avatars?: Record<string, string>;
+}) {
+  const kudos = social?.kudos[m.id] ?? [];
   return (
     <article className="card">
       <Who m={m} viewer={viewer} coachTools names={names} />
@@ -131,6 +144,8 @@ export function MemberCard({ m, viewer, names }: { m: Profile; viewer: Profile; 
       <Field label="Actively creating" value={m.creating} className="creating" />
       <div className="acct"><Field label="Held accountable to" value={m.accountability} /></div>
       <DoneState m={m} viewer={viewer} />
+      {social && <Milestones m={m} viewer={viewer} p={p} items={social.milestones[m.id] ?? []} kudos={kudos.length} />}
+      {social && <Thread m={m} viewer={viewer} comments={social.comments[m.id] ?? []} kudos={kudos} avatars={avatars ?? {}} />}
     </article>
   );
 }
@@ -161,11 +176,13 @@ export function MissionCard({ m, viewer }: { m: Profile; viewer: Profile }) {
 export type Tab = "team" | "accountability" | "missions";
 
 /** The Team, Accountability and Missions views for one or more teams. */
-export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins }: {
+export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins, social }: {
   tab: Tab; groups: { team: Team | null; members: Profile[] }[]; viewer: Profile; ownTeam?: boolean; logs?: Record<string, Progress>; names?: TeamNames;
-  checkins?: Partial<Record<Team, Checkin>>;
+  checkins?: Partial<Record<Team, Checkin>>; social?: Social | null;
 }) {
   const multi = groups.length > 1;
+  const avatars = Object.fromEntries(groups.flatMap((g) => g.members).filter((m) => m.avatar_url).map((m) => [m.id, m.avatar_url]));
+  if (viewer.avatar_url) avatars[viewer.id] = viewer.avatar_url;
   return (
     <>
       {groups.map(({ team, members }) => {
@@ -176,7 +193,7 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins 
             <>
               {team && checkins?.[team] && <MeetingCheckin team={team} members={members} viewer={viewer} c={checkins[team]} />}
               {team && <TeamWheel team={team} members={members} ownTeam={ownTeam} names={names} />}
-              <div className="grid">{members.map((m) => <MemberCard key={m.id} m={m} viewer={viewer} names={names} />)}</div>
+              <div className="grid">{members.map((m) => <MemberCard key={m.id} m={m} viewer={viewer} names={names} p={logs?.[m.id]} social={social} avatars={avatars} />)}</div>
             </>
           ) : <EmptyTeam label={teamLabel(team, names)} coach={viewer.role === "coach"} />;
         } else if (tab === "accountability") {
