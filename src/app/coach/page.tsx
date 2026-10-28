@@ -95,7 +95,11 @@ function AskedNotice({ asked }: { asked: string }) {
     badlink: "That meeting link didn't look right. It needs to start with https://",
     setup: "Email isn't set up yet: SUPABASE_SERVICE_ROLE_KEY is missing in Cloudflare.",
     nomail: "Email only sends from the live app, not from a local preview.",
+    linksaved: "Link saved. It fills in for this team's meetings from now on, and members see it on Join the meeting and in their calendar.",
+    linkcleared: "Saved link removed. Paste a link when you ask the team next time.",
+    linkfail: "The link didn't save. Try again.",
   };
+  if (asked.startsWith("link") && asked !== "linkfail") return <div className="notice good">{text[asked]}</div>;
   if (Number.isInteger(n)) {
     return <div className="notice good">{n ? `Asked ${n} ${n === 1 ? "person" : "people"} by email. Answers show up below as they come in.` : "Saved. No one needed an email (everyone's answered, or they're Example members)."}</div>;
   }

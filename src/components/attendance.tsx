@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { askAttendance, setAttendance } from "@/app/actions";
+import { askAttendance, saveMeetingLink, setAttendance } from "@/app/actions";
 import { Avatar } from "@/components/avatar";
 import { calendarEvent, clockLabel, firstName, googleCalendarUrl, meetingWhen, type Profile, type Team } from "@/lib/coaching";
 import { calendarDetails, type Checkin } from "@/lib/checkin";
@@ -68,13 +68,21 @@ export function MeetingCheckin({ team, label, members, viewer, c }: { team: Team
             Meeting link (optional)
             <input className="input" name="meeting_url" type="url" inputMode="url" maxLength={500} defaultValue={c.url || c.standing.url || c.lastUrl} placeholder="https://zoom.us/j/… or https://meet.google.com/…" />
           </label>
-          <button className="btn" type="submit" disabled={!waiting.length}>
-            {c.askedAt ? `Ask again (${waiting.length} to go)` : "Email the team: are you coming?"}
-          </button>
+          <div className="rsvp-btns">
+            <button className="btn" type="submit" disabled={!waiting.length}>
+              {c.askedAt ? `Ask again (${waiting.length} to go)` : "Email the team: are you coming?"}
+            </button>
+            <button className="btn ghost" type="submit" formAction={saveMeetingLink.bind(null, team)} formNoValidate>Save link</button>
+          </div>
+          <label className="save-link">
+            <input type="checkbox" name="save_link" defaultChecked={!c.standing.url || (c.url || c.lastUrl) === c.standing.url} />
+            Use this link for future meetings too
+          </label>
           <span className="hint">
             {c.askedAt
               ? `Asked ${new Intl.DateTimeFormat("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: TZ }).format(new Date(c.askedAt))}. Asking again only emails people who haven't answered.`
               : "Each person gets I'm in and I'm out buttons, plus the meeting link."}
+            {c.standing.url ? " This team has a saved link, so it fills in here every week." : " Save link keeps it for every week without emailing anyone."}
           </span>
         </form>
       )}
