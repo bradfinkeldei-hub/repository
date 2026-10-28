@@ -452,8 +452,71 @@ export async function removeAvatar() {
   revalidatePath("/", "layout");
 }
 
-async function removeAvatarFiles(id: string, keep?: string) {
-  const bucket = (await createClient()).storage.from("avatars");
+/**
+ * Coach only: a photo for a member. Their folder only takes their own uploads,
+ * so the photo goes up from the server with the service key.
+ */
+export async function setMemberAvatar(memberId: string, formData: FormData) {
+  await requireCoach();
+  const file = formData.get("photo");
+  if (!(file instanceof Blob) || file.size > 2_000_000 || file.type !== "image/jpeg") return { error: "That photo didn't upload. Try a different one." };
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { error: "Photo uploads for members need the service key set up." };
+  const admin = createAdminClient();
+  const path = `${memberId}/${crypto.randomUUID()}.jpg`;
+  const bucket = admin.storage.from("avatars");
+  const { error: upErr } = await bucket.upload(path, file, { contentType: "image/jpeg" });
+  if (upErr) return { error: "That photo didn't upload. Try again." };
+  const { error } = await admin.from("profiles").update({ avatar_url: bucket.getPublicUrl(path).data.publicUrl }).eq("id", memberId);
+  if (error) return { error: "That photo didn't save. Try again." };
+  await removeAvatarFiles(memberId, path, admin);
+  revalidatePath("/", "layout");
+  return {};
+}
+
+export async function removeMemberAvatar(memberId: string) {
+  const { supabase } = await requireCoach();
+  await supabase.from("profiles").update({ avatar_url: "" }).eq("id", memberId);
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) await removeAvatarFiles(memberId, undefined, createAdminClient());
+  revalidatePath("/", "layout");
+}
+
+/** Coach only: changes the email a member signs in and gets reminders with, straight away, no confirming link. */
+export async function changeMemberEmail(memberId: string, formData: FormData) {
+  const { supabase, me } = await requireCoach();
+  const back: (q: string) => never = (q) => redirect(`/profile?id=${memberId}&${q}#signin`);
+  const email = str(formData.get("email"), 200).toLowerCase();
+  if (memberId === me.id || !/^\S+@\S+\.\S+$/.test(email)) back("error=email");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) back("error=setup");
+  const { error } = await createAdminClient().auth.admin.updateUserById(memberId, { email, email_confirm: true });
+  if (error) back(`error=${/already|exists|registered/i.test(error.message) ? "taken" : "email"}`);
+  await supabase.from("member_contacts").update({ email }).eq("id", memberId);
+  revalidatePath("/", "layout");
+  back("saved=newemail");
+}
+
+/** Coach only: emails a member a link to set a new password. */
+export async function sendMemberPasswordReset(memberId: string) {
+  const { supabase } = await requireCoach();
+  const { data } = await supabase.from("member_contacts").select("email").eq("id", memberId).maybeSingle();
+  const back: (q: string) => never = (q) => redirect(`/profile?id=${memberId}&${q}#signin`);
+  if (!data?.email) back("error=noemail");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) back("error=setup");
+  // Sent from a session-less client so nothing about it sticks to the coach's own sign-in.
+  const { error } = await createAdminClient().auth.resetPasswordForEmail(data.email, { redirectTo: `${process.env.SITE_URL ?? ""}/auth/callback` });
+  back(error ? "error=reset" : "saved=resetsent");
+}
+
+/** Coach only: leaves "view as" and opens that member's edit page. */
+export async function editViewedMember() {
+  await requireRealCoach();
+  const jar = await cookies();
+  const id = jar.get(VIEW_AS_COOKIE)?.value;
+  jar.delete(VIEW_AS_COOKIE);
+  redirect(id ? `/profile?id=${id}` : "/coach");
+}
+
+async function removeAvatarFiles(id: string, keep?: string, client?: ReturnType<typeof createAdminClient>) {
+  const bucket = (client ?? await createClient()).storage.from("avatars");
   const { data } = await bucket.list(id);
   const old = (data ?? []).map((f) => `${id}/${f.name}`).filter((p) => p !== keep);
   if (old.length) await bucket.remove(old);

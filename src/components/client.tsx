@@ -77,11 +77,15 @@ export function ReminderFields({ enabled, day }: { enabled: boolean; day: string
   );
 }
 
-/** Picks a photo, crops it square, shrinks it to 320px and uploads it. */
-export function PhotoPicker({ userId, hasPhoto, save, remove }: {
+/**
+ * Picks a photo, crops it square, shrinks it to 320px and uploads it.
+ * Your own photo uploads from the browser; `upload` instead hands it to the server (the coach adding a member's).
+ */
+export function PhotoPicker({ userId, hasPhoto, save, upload, remove }: {
   userId: string;
   hasPhoto: boolean;
-  save: (path: string) => Promise<{ error?: string }>;
+  save?: (path: string) => Promise<{ error?: string }>;
+  upload?: (formData: FormData) => Promise<{ error?: string }>;
   remove: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
@@ -92,10 +96,17 @@ export function PhotoPicker({ userId, hasPhoto, save, remove }: {
     setError("");
     try {
       const blob = await squareJpeg(file, 320);
-      const path = `${userId}/${crypto.randomUUID()}.jpg`;
-      const { error: upErr } = await createClient().storage.from("avatars").upload(path, blob, { contentType: "image/jpeg" });
-      if (upErr) throw upErr;
-      const res = await save(path);
+      let res: { error?: string };
+      if (upload) {
+        const form = new FormData();
+        form.append("photo", blob, "photo.jpg");
+        res = await upload(form);
+      } else {
+        const path = `${userId}/${crypto.randomUUID()}.jpg`;
+        const { error: upErr } = await createClient().storage.from("avatars").upload(path, blob, { contentType: "image/jpeg" });
+        if (upErr) throw upErr;
+        res = await save!(path);
+      }
       if (res.error) setError(res.error);
     } catch {
       setError("That photo didn't upload. Try a different one.");
