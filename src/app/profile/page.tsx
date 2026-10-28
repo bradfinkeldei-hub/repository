@@ -2,10 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/session";
 import { removeAvatar, saveProfile, setAvatar } from "@/app/actions";
-import { PhotoPicker, RangeField, ReminderFields } from "@/components/client";
+import { CommitmentFields, PhotoPicker, RangeField, ReminderFields } from "@/components/client";
 import { Avatar } from "@/components/avatar";
 import { AccountTabs } from "@/components/account-tabs";
-import { AREAS, teamOptions, type Profile } from "@/lib/coaching";
+import { AREAS, commitmentList, MAX_COMMITMENTS, teamOptions, type Profile } from "@/lib/coaching";
 
 export default async function ProfilePage({ searchParams: sp }: { searchParams: Promise<{ id?: string; error?: string }> }) {
   const searchParams = await sp;
@@ -56,10 +56,11 @@ export default async function ProfilePage({ searchParams: sp }: { searchParams: 
           <span className="hint">The one thing in your life you&apos;re bringing into being right now.</span>
           <textarea name="creating" defaultValue={m.creating} maxLength={400} />
         </label>
-        <label>What I&apos;m being held accountable to
-          <span className="hint">A concrete commitment your team can check in on each week.</span>
-          <textarea name="accountability" defaultValue={m.accountability} maxLength={400} />
-        </label>
+        <div className="form-group">
+          <span className="form-label">What I&apos;m being held accountable to</span>
+          <span className="hint">One specific thing you&apos;ll do before the next meeting, so your team can ask &ldquo;did you do it?&rdquo; For example: &ldquo;Work out 4 mornings&rdquo; or &ldquo;Make 3 calls for the new project.&rdquo; You can add up to {MAX_COMMITMENTS}.</span>
+          <CommitmentFields initial={commitmentList(m.accountability)} max={MAX_COMMITMENTS} />
+        </div>
         <label>My mission
           <span className="hint">The mission you&apos;re living into.</span>
           <textarea name="mission" defaultValue={m.mission} maxLength={600} />

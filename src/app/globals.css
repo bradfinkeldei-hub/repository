@@ -143,6 +143,47 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
 .coach-btns form { display: flex; }
 .coach-btns form .btn { flex: 1; min-width: 0; }
 .coach-btns .clip { overflow: hidden; text-overflow: ellipsis; }
+/* Milestones and the kudos thread under a member's card. */
+.milestones, .thread { border-top: 1px dashed var(--line-strong); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.milestones h4, .thread h4 { margin: 0; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+.badges { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.badge { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 650; padding: 5px 11px; border-radius: 999px; background: var(--sun-soft); color: var(--sun); }
+.wins { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.wins li { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--surface-2); }
+.wins li > div { flex: 1; min-width: 0; }
+.wins p { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.wins small { color: var(--muted); font-size: 0.78rem; }
+.trophy { font-size: 1.05rem; line-height: 1.4; }
+.next-up { margin: 0; font-size: 0.84rem; color: var(--accent); font-weight: 600; }
+.quiet { margin: 0; color: var(--muted); font-size: 0.86rem; }
+.inline-form { display: flex; gap: 8px; align-items: flex-end; }
+.inline-form .input { flex: 1; min-width: 0; min-height: 40px; padding: 8px 12px; font-size: 0.92rem; }
+.inline-form textarea.input { resize: vertical; min-height: 44px; }
+.xbtn { border: 0; background: none; color: var(--muted); font-size: 1.15rem; line-height: 1; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; flex: none; }
+.xbtn:hover { background: var(--alert-soft); color: var(--alert); }
+.fold summary { list-style: none; display: flex; align-items: center; gap: 10px; cursor: pointer; min-height: 40px; margin: -6px -8px; padding: 6px 8px; border-radius: 12px; -webkit-tap-highlight-color: transparent; }
+.fold summary::-webkit-details-marker { display: none; }
+.fold summary:hover { background: var(--accent-soft); }
+.fold summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent-bright) 45%, transparent); }
+.fold-counts { display: flex; align-items: center; gap: 12px; margin-left: auto; font-size: 0.86rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.closed-tag { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+.chev { flex: none; width: 9px; height: 9px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg) translate(-2px, -2px); transition: transform 0.18s; margin: 0 4px; }
+.fold[open] .chev { transform: rotate(225deg) translate(-2px, -2px); }
+.fold-body { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; }
+.thread-toggle { align-self: flex-end; margin-bottom: -4px; }
+.thread-toggle .linkbtn { font-size: 0.84rem; }
+.kudos-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.btn.kudos { background: var(--sun-fill); color: #3a2300; box-shadow: 0 4px 12px -6px color-mix(in srgb, var(--sun-fill) 80%, transparent); }
+.btn.kudos.given { background: var(--sun-soft); color: var(--sun); box-shadow: none; border-color: color-mix(in srgb, var(--sun-line) 50%, transparent); }
+.kudos-count { font-size: 0.86rem; color: var(--muted); }
+.kudos-count b { color: var(--ink); }
+.comments { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.comments li { display: flex; align-items: flex-start; gap: 8px; }
+.bubble { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px 14px 14px 14px; padding: 8px 12px; }
+.bubble .by { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 0.84rem; }
+.bubble time { color: var(--muted); font-size: 0.76rem; }
+.bubble p { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.94rem; }
+.closed-note { margin: 0; font-size: 0.84rem; color: var(--muted); background: var(--surface-2); border-radius: 10px; padding: 8px 12px; }
 .avatar { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--sun-soft) 70%, var(--accent-soft))); color: var(--accent); flex: none; box-shadow: 0 0 0 2px var(--surface); }
 .wheelrow { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
 .wheel { flex: none; max-width: 100%; }
@@ -156,6 +197,29 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
 .field p.empty { color: var(--muted); font-style: italic; background: none; border: 0; padding: 0; display: block; }
 .creating p { font-family: var(--display); font-weight: 500; font-size: 1.1rem; line-height: 1.35; }
 .acct { background: var(--accent-soft); border-radius: var(--r); padding: 12px 14px; }
+.acct-tip { margin: 8px 0 0; font-size: 0.84rem; color: var(--sun); }
+.acct .empty { margin: 3px 0 0; color: var(--muted); font-style: italic; }
+.commits { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.commits li { display: flex; align-items: flex-start; gap: 10px; }
+.commits form { display: flex; }
+.tick { flex: none; width: 26px; height: 26px; border-radius: 8px; border: 2px solid color-mix(in srgb, var(--accent) 45%, var(--line-strong)); background: var(--surface); display: grid; place-items: center; padding: 0; cursor: pointer; margin-top: 1px; }
+span.tick { cursor: default; width: 22px; height: 22px; border-radius: 7px; }
+.commits li.on .tick { background: var(--ok); border-color: var(--ok); }
+.commits li.on .tick::after { content: "\2713"; color: #fff; font-weight: 800; font-size: 0.9rem; line-height: 1; }
+.commit-text { overflow-wrap: anywhere; line-height: 1.45; padding-top: 2px; }
+.commits li.on .commit-text { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.commit-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
+.add-commit { flex: 1 1 100%; }
+.add-commit summary { list-style: none; cursor: pointer; color: var(--accent); font-weight: 650; font-size: 0.88rem; display: inline-block; padding: 4px 0; }
+.add-commit summary::-webkit-details-marker { display: none; }
+.add-commit[open] summary { margin-bottom: 6px; }
+.commit-line { display: block; }
+.commit-line + .commit-line { margin-top: 6px; }
+.commit-fields { display: flex; flex-direction: column; gap: 8px; }
+.commit-field { display: flex; align-items: center; gap: 10px; }
+.commit-field input { flex: 1; min-width: 0; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-label { font-weight: 600; font-size: 0.92rem; }
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 650; border-radius: 999px; padding: 4px 11px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); }
 .pill.on { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
 .pill.done { background: var(--ok-soft); border-color: transparent; color: var(--ok); }
@@ -321,7 +385,7 @@ tr:last-child td { border-bottom: 0; }
 @media (max-width: 760px) {
   /* 16px stops iPhones zooming in when a field is tapped. */
   body { font-size: 16px; }
-  .input, .addact input, .addact select, .form input, .form textarea, .form select, .inline-select, .signin input { font-size: 16px; }
+  .input, .addact input, .addact select, .form input, .form textarea, .form select, .inline-select, .signin input, .inline-form .input { font-size: 16px; }
   .bar { gap: 10px 12px; padding-block: 10px; }
   .brand { font-size: 1.12rem; }
   .brand .mark { width: 30px; height: 30px; border-radius: 10px; }
@@ -448,3 +512,4 @@ tr:last-child td { border-bottom: 0; }
   .rsvp-ask form { flex: 1 1 0; }
   .btn.rsvp { width: 100%; min-width: 0; }
 }
+.progtable td:nth-child(2) { white-space: pre-line; }

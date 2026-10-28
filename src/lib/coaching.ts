@@ -40,6 +40,8 @@ export type Profile = {
   updated_at: string;
   /** Set while the coach has archived them: off their team and signed out, history kept. */
   archived_at: string | null;
+  /** The member's choice: false stops teammates adding comments under their card. */
+  thread_open?: boolean;
 };
 
 export type CoachActionRow = {
@@ -67,6 +69,19 @@ export function teamLabel(team: Team | null, names: TeamNames = {}) {
 /** The team menu's choices: [team key, its current name]. */
 export function teamOptions(names: TeamNames = {}): [string, string][] {
   return TEAMS.map((t) => [t, teamLabel(t, names)]);
+}
+
+/** Members can hold themselves to up to this many commitments a week. */
+export const MAX_COMMITMENTS = 3;
+
+/** A member's commitments. profiles.accountability holds them one per line. */
+export function commitmentList(text: string | null | undefined) {
+  return (text ?? "").split("\n").map((s) => s.trim()).filter(Boolean).slice(0, MAX_COMMITMENTS);
+}
+
+/** The accountability text for a list of commitments: one per line, each kept to 200 characters. */
+export function joinCommitments(list: string[]) {
+  return list.map((s) => s.replace(/\s+/g, " ").trim().slice(0, 200)).filter(Boolean).slice(0, MAX_COMMITMENTS).join("\n");
 }
 
 export function firstName(name: string) {
@@ -159,6 +174,20 @@ export type Suggestion = {
 
 const DAY_INDEX: Record<string, number> = { Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7 };
 
+const COUNTED = /\d|\b(one|two|three|four|five|six|seven|eight|nine|ten|once|twice|daily|every|each)\b/i;
+const FUZZY = /\bgoals?\b|\bwork(ing)? on\b|\bfocus(ing)? on\b|\bbetter\b|\bimprov(e|ing)\b|\bmore\b|\bless\b/i;
+
+/**
+ * A commitment nobody could check off at the next meeting: a word or two, or
+ * areas and goals ("health goals", "be better with money") with no count or
+ * frequency in it.
+ */
+export function isVagueCommitment(text: string) {
+  const t = text.trim();
+  if (!t) return false;
+  return t.split(/\s+/).length < 3 || (FUZZY.test(t) && !COUNTED.test(t));
+}
+
 /**
  * What the coach should do this week. Generated from member profiles and
  * bookings; done marks and the coach's own actions come from coach_actions.
@@ -183,8 +212,13 @@ export function coachActions(
       out.push({ id, kind, level, text, why, team: m.team, memberId: m.id, done: marks.get(id) ?? false });
     };
     if (!m.accountability) add("commit", "high", `Help ${fn} set a commitment`, "They haven't shared what they want to be held accountable to.");
-    else if (m.team && today >= DAY_INDEX[m.team] && m.done_week !== wk)
-      add("checkin", "high", `Check in with ${fn}`, `Not marked done since ${m.team}'s meeting: ${m.accountability}`);
+    else {
+      const vague = commitmentList(m.accountability).filter(isVagueCommitment);
+      if (vague.length)
+        add("commit", "mid", `Help ${fn} make their commitment specific`, `"${vague.join("; ")}" is hard to check off. Ask for one action they can finish before the next meeting.`);
+    }
+    if (m.accountability && m.team && today >= DAY_INDEX[m.team] && m.done_week !== wk)
+      add("checkin", "high", `Check in with ${fn}`, `Not marked done since ${m.team}'s meeting: ${commitmentList(m.accountability).join("; ")}`);
     const low = AREAS.filter(([k]) => Number(m.wheel?.[k]) > 0 && Number(m.wheel?.[k]) <= 3);
     if (low.length)
       add("wheel", "mid", `Talk with ${fn} about ${low.map(([, l]) => l).join(" and ")}`,
@@ -279,4 +313,43 @@ export function progressByMember(rows: LogRow[], currentWeek: string): Record<st
   const out: Record<string, LogRow[]> = {};
   for (const r of rows) (out[r.member_id] ??= []).push(r);
   return Object.fromEntries(Object.entries(out).map(([id, list]) => [id, progress(list, currentWeek)]));
+}
+
+export type EarnedMilestone = { key: string; label: string; icon: string };
+
+const STREAKS = [3, 5, 10, 26, 52];
+const KEPT = [5, 10, 25, 50, 100];
+const KUDOS = [5, 10, 25, 50, 100];
+
+/** The largest step in a ladder that n has reached, and the next one up. */
+function ladder(steps: number[], n: number) {
+  const hit = steps.filter((s) => n >= s).at(-1);
+  return { hit, next: steps.find((s) => n < s) };
+}
+
+/**
+ * Milestones worked out from the accountability tracker and kudos: a first
+ * kept commitment, then the highest streak, follow-through and kudos marks
+ * reached, plus the nearest next one to aim for.
+ */
+export function autoMilestones(p: Progress | undefined, kudos: number): { earned: EarnedMilestone[]; next: string | null } {
+  const earned: EarnedMilestone[] = [];
+  const best = p?.best ?? 0, kept = p?.done ?? 0;
+  if (kept >= 1) earned.push({ key: "first", label: "Kept a first commitment", icon: "\u2713" });
+  const s = ladder(STREAKS, best), k = ladder(KEPT, kept), u = ladder(KUDOS, kudos);
+  if (s.hit) earned.push({ key: `streak-${s.hit}`, label: `${s.hit}-week streak`, icon: "\u{1F525}" });
+  if (k.hit) earned.push({ key: `kept-${k.hit}`, label: `${k.hit} commitments kept`, icon: "\u2B50" });
+  if (u.hit) earned.push({ key: `kudos-${u.hit}`, label: `${u.hit} kudos received`, icon: "\u{1F44F}" });
+  // The closest goal: the current streak counts toward the next streak mark.
+  const goals: [number, string][] = [];
+  const streak = p?.streak ?? 0;
+  if (kept >= 1) {
+    const ns = STREAKS.find((n) => streak < n && n > best) ?? STREAKS.find((n) => streak < n);
+    if (ns) goals.push([ns - streak, `${ns - streak} more ${ns - streak === 1 ? "week" : "weeks"} to a ${ns}-week streak`]);
+  } else {
+    goals.push([1, "Mark a week done to earn a first milestone"]);
+  }
+  if (k.next && kept >= 1) goals.push([k.next - kept, `${k.next - kept} more to ${k.next} commitments kept`]);
+  goals.sort((a, b) => a[0] - b[0]);
+  return { earned, next: goals[0]?.[1] ?? null };
 }
