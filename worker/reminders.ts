@@ -2,7 +2,7 @@
 // outside Next.js, because sending through Gmail uses Cloudflare's TCP sockets.
 import { createClient } from "@supabase/supabase-js";
 import { connectMailer } from "./mail";
-import { firstName, weekdayName, weekKey, type Profile } from "../src/lib/coaching";
+import { BOOKING_ENABLED, firstName, weekdayName, weekKey, type Profile } from "../src/lib/coaching";
 
 export type ReminderEnv = {
   NEXT_PUBLIC_SUPABASE_URL?: string;
@@ -26,9 +26,9 @@ export function reminderText(p: Profile, site: string, coach: string) {
     p.creating?.trim() ? `\nWhat you're creating: ${p.creating.trim()}` : "",
     "",
     `When you've done your part this week, mark it done: ${site}/team?tab=accountability`,
-    `Feeling stuck? Book a call with ${coach}: ${site}/book`,
+    ...(BOOKING_ENABLED ? [`Feeling stuck? Book a call with ${coach}: ${site}/book`] : []),
     "",
-    "You can change or turn off this reminder on your profile.",
+    `You can change or turn off this reminder in Settings: ${site}/settings`,
   ].join("\n");
 }
 
@@ -50,16 +50,17 @@ export async function sendReminders(env: ReminderEnv, now = new Date()) {
 
   const { data: contacts } = await admin.from("member_contacts").select("id, email").in("id", people.map((p) => p.id));
   const email = new Map((contacts ?? []).map((c) => [c.id as string, c.email as string]));
+  // @example.com is the made-up Example team; those addresses can't receive mail.
+  const real = people.filter((p) => !!email.get(p.id) && !email.get(p.id)!.toLowerCase().endsWith("@example.com"));
+  if (!real.length) return { sent: 0, failed: 0, today, week };
 
   const mailer = await connectMailer(env);
   const site = (env.SITE_URL || "").replace(/\/$/, "");
   const coach = env.COACH_NAME || "your coach";
 
   let sent = 0, failed = 0;
-  for (const p of people) {
-    const to = email.get(p.id);
-    // @example.com is the made-up Example team; those addresses can't receive mail.
-    if (!to || to.toLowerCase().endsWith("@example.com")) continue;
+  for (const p of real) {
+    const to = email.get(p.id)!;
     try {
       await mailer.send({ to, subject: "Your weekly accountability reminder", text: reminderText(p, site, coach) });
       await admin.from("profiles").update({ last_reminder_week: week }).eq("id", p.id);

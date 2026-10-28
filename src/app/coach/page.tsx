@@ -26,12 +26,14 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
   const sel = searchParams.team === "all" || searchParams.team === "none" || isTeam(searchParams.team) ? searchParams.team : "Monday";
   const tab = (["team", "accountability", "missions", "progress", "actions"].includes(searchParams.tab ?? "") ? searchParams.tab : "team") as CoachTab;
 
-  const [{ data: profiles }, { data: rows }, { data: bookings }, { data: log }] = await Promise.all([
+  const [{ data: profiles, error }, { data: rows }, { data: bookings }, { data: log }] = await Promise.all([
     supabase.from("profiles").select("*").neq("role", "coach").is("archived_at", null).order("name"),
     supabase.from("coach_actions").select("*"),
     supabase.from("bookings").select("*").gte("created_at", new Date(Date.now() - 7 * 864e5).toISOString()),
     supabase.from("commitment_log").select("member_id, week, commitment, done"),
   ]);
+  // An empty list here would look like everyone vanished; show the error page instead.
+  if (error) throw new Error(`Couldn't load members: ${error.message}`);
   const logs = progressByMember((log ?? []) as LogRow[], weekKey(new Date(), TZ));
   const members = (profiles ?? []) as Profile[];
   const actions = coachActions(members, (rows ?? []) as CoachActionRow[], (bookings ?? []) as Booking[], new Date(), TZ, names);

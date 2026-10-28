@@ -42,13 +42,15 @@ export function AutoSubmitCheckbox({ id, label, checked, action }: {
   );
 }
 
-export function RangeField({ name, label, initial }: { name: string; label: string; initial: number }) {
+/** unrated: the area has no score yet, and nothing is sent for it until the slider is moved. */
+export function RangeField({ name, label, initial, unrated }: { name: string; label: string; initial: number; unrated?: boolean }) {
   const [v, setV] = useState(initial);
+  const [touched, setTouched] = useState(!unrated);
   return (
     <label className="slider">
       <span>{label}</span>
-      <input type="range" name={name} min={1} max={10} value={v} onChange={(e) => setV(Number(e.target.value))} style={{ accentColor: "var(--accent)" }} />
-      <output style={{ fontWeight: 700, textAlign: "right" }}>{v}</output>
+      <input type="range" name={touched ? name : undefined} min={1} max={10} value={v} onChange={(e) => { setV(Number(e.target.value)); setTouched(true); }} style={{ accentColor: "var(--accent)", opacity: touched ? 1 : 0.35 }} />
+      <output style={{ fontWeight: 700, textAlign: "right" }}>{touched ? v : "–"}</output>
     </label>
   );
 }

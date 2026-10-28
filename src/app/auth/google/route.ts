@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   const csrf = request.cookies.get("g_csrf_token")?.value;
   if (typeof credential !== "string" || (csrf && csrf !== form.get("g_csrf_token"))) return back("google");
   const { error } = await (await createClient()).auth.signInWithIdToken({ provider: "google", token: credential });
-  // A new Google account that wasn't invited is turned away by the database.
-  if (error) return back(/database error/i.test(error.message) ? "invite" : "google");
+  // A new Google account that wasn't invited is turned away by the database; an archived member's account is blocked.
+  if (error) return back(/database error/i.test(error.message) ? "invite" : /banned/i.test(error.message) ? "archived" : "google");
   return back();
 }

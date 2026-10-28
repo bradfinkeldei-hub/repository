@@ -30,8 +30,10 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
   }
 
   // The database only returns profiles on this person's team.
-  const { data } = await supabase.from("profiles").select("*").eq("team", me.team).neq("role", "coach").is("archived_at", null).order("name");
-  const members = (data ?? []) as Profile[];
+  const { data, error } = await supabase.from("profiles").select("*").eq("team", me.team).neq("role", "coach").is("archived_at", null).order("name");
+  if (error) throw new Error(`Couldn't load the team: ${error.message}`);
+  // Your own card first, so it's not lost among your teammates.
+  const members = ((data ?? []) as Profile[]).sort((a, b) => Number(b.id === me.id) - Number(a.id === me.id));
   const { data: log } = await supabase.from("commitment_log").select("member_id, week, commitment, done")
     .in("member_id", members.map((m) => m.id));
   const logs = progressByMember((log ?? []) as LogRow[], weekKey(new Date(), TZ));

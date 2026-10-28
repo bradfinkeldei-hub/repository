@@ -270,11 +270,13 @@ export async function cancelInvite(id: string) {
 export async function resendInvite(id: string) {
   const { supabase } = await requireCoach();
   const { data } = await supabase.from("invites").select("email, name").eq("id", id).single();
-  if (data && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    await sendInvite(data.email, data.name ?? "");
-    await supabase.from("invites").update({ invited_at: new Date().toISOString() }).eq("id", id);
-  }
+  if (!data) redirect("/coach/members");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) redirect("/coach/members?error=setup");
+  const { error } = await sendInvite(data.email, data.name ?? "");
+  if (error) redirect("/coach/members?error=resend");
+  await supabase.from("invites").update({ invited_at: new Date().toISOString() }).eq("id", id);
   revalidatePath("/coach/members");
+  redirect("/coach/members?resent=1");
 }
 
 /** Removes a member and their sign-in. Coach only. */
