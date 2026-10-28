@@ -109,11 +109,12 @@ function CoachTools({ m, viewer, names }: { m: Profile; viewer: Profile; names?:
   );
 }
 
-function Field({ label, value, className = "" }: { label: string; value: string; className?: string }) {
+function Field({ label, value, className = "", note }: { label: string; value: string; className?: string; note?: string }) {
   return (
     <div className={`field ${className}`}>
       <span className="label">{label}</span>
       <p className={value ? "" : "empty"}>{value || "Not shared yet"}</p>
+      {note && value && <span className="field-note">{note}</span>}
     </div>
   );
 }
@@ -178,7 +179,7 @@ export function MemberCard({ m, viewer, names, p, social, avatars, checked, note
         <WheelSvg wheel={m.wheel as Wheel} label={`${m.name}'s life wheel`} />
         <Legend wheel={m.wheel as Wheel} />
       </div>
-      <Field label="Who I'm going to be" value={m.becoming} className="becoming" />
+      <Field label="Who I'm going to be" value={m.becoming} className="becoming" note="A way of being I choose, before anything I do." />
       <Field label="Actively creating" value={m.creating} className="creating" />
       <Commitments m={m} viewer={viewer} checked={checked} />
       {social && <Milestones m={m} viewer={viewer} p={p} items={social.milestones[m.id] ?? []} kudos={kudos.length} />}
