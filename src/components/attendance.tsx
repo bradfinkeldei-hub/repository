@@ -61,7 +61,7 @@ export function MeetingCheckin({ team, members, viewer, c }: { team: Team; membe
           <span className="hint">
             {c.askedAt
               ? `Asked ${new Intl.DateTimeFormat("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: TZ }).format(new Date(c.askedAt))}. Asking again only emails people who haven't answered.`
-              : "Each person gets one-tap I'm in and I'm out buttons, plus the meeting link."}
+              : "Each person gets I'm in and I'm out buttons, plus the meeting link."}
           </span>
         </form>
       )}
