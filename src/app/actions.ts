@@ -563,6 +563,15 @@ export async function addComment(memberId: string, formData: FormData) {
   revalidatePath("/", "layout");
 }
 
+/** Rewords a comment. The access rules only let its author or the coach, and only the words change. */
+export async function editComment(id: string, formData: FormData) {
+  const { supabase } = await requireEditor();
+  const body = str(formData.get("body"), 1000);
+  if (!body) return;
+  await supabase.from("card_comments").update({ body }).eq("id", id);
+  revalidatePath("/", "layout");
+}
+
 /** Takes a comment down: your own, any on your card, or any as coach. */
 export async function deleteComment(id: string) {
   const { supabase } = await requireEditor();
@@ -577,6 +586,14 @@ export async function toggleKudos(memberId: string) {
   const week = weekKey(new Date(), TZ);
   const { data } = await supabase.from("kudos").delete().eq("member_id", memberId).eq("author_id", me.id).eq("week", week).select("week");
   if (!data?.length) await supabase.from("kudos").insert({ member_id: memberId, week });
+  revalidatePath("/", "layout");
+}
+
+/** Adds, changes or clears the short note on the kudos you gave a teammate this week. */
+export async function setKudosNote(memberId: string, formData: FormData) {
+  const { supabase, me } = await requireEditor();
+  const note = str(formData.get("note"), 140);
+  await supabase.from("kudos").update({ note }).eq("member_id", memberId).eq("author_id", me.id).eq("week", weekKey(new Date(), TZ));
   revalidatePath("/", "layout");
 }
 
@@ -598,6 +615,16 @@ export async function addMilestone(memberId: string, formData: FormData) {
   revalidatePath("/", "layout");
 }
 
+/** Changes a milestone's words or date: on your own card, or anyone's as coach. */
+export async function editMilestone(id: string, formData: FormData) {
+  const { supabase } = await requireEditor();
+  const title = str(formData.get("title"), 120);
+  const on = str(formData.get("achieved_on"), 10);
+  if (!title) return;
+  await supabase.from("milestones").update({ title, ...(/^\d{4}-\d{2}-\d{2}$/.test(on) ? { achieved_on: on } : {}) }).eq("id", id);
+  revalidatePath("/", "layout");
+}
+
 export async function deleteMilestone(id: string) {
   const { supabase } = await requireEditor();
   await supabase.from("milestones").delete().eq("id", id);
@@ -609,6 +636,13 @@ export async function addNote(memberId: string, formData: FormData) {
   const { supabase } = await requireCoach();
   const body = str(formData.get("body"), 2000);
   if (body) await supabase.from("coach_notes").insert({ member_id: memberId, body });
+  revalidatePath("/coach");
+}
+
+export async function editNote(id: string, formData: FormData) {
+  const { supabase } = await requireCoach();
+  const body = str(formData.get("body"), 2000);
+  if (body) await supabase.from("coach_notes").update({ body }).eq("id", id);
   revalidatePath("/coach");
 }
 

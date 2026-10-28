@@ -1,4 +1,5 @@
-import { addNote, deleteNote } from "@/app/actions";
+import { addNote, deleteNote, editNote } from "@/app/actions";
+import { EditFold } from "@/components/client";
 import { firstName, type Profile } from "@/lib/coaching";
 import type { CoachNote } from "@/lib/social";
 
@@ -32,7 +33,14 @@ export function CoachNotes({ m, notes }: { m: Profile; notes: CoachNote[] }) {
               <li key={n.id}>
                 <div>
                   <time dateTime={n.created_at}>{when(n.created_at)}</time>
+                  {n.edited_at && <span className="edited" title={`Edited ${when(n.edited_at)}`}> · edited</span>}
                   <p>{n.body}</p>
+                  <EditFold title="Edit note">
+                    <form className="edit-form" action={editNote.bind(null, n.id)}>
+                      <textarea className="input" name="body" rows={3} maxLength={2000} required defaultValue={n.body} aria-label="Edit note" />
+                      <button className="btn small" type="submit">Save</button>
+                    </form>
+                  </EditFold>
                 </div>
                 <form action={deleteNote.bind(null, n.id)}>
                   <button className="xbtn" type="submit" aria-label="Delete note" title="Delete">×</button>
