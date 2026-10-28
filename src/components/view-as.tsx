@@ -1,9 +1,9 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { VIEW_AS_COOKIE, viewedMember } from "@/lib/session";
-import { startViewAs, stopViewAs } from "@/app/actions";
+import { editViewedMember, startViewAs, stopViewAs } from "@/app/actions";
 import { AutoSubmitSelect } from "@/components/client";
-import { teamLabel, type Profile, type TeamNames } from "@/lib/coaching";
+import { firstName, teamLabel, type Profile, type TeamNames } from "@/lib/coaching";
 
 /** Coach only: the bar shown while viewing the app as a member, with a switcher and the way out. */
 export async function ViewAsBanner() {
@@ -27,7 +27,7 @@ export async function ViewAsBanner() {
       <style>{`form:not(.viewas) :is(button, input, select, textarea) { pointer-events: none; opacity: 0.55; } body { padding-bottom: 96px; }`}</style>
       <div className="viewas-bar" role="status">
         <div className="wrap row">
-          <span><b>Viewing as {member.name || "this member"}</b> · {teamLabel(member.team, names)} · Read-only, nothing here saves.</span>
+          <span><b>Viewing as {member.name || "this member"}</b> · {teamLabel(member.team, names)} · Read-only here. Use Edit to change things for them.</span>
           <span className="spacer" />
           <form className="viewas row">
             <AutoSubmitSelect
@@ -37,6 +37,7 @@ export async function ViewAsBanner() {
               options={others.map((o) => [o.id, `${o.name || "No name"}${o.team ? ` (${teamLabel(o.team, names)})` : ""}`])}
             />
           </form>
+          <form className="viewas" action={editViewedMember}><button className="btn small" type="submit">Edit {firstName(member.name) || "this member"}</button></form>
           <form className="viewas" action={stopViewAs}><button className="btn small" type="submit">Exit member view</button></form>
         </div>
       </div>

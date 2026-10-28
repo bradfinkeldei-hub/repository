@@ -172,7 +172,7 @@ export function MemberCard({ m, viewer, names, p, social, avatars, checked, note
 }) {
   const kudos = social?.kudos[m.id] ?? [];
   return (
-    <article className="card">
+    <article className="card" id={`member-${m.id}`}>
       <Who m={m} viewer={viewer} coachTools names={names} />
       <div className="wheelrow">
         <WheelSvg wheel={m.wheel as Wheel} label={`${m.name}'s life wheel`} />
