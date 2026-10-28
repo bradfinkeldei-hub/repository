@@ -384,3 +384,9 @@ tr:last-child td { border-bottom: 0; }
   .legend { flex-basis: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+.intro-actions { gap: 8px; flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .intro-actions { width: 100%; }
+  .intro-actions .btn { flex: 1 1 auto; }
+}

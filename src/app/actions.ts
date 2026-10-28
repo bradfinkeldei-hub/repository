@@ -124,7 +124,7 @@ export async function renameTeams(formData: FormData) {
   const rows = TEAMS.map((team) => ({ team, name: str(formData.get(`name_${team}`), 40) || `${team} team` }));
   const { error } = await supabase.from("team_names").upsert(rows);
   revalidatePath("/", "layout");
-  redirect(error ? "/coach/members?error=rename#team-names" : "/coach/members?renamed=1#team-names");
+  redirect(error ? "/coach/teams?error=1" : "/coach/teams?saved=1");
 }
 
 /** Sends Supabase's invite email. The name fills {{ .Data.name }} in the Invite user template and becomes their profile name. */
