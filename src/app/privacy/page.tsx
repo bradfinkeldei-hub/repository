@@ -2,8 +2,6 @@ import Link from "next/link";
 
 export const metadata = { title: "Privacy policy and terms · The Coaching Circle" };
 
-const CONTACT = "bradfinkeldei@gmail.com";
-
 /** Public page, linked from Google's sign-in screen. Keep in step with the copy on the Carrd site. */
 export default function PrivacyPage() {
   return (
@@ -29,7 +27,7 @@ export default function PrivacyPage() {
       <h2>Service providers</h2>
       <p>The app is hosted on Cloudflare, stores data with Supabase, and sends email through Google Gmail. These providers process information only to run the app.</p>
       <h2>Keeping and deleting information</h2>
-      <p>Information stays in the app until you edit it or ask for it to be removed. To have your account and all of its information deleted, email your coach at {CONTACT}.</p>
+      <p>Information stays in the app until you edit it or ask for it to be removed. To have your account and all of its information deleted, ask your coach.</p>
 
       <h1 id="terms">Terms of service</h1>
       <p>These terms apply to The Coaching Circle, a private, invite-only web app run by Brad for Sparkz of Courage group life coaching. By signing in, you agree to them.</p>
@@ -42,7 +40,7 @@ export default function PrivacyPage() {
       <h2>Changes and access</h2>
       <p>The app is provided as is, and it may change or occasionally be unavailable. Your coach can remove an account, for example if someone leaves the group or doesn&apos;t follow these terms. You can ask to have your account deleted at any time.</p>
       <h2>Contact</h2>
-      <p>Questions about this policy or these terms can go to Brad at {CONTACT}.</p>
+      <p>Questions about this policy or these terms can go to your coach, Brad.</p>
     </div>
   );
 }
