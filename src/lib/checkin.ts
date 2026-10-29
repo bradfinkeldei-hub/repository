@@ -26,7 +26,7 @@ export async function loadCheckins(
     supabase.from("attendance").select("member_id, meeting, going").in("meeting", dates),
     supabase.from("roll_calls").select("team, meeting, sent_at, meeting_url").in("team", teams).order("meeting", { ascending: false }).limit(200),
     // Empty (and so no calendar buttons) until the meeting-time columns exist.
-    supabase.from("team_names").select("team, meeting_time, meeting_minutes, meeting_url").in("team", teams),
+    supabase.from("team_names").select("team, meeting_time, meeting_minutes, meeting_url, meeting_tz").in("team", teams),
   ]);
   const out: Partial<Record<Team, Checkin>> = {};
   for (const t of teams) {
@@ -39,7 +39,7 @@ export async function loadCheckins(
       askedAt: now?.sent_at ?? null,
       url: now?.meeting_url ?? "",
       lastUrl: mine.find((c) => c.meeting_url)?.meeting_url ?? "",
-      standing: { time: st?.meeting_time ?? "", minutes: st?.meeting_minutes ?? 60, url: st?.meeting_url ?? "" },
+      standing: { time: st?.meeting_time ?? "", minutes: st?.meeting_minutes ?? 60, url: st?.meeting_url ?? "", tz: st?.meeting_tz ?? "" },
     };
   }
   return out;
