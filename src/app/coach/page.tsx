@@ -8,7 +8,7 @@ import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitCheckbox } from "@/components/client";
 import { addAction, deleteAction, setActionDone } from "@/app/actions";
 import { loadCheckins } from "@/lib/checkin";
-import { loadChecked, loadNotes, loadSocial } from "@/lib/social";
+import { loadChecked, loadIntentions, loadNotes, loadSocial } from "@/lib/social";
 import {
   BOOKING_ENABLED, coachActions, isTeam, progressByMember, teamLabel, TEAMS, weekKey,
   type Booking, type CoachActionRow, type LogRow, type Profile, type Progress, type Suggestion, type Team, type TeamNames,
@@ -45,9 +45,9 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
     : [sel === "none" ? null : (sel as Team)];
   const groups = teamsShown.map((team) => ({ team, members: members.filter((m) => m.team === team) }));
   const shownIds = groups.flatMap((g) => g.members.map((m) => m.id));
-  const [checkins, social, notes] = tab === "team"
-    ? await Promise.all([loadCheckins(supabase, teamsShown.filter(isTeam), TZ), loadSocial(supabase, shownIds), loadNotes(supabase, shownIds)])
-    : [undefined, undefined, undefined];
+  const [checkins, social, notes, intentions] = tab === "team"
+    ? await Promise.all([loadCheckins(supabase, teamsShown.filter(isTeam), TZ), loadSocial(supabase, shownIds), loadNotes(supabase, shownIds), loadIntentions(supabase, teamsShown.filter(isTeam))])
+    : [undefined, undefined, undefined, undefined];
   const checked = tab === "team" || tab === "accountability"
     ? await loadChecked(supabase, groups.flatMap((g) => g.members.map((m) => m.id)), weekKey(new Date(), TZ)) : undefined;
   const selLabel = sel === "all" ? "All teams" : teamLabel(sel === "none" ? null : (sel as Team), names);
@@ -80,7 +80,7 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
                 </div>
               </div>
               {searchParams.asked && <AskedNotice asked={searchParams.asked} />}
-              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} names={names} checkins={checkins} social={social} checked={checked} notes={notes} />
+              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} names={names} checkins={checkins} social={social} checked={checked} notes={notes} intentions={intentions} />
             </>
           )}
         </main>
@@ -98,8 +98,10 @@ function AskedNotice({ asked }: { asked: string }) {
     linksaved: "Link saved. It fills in for this team's meetings from now on, and members see it on Join the meeting and in their calendar.",
     linkcleared: "Saved link removed. Paste a link when you ask the team next time.",
     linkfail: "The link didn't save. Try again.",
+    intentsaved: "Saved. Everyone on this team sees it at the top of their Team tab.",
+    intentfail: "The intention didn't save. Try again.",
   };
-  if (asked.startsWith("link") && asked !== "linkfail") return <div className="notice good">{text[asked]}</div>;
+  if ((asked.startsWith("link") && asked !== "linkfail") || asked === "intentsaved") return <div className="notice good">{text[asked]}</div>;
   if (Number.isInteger(n)) {
     return <div className="notice good">{n ? `Asked ${n} ${n === 1 ? "person" : "people"} by email. Answers show up below as they come in.` : "Saved. No one needed an email (everyone's answered, or they're Example members)."}</div>;
   }

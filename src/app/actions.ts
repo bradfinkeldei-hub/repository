@@ -240,6 +240,16 @@ export async function saveMeetingLink(team: string, formData: FormData) {
   back(error ? "asked=linkfail" : url ? "asked=linksaved" : "asked=linkcleared");
 }
 
+/** Coach only: "The intention of this group is:" for one team. An empty box clears it. */
+export async function saveIntention(team: string, formData: FormData) {
+  const { supabase } = await requireCoach();
+  if (!isTeam(team)) redirect("/coach");
+  const body = str(formData.get("body"), 500);
+  const { error } = await supabase.from("team_intentions").upsert({ team, body, updated_at: new Date().toISOString() });
+  revalidatePath("/", "layout");
+  redirect(`/coach?team=${team}&asked=${error ? "intentfail" : "intentsaved"}#intention-${team}`);
+}
+
 function attendanceEmail(m: Profile, to: string, o: { when: string; team: string; coach: string; site: string; url: string; yes: string; no: string }) {
   const q = `Will you be at ${o.team}'s meeting ${o.when}?`;
   const text = [

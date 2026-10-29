@@ -303,4 +303,13 @@ await check("only the coach sets meeting times; everyone can read them", async (
   assert.deepEqual((await as(mon1, `select meeting_time from public.team_names where team = 'Monday'`)).map((r) => r.meeting_time), ["19:00"]);
   await assert.rejects(as(coach, `update public.team_names set meeting_time = '7pm' where team = 'Monday'`));
 });
+await check("only the coach writes a team's intention; members see their own team's", async () => {
+  await as(coach, `insert into public.team_intentions (team, body) values ('Monday', 'To show up for each other'), ('Tuesday', 'To grow together')`);
+  await assert.rejects(as(mon1, `insert into public.team_intentions (team, body) values ('Wednesday', 'Hacked')`));
+  await as(mon1, `update public.team_intentions set body = 'Hacked' where team = 'Monday'`);
+  assert.deepEqual((await as(mon1, `select body from public.team_intentions`)).map((r) => r.body), ["To show up for each other"]);
+  assert.deepEqual((await as(tue1, `select team from public.team_intentions`)).map((r) => r.team), ["Tuesday"]);
+  assert.equal((await as(coach, `select team from public.team_intentions`)).length, 2);
+  await assert.rejects(as(coach, `update public.team_intentions set body = repeat('x', 501) where team = 'Monday'`));
+});
 console.log(`\n${passed} checks passed`);

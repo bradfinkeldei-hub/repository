@@ -1,4 +1,5 @@
 import type { createClient } from "@/lib/supabase/server";
+import type { Team } from "@/lib/coaching";
 
 /** edited_at and edited_by are set by the database when someone changes the words; null until then. */
 type Edited = { edited_at?: string | null; edited_by?: string | null };
@@ -67,4 +68,11 @@ export function unseen(social: Social, memberId: string, seenAt: string | null) 
     comments: (social.comments[memberId] ?? []).filter(since).length,
     kudos: (social.kudos[memberId] ?? []).filter(since).length,
   };
+}
+
+/** Each team's "The intention of this group is:" text. Members only get their own team's back. */
+export async function loadIntentions(supabase: Awaited<ReturnType<typeof createClient>>, teams: Team[]): Promise<Partial<Record<Team, string>>> {
+  if (!teams.length) return {};
+  const { data } = await supabase.from("team_intentions").select("team, body").in("team", teams);
+  return Object.fromEntries((data ?? []).map((r) => [r.team, r.body]));
 }

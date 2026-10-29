@@ -8,6 +8,7 @@ import { MeetingCheckin } from "@/components/attendance";
 import { Milestones, Thread } from "@/components/thread";
 import { CoachNotes } from "@/components/notes";
 import { TeamPulse } from "@/components/pulse";
+import { Intention } from "@/components/intention";
 import type { Checkin } from "@/lib/checkin";
 import type { CoachNote, Social } from "@/lib/social";
 
@@ -193,11 +194,13 @@ export function MissionCard({ m, viewer }: { m: Profile; viewer: Profile }) {
 export type Tab = "team" | "accountability" | "missions";
 
 /** The Team, Accountability and Missions views for one or more teams. */
-export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins, social, checked, notes }: {
+export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins, social, checked, notes, intentions }: {
   tab: Tab; groups: { team: Team | null; members: Profile[] }[]; viewer: Profile; ownTeam?: boolean; logs?: Record<string, Progress>; names?: TeamNames;
   checkins?: Partial<Record<Team, Checkin>>; social?: Social | null; checked?: Record<string, string[]>;
   /** The coach's private notes by member id. Only the coach page passes these. */
   notes?: Record<string, CoachNote[]> | null;
+  /** Each team's "The intention of this group is:" text. Only the Team tab passes these. */
+  intentions?: Partial<Record<Team, string>>;
 }) {
   const multi = groups.length > 1;
   const avatars = Object.fromEntries(groups.flatMap((g) => g.members).filter((m) => m.avatar_url).map((m) => [m.id, m.avatar_url]));
@@ -228,6 +231,7 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins,
         return (
           <section key={key} className="team-block">
             {multi && <h2>{teamLabel(team, names)}</h2>}
+            {tab === "team" && team && intentions && <Intention team={team} text={intentions[team] ?? ""} coach={viewer.role === "coach"} />}
             {body}
           </section>
         );
