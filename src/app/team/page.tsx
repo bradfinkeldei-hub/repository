@@ -4,7 +4,7 @@ import { requireProfile } from "@/lib/session";
 import { Header, MEMBER_TABS } from "@/components/header";
 import { TeamViews, type Tab } from "@/components/cards";
 import { loadCheckins } from "@/lib/checkin";
-import { loadChecked, loadSocial, loadThreadSeen, unseen } from "@/lib/social";
+import { loadChecked, loadIntentions, loadSocial, loadThreadSeen, unseen } from "@/lib/social";
 import { BOOKING_ENABLED, monthKey, monthName, progressByMember, teamLabel, weekKey, type LogRow, type Profile } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
@@ -42,6 +42,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
     .eq("member_id", me.id).eq("month", monthKey(new Date(), TZ)).eq("kind", "free");
   const freeLeft = !count;
   const checkins = tab === "team" ? await loadCheckins(supabase, [me.team], TZ) : undefined;
+  const intentions = tab === "team" ? await loadIntentions(supabase, [me.team]) : undefined;
   const social = tab === "team" ? await loadSocial(supabase, members.map((m) => m.id)) : undefined;
   // In-app only: a signal for comments and kudos on your own card since you last opened them.
   const seenAt = social ? await loadThreadSeen(supabase, me.id) : undefined;
@@ -79,7 +80,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
         {Object.keys(me.wheel ?? {}).length === 0 && (
           <div className="notice">Your profile is almost empty. <Link href="/profile">Fill in your life wheel</Link> so your team can see where you are.</div>
         )}
-        <TeamViews tab={tab} groups={[{ team: me.team, members }]} viewer={me} logs={logs} names={names} checkins={checkins} social={social} checked={checked} ownTeam />
+        <TeamViews tab={tab} groups={[{ team: me.team, members }]} viewer={me} logs={logs} names={names} checkins={checkins} social={social} checked={checked} intentions={intentions} ownTeam />
       </main></div>
     </>
   );

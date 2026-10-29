@@ -578,3 +578,14 @@ tr:last-child td { border-bottom: 0; }
 .new-badge { font-size: 0.72rem; font-weight: 800; color: #fff; background: var(--coral, #ef6a4c); border-radius: 999px; padding: 2px 8px; letter-spacing: 0.02em; }
 .new-note a { font-weight: 700; }
 .fold { scroll-margin-top: 120px; }
+
+/* "The intention of this group is:" at the top of each team's Team tab */
+.intention { gap: 10px; border-top: 4px solid var(--sun-fill); background: linear-gradient(180deg, var(--sun-soft), var(--surface) 70%); }
+.intention h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1.25rem; }
+.intention-text { margin: 0; font-family: var(--display); font-size: 1.15rem; line-height: 1.45; white-space: pre-line; }
+.intention-empty { margin: 0; }
+.intention-form { display: grid; gap: 10px; margin-top: 8px; }
+.intention-form textarea { width: 100%; }
+.intention details summary { list-style: none; width: fit-content; }
+.intention details summary::-webkit-details-marker { display: none; }
+.intention details[open] summary { display: none; }
