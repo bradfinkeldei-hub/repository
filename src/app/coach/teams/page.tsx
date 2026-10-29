@@ -3,7 +3,9 @@ import { requireCoach } from "@/lib/session";
 import { Header } from "@/components/header";
 import { TeamColumn } from "@/components/team-column";
 import { renameTeams } from "@/app/actions";
-import { teamLabel, TEAMS, type MeetingTime, type Profile, type Team } from "@/lib/coaching";
+import { teamLabel, TEAMS, TIME_ZONES, zoneLabel, type MeetingTime, type Profile, type Team } from "@/lib/coaching";
+
+const TZ = process.env.REMINDER_TIMEZONE || "America/Chicago";
 
 const LENGTHS: [number, string][] = [[30, "30 min"], [45, "45 min"], [60, "1 hour"], [75, "1¼ hours"], [90, "1½ hours"], [120, "2 hours"]];
 
@@ -13,10 +15,10 @@ export default async function TeamsPage({ searchParams: sp }: { searchParams: Pr
   const { supabase, me, names } = await requireCoach();
   const [{ data }, { data: rows }] = await Promise.all([
     supabase.from("profiles").select("*").neq("role", "coach").is("archived_at", null).order("name"),
-    supabase.from("team_names").select("team, meeting_time, meeting_minutes, meeting_url"),
+    supabase.from("team_names").select("team, meeting_time, meeting_minutes, meeting_url, meeting_tz"),
   ]);
   const members = (data ?? []) as Profile[];
-  const times = Object.fromEntries((rows ?? []).map((r) => [r.team, { time: r.meeting_time, minutes: r.meeting_minutes, url: r.meeting_url }])) as Partial<Record<Team, MeetingTime>>;
+  const times = Object.fromEntries((rows ?? []).map((r) => [r.team, { time: r.meeting_time, minutes: r.meeting_minutes, url: r.meeting_url, tz: r.meeting_tz }])) as Partial<Record<Team, MeetingTime>>;
 
   return (
     <>
@@ -26,7 +28,7 @@ export default async function TeamsPage({ searchParams: sp }: { searchParams: Pr
         <main>
           <div className="intro"><div>
             <h1>Teams and meeting times</h1>
-            <p>Rename a team, or set when it meets so members can add the meeting to their phone&apos;s calendar. Members see changes right away. Empty a name to go back to the day name; empty a time to turn the calendar buttons off.</p>
+            <p>Rename a team, or set when it meets and in which time zone so members can add the meeting to their phone&apos;s calendar. Members in other time zones also see the time in their own. Members see changes right away. Empty a name to go back to the day name; empty a time to turn the calendar buttons off.</p>
           </div></div>
           {searchParams.saved && <div className="notice good">Teams saved. <Link href="/coach">Back to teams</Link></div>}
           {searchParams.error === "link" && <div className="notice">A meeting link didn&apos;t look right. It needs to start with https://</div>}
@@ -52,6 +54,12 @@ export default async function TeamsPage({ searchParams: sp }: { searchParams: Pr
                           </select>
                         </label>
                       </div>
+                      <label>Time zone
+                        <select className="input" name={`tz_${t}`} defaultValue={mt?.tz || TZ}>
+                          {TIME_ZONES.map(([z, l]) => <option key={z} value={z}>{l}</option>)}
+                          {!TIME_ZONES.some(([z]) => z === (mt?.tz || TZ)) && <option value={mt?.tz || TZ}>{zoneLabel(mt?.tz || TZ)}</option>}
+                        </select>
+                      </label>
                       <label>Standing meeting link (optional)
                         <input className="input" type="url" inputMode="url" name={`url_${t}`} maxLength={500} defaultValue={mt?.url ?? ""} placeholder="https://zoom.us/j/… or https://meet.google.com/…" />
                       </label>

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { askAttendance, saveMeetingLink, setAttendance } from "@/app/actions";
 import { Avatar } from "@/components/avatar";
-import { calendarEvent, clockLabel, firstName, googleCalendarUrl, meetingWhen, type Profile, type Team } from "@/lib/coaching";
+import { calendarEvent, clockLabel, firstName, googleCalendarUrl, meetingWhen, zonedTime, zoneLabel, type Profile, type Team } from "@/lib/coaching";
+import { YourTime } from "@/components/client";
 import { calendarDetails, type Checkin } from "@/lib/checkin";
 
 const TZ = process.env.REMINDER_TIMEZONE;
@@ -48,7 +49,10 @@ export function MeetingCheckin({ team, label, members, viewer, c }: { team: Team
 
       {cal ? (
         <div className="cal-add">
-          <span>Every {team} at {clockLabel(c.standing.time)}. Add it to your calendar:</span>
+          <span>
+            Every {team} at {clockLabel(c.standing.time)} {zoneLabel(cal.timeZone)}
+            <YourTime at={zonedTime(c.meeting, c.standing.time, cal.timeZone).toISOString()} meetingZone={cal.timeZone} />. Add it to your calendar:
+          </span>
           <a className="btn ghost small" href={googleCalendarUrl(cal)} target="_blank" rel="noopener noreferrer">Google Calendar</a>
           <a className="btn ghost small" href={`/calendar/${team}`}>Apple or Outlook</a>
         </div>

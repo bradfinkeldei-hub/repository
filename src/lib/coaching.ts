@@ -146,8 +146,49 @@ export function meetingWhen(meeting: string, now = new Date(), timeZone?: string
     .format(new Date(`${meeting}T12:00:00Z`));
 }
 
-/** A team's standing weekly meeting (columns on team_names). time is like "19:00" in the coach's time zone, or "" if not set. */
-export type MeetingTime = { time: string; minutes: number; url: string };
+/**
+ * A team's standing weekly meeting (columns on team_names). time is like "19:00", or "" if not set.
+ * tz is the time zone the meeting time is in, like "America/New_York"; "" means the app's default zone.
+ */
+export type MeetingTime = { time: string; minutes: number; url: string; tz: string };
+
+/** The time zones the coach picks from for a team's meeting, with the names members see. */
+export const TIME_ZONES: [string, string][] = [
+  ["America/New_York", "Eastern"], ["America/Chicago", "Central"], ["America/Denver", "Mountain"],
+  ["America/Phoenix", "Arizona"], ["America/Los_Angeles", "Pacific"], ["America/Anchorage", "Alaska"],
+  ["Pacific/Honolulu", "Hawaii"], ["America/Puerto_Rico", "Atlantic (Puerto Rico)"],
+  ["Europe/London", "UK"], ["Europe/Paris", "Central Europe"], ["Asia/Kolkata", "India"], ["Australia/Sydney", "Sydney"],
+];
+
+export function isTimeZone(tz: string) {
+  if (!tz) return false;
+  try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return true; } catch { return false; }
+}
+
+/** "Central time" for "America/Chicago". Zones not on the list show their own name. */
+export function zoneLabel(tz: string) {
+  const z = TIME_ZONES.find(([k]) => k === tz);
+  return z ? `${z[1]} time` : tz.replace(/_/g, " ");
+}
+
+/** How far a time zone is ahead of UTC at a moment, in milliseconds. */
+function zoneOffset(at: number, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric",
+  }).formatToParts(new Date(at));
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  return Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second")) - Math.floor(at / 1000) * 1000;
+}
+
+/** The moment a wall-clock date and time ("2026-11-02", "19:00") happen in a time zone. */
+export function zonedTime(date: string, time: string, timeZone: string) {
+  const [y, mo, d] = date.split("-").map(Number);
+  const [h, mi] = time.split(":").map(Number);
+  const wall = Date.UTC(y, mo - 1, d, h, mi);
+  let at = wall - zoneOffset(wall, timeZone);
+  at = wall - zoneOffset(at, timeZone); // second pass settles days when clocks change
+  return new Date(at);
+}
 
 /** "7:00 PM" for "19:00". */
 export function clockLabel(time: string) {
@@ -168,11 +209,13 @@ function calStamp(date: string, time: string, plusMinutes = 0) {
 /** What "Add to calendar" puts in a team's repeating weekly event. Null until the team has a weekday and a meeting time. */
 export type CalendarEvent = { team: Team; title: string; details: string; start: string; end: string; byDay: string; timeZone: string; url: string };
 
+/** opts.timeZone is the app's default zone, used when the team hasn't picked one. */
 export function calendarEvent(team: Team, mt: MeetingTime | undefined, opts: { title: string; details: string; now?: Date; timeZone?: string }): CalendarEvent | null {
   if (!mt?.time || !BYDAY[team]) return null;
-  const date = nextMeeting(team, opts.now ?? new Date(), opts.timeZone);
+  const timeZone = mt.tz || opts.timeZone || "UTC";
+  const date = nextMeeting(team, opts.now ?? new Date(), timeZone);
   return {
-    team, title: opts.title, details: opts.details, url: mt.url, byDay: BYDAY[team], timeZone: opts.timeZone ?? "UTC",
+    team, title: opts.title, details: opts.details, url: mt.url, byDay: BYDAY[team], timeZone,
     start: calStamp(date, mt.time), end: calStamp(date, mt.time, mt.minutes || 60),
   };
 }

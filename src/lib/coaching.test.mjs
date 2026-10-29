@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addWeeks, calendarEvent, clockLabel, coachActions, googleCalendarUrl, meetingIcs, dateKey, meetingDate, meetingWhen, nextMeeting, monthKey, progress, teamAverage, teamLabel, teamOptions, teamPulse, weekKey, weekdayName } from "./coaching.ts";
+import { addWeeks, calendarEvent, clockLabel, isTimeZone, zonedTime, zoneLabel, coachActions, googleCalendarUrl, meetingIcs, dateKey, meetingDate, meetingWhen, nextMeeting, monthKey, progress, teamAverage, teamLabel, teamOptions, teamPulse, weekKey, weekdayName } from "./coaching.ts";
 
 const TZ = "America/Chicago";
 const base = {
@@ -155,6 +155,13 @@ test("a team's weekly meeting becomes a repeating calendar event", () => {
   assert.match(ics, /\r\nRRULE:FREQ=WEEKLY;BYDAY=TH\r\n/);
   assert.match(ics, /\r\nDESCRIPTION:Weekly circle\\; bring your wins\r\n/);
   assert.match(ics, /\r\nUID:team-thursday-meeting@coaching-circle\r\n/);
+  // A team in another zone keeps its own wall-clock time and zone.
+  const ny = calendarEvent("Thursday", { time: "19:00", minutes: 60, url: "", tz: "America/New_York" }, opts);
+  assert.equal(ny.start, "20261029T190000");
+  assert.equal(ny.timeZone, "America/New_York");
+  assert.match(meetingIcs(ny, now), /\r\nDTSTART;TZID=America\/New_York:20261029T190000\r\n/);
+  assert.equal(new URL(googleCalendarUrl(ny)).searchParams.get("ctz"), "America/New_York");
+  assert.equal(calendarEvent("Thursday", { time: "19:00", minutes: 60, url: "", tz: "" }, opts).timeZone, TZ);
   assert.equal(clockLabel("19:05"), "7:05 PM");
   assert.equal(clockLabel("00:30"), "12:30 AM");
 });
@@ -182,4 +189,17 @@ test("team pulse counts this week's ticks, follow-through, streaks and nudges", 
   assert.deepEqual(p.milestones.map((m) => m.title), ["First 10k"]);
   // Bo missed last week but is done now, so only Cy needs a nudge.
   assert.deepEqual(p.nudges.map((n) => n.id), ["c"]);
+});
+
+test("meeting time zones: labels, checks and the real moment", () => {
+  assert.equal(zoneLabel("America/Chicago"), "Central time");
+  assert.equal(zoneLabel("America/Argentina/Buenos_Aires"), "America/Argentina/Buenos Aires");
+  assert.equal(isTimeZone("America/New_York"), true);
+  assert.equal(isTimeZone("Mars/Base"), false);
+  assert.equal(isTimeZone(""), false);
+  // 7 PM Eastern is 23:00 UTC while daylight time lasts and midnight UTC after clocks fall back (Nov 1).
+  assert.equal(zonedTime("2026-10-29", "19:00", "America/New_York").toISOString(), "2026-10-29T23:00:00.000Z");
+  assert.equal(zonedTime("2026-11-05", "19:00", "America/New_York").toISOString(), "2026-11-06T00:00:00.000Z");
+  assert.equal(zonedTime("2026-11-02", "18:30", "America/Chicago").toISOString(), "2026-11-03T00:30:00.000Z");
+  assert.equal(zonedTime("2026-11-02", "09:00", "Asia/Kolkata").toISOString(), "2026-11-02T03:30:00.000Z");
 });

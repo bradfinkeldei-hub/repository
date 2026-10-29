@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCoach, requireEditor, requireProfile, requireRealCoach, VIEW_AS_COOKIE } from "@/lib/session";
-import { AREAS, BOOKING_ENABLED, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, type Profile, type Wheel } from "@/lib/coaching";
+import { AREAS, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
 import { sendEmails } from "@/lib/mail";
 import { rsvpLink } from "@/lib/rsvp";
 
@@ -188,9 +188,10 @@ export async function askAttendance(team: string, formData: FormData) {
   if (!secret) back("asked=setup");
   const meeting = nextMeeting(team, new Date(), TZ);
 
-  const [{ data: members }, { data: answers }] = await Promise.all([
+  const [{ data: members }, { data: answers }, { data: standing }] = await Promise.all([
     supabase.from("profiles").select("*").eq("team", team).neq("role", "coach").is("archived_at", null),
     supabase.from("attendance").select("member_id").eq("meeting", meeting),
+    supabase.from("team_names").select("meeting_time, meeting_tz").eq("team", team).maybeSingle(),
   ]);
   const answered = new Set((answers ?? []).map((a) => a.member_id as string));
   const waiting = ((members ?? []) as Profile[]).filter((m) => !answered.has(m.id));
@@ -201,6 +202,8 @@ export async function askAttendance(team: string, formData: FormData) {
   const site = (process.env.SITE_URL ?? "").replace(/\/$/, "");
   const coach = process.env.COACH_NAME || "your coach";
   const when = meetingWhen(meeting, new Date(), TZ);
+  // "at 7:00 PM Central time" once the team has a meeting time.
+  const at = standing?.meeting_time ? `at ${clockLabel(standing.meeting_time)} ${zoneLabel(standing.meeting_tz || TZ || "UTC")}` : "";
 
   const emails = [];
   for (const m of waiting) {
@@ -208,7 +211,7 @@ export async function askAttendance(team: string, formData: FormData) {
     // @example.com is the made-up Example team; those addresses can't receive mail.
     if (!to || to.toLowerCase().endsWith("@example.com")) continue;
     emails.push(attendanceEmail(m, to, {
-      when, team: teamLabel(team, names), coach, site, url,
+      when, at, team: teamLabel(team, names), coach, site, url,
       yes: await rsvpLink(site, secret, m.id, meeting, true),
       no: await rsvpLink(site, secret, m.id, meeting, false),
     }));
@@ -250,8 +253,8 @@ export async function saveIntention(team: string, formData: FormData) {
   redirect(`/coach?team=${team}&asked=${error ? "intentfail" : "intentsaved"}#intention-${team}`);
 }
 
-function attendanceEmail(m: Profile, to: string, o: { when: string; team: string; coach: string; site: string; url: string; yes: string; no: string }) {
-  const q = `Will you be at ${o.team}'s meeting ${o.when}?`;
+function attendanceEmail(m: Profile, to: string, o: { when: string; at: string; team: string; coach: string; site: string; url: string; yes: string; no: string }) {
+  const q = `Will you be at ${o.team}'s meeting ${[o.when, o.at].filter(Boolean).join(" ")}?`;
   const text = [
     `Hi ${firstName(m.name)},`,
     "",
@@ -296,11 +299,13 @@ export async function renameTeams(formData: FormData) {
     const time = str(formData.get(`time_${team}`), 5);
     const minutes = Math.round(Number(formData.get(`minutes_${team}`)));
     const url = str(formData.get(`url_${team}`), 500);
+    const tz = str(formData.get(`tz_${team}`), 64);
     return {
       team, name: str(formData.get(`name_${team}`), 40) || `${team} team`,
       meeting_time: /^([01]\d|2[0-3]):[0-5]\d$/.test(time) ? time : "",
       meeting_minutes: minutes >= 15 && minutes <= 240 ? minutes : 60,
       meeting_url: /^https?:\/\/\S+$/.test(url) ? url : "",
+      meeting_tz: isTimeZone(tz) ? tz : "",
     };
   });
   const { error } = await supabase.from("team_names").upsert(rows);

@@ -209,3 +209,22 @@ export function EditFold({ label = "Edit", title, children }: { label?: string; 
     </details>
   );
 }
+
+/**
+ * " (6:00 PM your time)" when the viewer's device is in a different time zone from the meeting.
+ * Shows nothing on the server, since only the browser knows where the viewer is.
+ */
+export function YourTime({ at, meetingZone }: { at: string; meetingZone: string }) {
+  const [label, setLabel] = useState("");
+  useEffect(() => {
+    const mine = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!mine || mine === meetingZone) return;
+    const d = new Date(at);
+    const fmt = (timeZone: string, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-US", { timeZone, ...o }).format(d);
+    const time = { hour: "numeric", minute: "2-digit" } as const;
+    if (fmt(mine, time) === fmt(meetingZone, time)) return;
+    const day = fmt(mine, { weekday: "long" });
+    setLabel(day === fmt(meetingZone, { weekday: "long" }) ? fmt(mine, time) : `${day} ${fmt(mine, time)}`);
+  }, [at, meetingZone]);
+  return label ? <> ({label} your time)</> : null;
+}
