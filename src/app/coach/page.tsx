@@ -3,14 +3,14 @@ import { requireCoach } from "@/lib/session";
 import { coachTabs, Header } from "@/components/header";
 import { StripKey, WeekStrip } from "@/components/progress";
 import { Avatar } from "@/components/avatar";
-import { TeamViews, type Tab } from "@/components/cards";
+import { TeamViews, type DetailsNudge, type Tab } from "@/components/cards";
 import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitCheckbox } from "@/components/client";
 import { addAction, deleteAction, remindDetails, setActionDone } from "@/app/actions";
 import { loadCheckins } from "@/lib/checkin";
 import { loadChecked, loadIntentions, loadNotes, loadSocial } from "@/lib/social";
 import {
-  BOOKING_ENABLED, coachActions, isTeam, progressByMember, teamLabel, TEAMS, weekKey,
+  BOOKING_ENABLED, coachActions, missingDetails, isTeam, progressByMember, teamLabel, TEAMS, weekKey,
   type Booking, type CoachActionRow, type LogRow, type Profile, type Progress, type Suggestion, type Team, type TeamNames,
 } from "@/lib/coaching";
 
@@ -50,6 +50,14 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
     : [undefined, undefined, undefined, undefined];
   const checked = tab === "team" || tab === "accountability"
     ? await loadChecked(supabase, groups.flatMap((g) => g.members.map((m) => m.id)), weekKey(new Date(), TZ)) : undefined;
+  // Members on the teams shown who still have blank details, for their cards and the Team tab banner.
+  const reminded = new Set(actions.filter((a) => a.kind === "details" && a.done).map((a) => a.memberId));
+  const nudges: Record<string, DetailsNudge> = {};
+  for (const m of groups.flatMap((g) => g.members)) {
+    const missing = missingDetails(m);
+    if (missing.length && m.team) nudges[m.id] = { missing, reminded: reminded.has(m.id) };
+  }
+  const notYet = Object.keys(nudges).filter((id) => !nudges[id].reminded);
   const selLabel = sel === "all" ? "All teams" : teamLabel(sel === "none" ? null : (sel as Team), names);
 
   return (
@@ -83,7 +91,17 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
                 </div>
               </div>
               {searchParams.asked && <AskedNotice asked={searchParams.asked} />}
-              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} names={names} checkins={checkins} social={social} checked={checked} notes={notes} intentions={intentions} />
+              {tab === "team" && searchParams.reminded && <RemindedNotice reminded={searchParams.reminded} />}
+              {tab === "team" && notYet.length > 0 && (
+                <form className="notice remind-all" id="details-reminder" action={remindDetails}>
+                  <input type="hidden" name="from" value="team" />
+                  <input type="hidden" name="team" value={sel} />
+                  {notYet.map((id) => <input key={id} type="hidden" name="member_id" value={id} />)}
+                  <span><b>{notYet.length} {notYet.length === 1 ? "member hasn't" : "members haven't"}</b> filled out all their details yet. Their cards show what&apos;s blank. Send each one a friendly email listing what&apos;s missing.</span>
+                  <button className="btn small" type="submit">Email {notYet.length === 1 ? "them" : `all ${notYet.length}`}</button>
+                </form>
+              )}
+              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} names={names} checkins={checkins} social={social} checked={checked} notes={notes} intentions={intentions} nudges={tab === "team" ? nudges : undefined} sel={sel} />
             </>
           )}
         </main>
@@ -115,7 +133,7 @@ function RemindedNotice({ reminded }: { reminded: string }) {
   const n = Number(reminded);
   if (reminded === "nomail") return <div className="notice">Email only sends from the live app, not from a local preview.</div>;
   if (!Number.isInteger(n) || reminded === "") return <div className="notice">That reminder didn&apos;t send. Try again.</div>;
-  return <div className="notice good">{n ? `Reminder emailed to ${n} ${n === 1 ? "person" : "people"}. Their reminder is ticked off below; it comes back next week if their details are still blank.` : "No one needed an email: their details are filled in, or they're Example members."}</div>;
+  return <div className="notice good">{n ? `Reminder emailed to ${n} ${n === 1 ? "person" : "people"}. It's ticked off on Coaches actions and their card; it comes back next week if their details are still blank.` : "No one needed an email: their details are filled in, or they're Example members."}</div>;
 }
 
 function ActionsView({ actions, teams, members, names, sel, title, showGeneral }: {

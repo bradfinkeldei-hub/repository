@@ -443,8 +443,11 @@ export async function deleteAction(id: string) {
 export async function remindDetails(formData: FormData) {
   const { supabase } = await requireCoach();
   const team = str(formData.get("team"), 20) || "all";
-  const back: (q: string) => never = (q) => redirect(`/coach?team=${encodeURIComponent(team)}&tab=actions&${q}`);
+  // Sent from the Team tab (a member's card or the banner) or from Coaches actions; go back to the same place.
+  const tab = formData.get("from") === "team" ? "team" : "actions";
   const ids = formData.getAll("member_id").map((v) => String(v)).filter(Boolean).slice(0, 200);
+  const anchor = tab === "team" ? (ids.length === 1 ? `#member-${ids[0]}` : "#details-reminder") : "";
+  const back: (q: string) => never = (q) => redirect(`/coach?team=${encodeURIComponent(team)}&tab=${tab}&${q}${anchor}`);
   if (!ids.length) back("reminded=0");
 
   const { data: rows } = await supabase.from("profiles").select("*").in("id", ids).neq("role", "coach").is("archived_at", null);

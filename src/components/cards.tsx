@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { AREAS, commitmentList, fmt, isVagueCommitment, MAX_COMMITMENTS, teamLabel, teamOptions, teamPulse, weekKey, type Profile, type Progress, type Team, type TeamNames, type Wheel } from "@/lib/coaching";
-import { addCommitment, setTeam, startViewAs, toggleCommitment } from "@/app/actions";
+import { AREAS, commitmentList, firstName, listJoin, fmt, isVagueCommitment, MAX_COMMITMENTS, teamLabel, teamOptions, teamPulse, weekKey, type Profile, type Progress, type Team, type TeamNames, type Wheel } from "@/lib/coaching";
+import { addCommitment, remindDetails, setTeam, startViewAs, toggleCommitment } from "@/app/actions";
 import { AutoSubmitSelect } from "@/components/client";
 import { Avatar } from "@/components/avatar";
 import { MiniProgress } from "@/components/progress";
@@ -147,14 +147,32 @@ function Commitments({ m, viewer, checked = [] }: { m: Profile; viewer: Profile;
   );
 }
 
-export function MemberCard({ m, viewer, names, p, social, avatars, checked, notes }: {
+/** What a member still has blank, and whether the coach already emailed them about it this week. Coach only. */
+export type DetailsNudge = { missing: string[]; reminded: boolean };
+
+/** On the coach's view of a card: what's still blank, with a button that emails the member to finish it. */
+function DetailsReminder({ m, nudge, sel }: { m: Profile; nudge: DetailsNudge; sel: string }) {
+  const fn = firstName(m.name);
+  return (
+    <form className={`details-card${nudge.reminded ? " sent" : ""}`} action={remindDetails}>
+      <input type="hidden" name="from" value="team" />
+      <input type="hidden" name="team" value={sel} />
+      <input type="hidden" name="member_id" value={m.id} />
+      <p><b>Still blank:</b> {listJoin(nudge.missing)}.{nudge.reminded && <span className="muted"> You emailed {fn} this week.</span>}</p>
+      <button className={`btn small${nudge.reminded ? " ghost" : ""}`} type="submit">{nudge.reminded ? "Email again" : `Email ${fn} to complete`}</button>
+    </form>
+  );
+}
+
+export function MemberCard({ m, viewer, names, p, social, avatars, checked, notes, nudge, sel }: {
   m: Profile; viewer: Profile; names?: TeamNames; p?: Progress; social?: Social | null; avatars?: Record<string, string>; checked?: string[];
-  notes?: CoachNote[];
+  notes?: CoachNote[]; nudge?: DetailsNudge; sel?: string;
 }) {
   const kudos = social?.kudos[m.id] ?? [];
   return (
     <article className="card" id={`member-${m.id}`}>
       <Who m={m} viewer={viewer} coachTools names={names} />
+      {nudge && viewer.role === "coach" && m.id !== viewer.id && <DetailsReminder m={m} nudge={nudge} sel={sel ?? m.team ?? "all"} />}
       <div className="wheelrow">
         <WheelSvg wheel={m.wheel as Wheel} label={`${m.name}'s life wheel`} />
         <Legend wheel={m.wheel as Wheel} />
@@ -194,13 +212,16 @@ export function MissionCard({ m, viewer }: { m: Profile; viewer: Profile }) {
 export type Tab = "team" | "accountability" | "missions";
 
 /** The Team, Accountability and Missions views for one or more teams. */
-export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins, social, checked, notes, intentions }: {
+export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins, social, checked, notes, intentions, nudges, sel }: {
   tab: Tab; groups: { team: Team | null; members: Profile[] }[]; viewer: Profile; ownTeam?: boolean; logs?: Record<string, Progress>; names?: TeamNames;
   checkins?: Partial<Record<Team, Checkin>>; social?: Social | null; checked?: Record<string, string[]>;
   /** The coach's private notes by member id. Only the coach page passes these. */
   notes?: Record<string, CoachNote[]> | null;
   /** Each team's "The intention of this group is:" text. Only the Team tab passes these. */
   intentions?: Partial<Record<Team, string>>;
+  /** Coach only: members with blank details, by member id, and the team menu's selection to come back to. */
+  nudges?: Record<string, DetailsNudge>;
+  sel?: string;
 }) {
   const multi = groups.length > 1;
   const avatars = Object.fromEntries(groups.flatMap((g) => g.members).filter((m) => m.avatar_url).map((m) => [m.id, m.avatar_url]));
@@ -216,7 +237,7 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins,
               {team && checkins?.[team] && <MeetingCheckin team={team} label={teamLabel(team, names)} members={members} viewer={viewer} c={checkins[team]} />}
               {team && <TeamPulse team={team} names={names} ownTeam={ownTeam} coach={viewer.role === "coach"}
                 p={teamPulse(members, { logs, checked, kudos: social?.kudos, milestones: social?.milestones, timeZone: TZ })} />}
-              <div className="grid">{members.map((m) => <MemberCard key={m.id} m={m} viewer={viewer} names={names} p={logs?.[m.id]} social={social} avatars={avatars} checked={checked?.[m.id]} notes={notes ? notes[m.id] ?? [] : undefined} />)}</div>
+              <div className="grid">{members.map((m) => <MemberCard key={m.id} m={m} viewer={viewer} names={names} p={logs?.[m.id]} social={social} avatars={avatars} checked={checked?.[m.id]} notes={notes ? notes[m.id] ?? [] : undefined} nudge={nudges?.[m.id]} sel={sel} />)}</div>
             </>
           ) : <EmptyTeam label={teamLabel(team, names)} coach={viewer.role === "coach"} />;
         } else if (tab === "accountability") {
