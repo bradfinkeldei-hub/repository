@@ -251,7 +251,10 @@ export function meetingIcs(e: CalendarEvent, now = new Date()) {
   return lines.join("\r\n") + "\r\n";
 }
 
-/** A member's answer to "Will you be at the meeting?" (table attendance). */
+/** The coach's words on the meeting card and reminder email: everyone is expected, and anyone who can't come marks themselves absent. */
+export const ASSUMED = "It's assumed you will attend based on your agreement to the group. However, life happens, and if you can't make it, please let the group know and mark yourself absent here.";
+
+/** A member marked absent for a meeting (going = false). No row, or going = true, means attending (table attendance). */
 export type Rsvp = { member_id: string; meeting: string; going: boolean };
 
 export function teamAverage(list: Pick<Profile, "wheel">[]): Record<AreaKey, number | null> {
