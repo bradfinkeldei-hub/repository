@@ -5,7 +5,7 @@ import { Header, MEMBER_TABS } from "@/components/header";
 import { TeamViews, type Tab } from "@/components/cards";
 import { loadCheckins } from "@/lib/checkin";
 import { loadChecked, loadIntentions, loadSocial, loadThreadSeen, unseen } from "@/lib/social";
-import { BOOKING_ENABLED, monthKey, monthName, progressByMember, teamLabel, weekKey, type LogRow, type Profile } from "@/lib/coaching";
+import { BOOKING_ENABLED, listJoin, missingDetails, monthKey, monthName, progressByMember, teamLabel, weekKey, type LogRow, type Profile } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 
@@ -47,6 +47,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
   // In-app only: a signal for comments and kudos on your own card since you last opened them.
   const seenAt = social ? await loadThreadSeen(supabase, me.id) : undefined;
   if (social && seenAt !== undefined) social.fresh = { memberId: me.id, ...unseen(social, me.id, seenAt) };
+  const missing = missingDetails(me);
   const checked = tab !== "missions" ? await loadChecked(supabase, members.map((m) => m.id), weekKey(new Date(), TZ)) : undefined;
 
   return (
@@ -77,8 +78,14 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
             <span aria-hidden="true">{"\u{1F514}"}</span> Your team left you {newSummary(social.fresh)} on your card. <a href={`#thread-${me.id}`}>See them</a>
           </div>
         )}
-        {Object.keys(me.wheel ?? {}).length === 0 && (
-          <div className="notice">Your profile is almost empty. <Link href="/profile">Fill in your life wheel</Link> so your team can see where you are.</div>
+        {missing.length > 0 && (
+          <div className="notice details-nudge">
+            <div>
+              <b>Finish your details so your team can get to know you.</b>
+              <span> Still blank: {listJoin(missing)}.</span>
+            </div>
+            <Link className="btn small" href="/profile">Fill them in</Link>
+          </div>
         )}
         <TeamViews tab={tab} groups={[{ team: me.team, members }]} viewer={me} logs={logs} names={names} checkins={checkins} social={social} checked={checked} intentions={intentions} ownTeam />
       </main></div>

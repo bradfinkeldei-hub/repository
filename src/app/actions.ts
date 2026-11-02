@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCoach, requireEditor, requireProfile, requireRealCoach, VIEW_AS_COOKIE } from "@/lib/session";
-import { AREAS, ASSUMED, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
+import { AREAS, ASSUMED, missingDetails, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
 import { sendEmails } from "@/lib/mail";
 import { rsvpLink } from "@/lib/rsvp";
 
@@ -425,6 +425,79 @@ export async function deleteAction(id: string) {
   const { supabase } = await requireCoach();
   await supabase.from("coach_actions").delete().eq("id", id).eq("custom", true);
   revalidatePath("/coach");
+}
+
+/**
+ * Coach only: emails each chosen member who still has blank parts of their profile,
+ * listing what's missing, and ticks off their "Remind ... to fill out their details"
+ * action for this week. Members whose profile is complete are skipped, as are
+ * Example members. Never sent automatically.
+ */
+export async function remindDetails(formData: FormData) {
+  const { supabase } = await requireCoach();
+  const team = str(formData.get("team"), 20) || "all";
+  const back: (q: string) => never = (q) => redirect(`/coach?team=${encodeURIComponent(team)}&tab=actions&${q}`);
+  const ids = formData.getAll("member_id").map((v) => String(v)).filter(Boolean).slice(0, 200);
+  if (!ids.length) back("reminded=0");
+
+  const { data: rows } = await supabase.from("profiles").select("*").in("id", ids).neq("role", "coach").is("archived_at", null);
+  const due = ((rows ?? []) as Profile[]).map((m) => ({ m, missing: missingDetails(m) })).filter((x) => x.missing.length);
+  const { data: contacts } = due.length
+    ? await supabase.from("member_contacts").select("id, email").in("id", due.map((x) => x.m.id))
+    : { data: [] };
+  const email = new Map((contacts ?? []).map((c) => [c.id as string, c.email as string]));
+  const site = (process.env.SITE_URL ?? "").replace(/\/$/, "");
+  const coach = process.env.COACH_NAME || "your coach";
+
+  const emails = [];
+  const byEmail = new Map<string, string>();
+  for (const { m, missing } of due) {
+    const to = email.get(m.id);
+    // @example.com is the made-up Example team; those addresses can't receive mail.
+    if (!to || to.toLowerCase().endsWith("@example.com")) continue;
+    emails.push(detailsEmail(m, to, missing, site, coach));
+    byEmail.set(to, m.id);
+  }
+  if (!emails.length) back("reminded=0");
+  let sent: string[] | null = [];
+  try {
+    sent = await sendEmails(emails);
+  } catch (e) {
+    console.error("details reminder failed", e);
+    back("reminded=fail");
+  }
+  if (sent === null) back("reminded=nomail");
+  if (!sent.length) back("reminded=fail");
+  const wk = weekKey(new Date(), TZ);
+  const marks = sent.map((to) => byEmail.get(to)).filter(Boolean).map((id) => ({ id: `g_${wk}_${id}_details`, custom: false, done: true, week: wk }));
+  if (marks.length) await supabase.from("coach_actions").upsert(marks);
+  revalidatePath("/coach");
+  back(`reminded=${sent.length}`);
+}
+
+function detailsEmail(m: Profile, to: string, missing: string[], site: string, coach: string) {
+  const link = `${site}/profile`;
+  const text = [
+    `Hi ${firstName(m.name)},`,
+    "",
+    "When your profile is filled in, your team can get to know you and cheer you on. A few parts of yours are still blank:",
+    "",
+    ...missing.map((d) => `- ${d}`),
+    "",
+    `It takes about five minutes: ${link}`,
+    "",
+    coach,
+  ].join("\n");
+  const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:16px;line-height:1.5;color:#15302b">
+<p>Hi ${esc(firstName(m.name))},</p>
+<p>When your profile is filled in, your team can get to know you and cheer you on. A few parts of yours are still blank:</p>
+<ul>${missing.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>
+<p><a href="${esc(link)}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#0b7d6e;color:#fff;font-weight:700;text-decoration:none">Fill in my profile</a></p>
+<p style="color:#5a6b66;font-size:14px">It takes about five minutes.</p>
+<p>${esc(coach)}</p>
+</div>`;
+  return { to, subject: "A few details to finish on your profile", text, html };
 }
 
 /** Records the booking, then sends the member to the scheduling page. */

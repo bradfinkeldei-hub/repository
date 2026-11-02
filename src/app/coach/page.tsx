@@ -6,7 +6,7 @@ import { Avatar } from "@/components/avatar";
 import { TeamViews, type Tab } from "@/components/cards";
 import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitCheckbox } from "@/components/client";
-import { addAction, deleteAction, setActionDone } from "@/app/actions";
+import { addAction, deleteAction, remindDetails, setActionDone } from "@/app/actions";
 import { loadCheckins } from "@/lib/checkin";
 import { loadChecked, loadIntentions, loadNotes, loadSocial } from "@/lib/social";
 import {
@@ -17,11 +17,11 @@ import {
 const TZ = process.env.REMINDER_TIMEZONE;
 type CoachTab = Tab | "progress" | "actions";
 const KIND: Record<Suggestion["kind"], string> = {
-  checkin: "Check in", commit: "Commitment", wheel: "Life wheel", team: "Team",
+  checkin: "Check in", commit: "Commitment", details: "Details", wheel: "Life wheel", team: "Team",
   remind: "Reminder", refresh: "Refresh", call: "Call", custom: "Your action",
 };
 
-export default async function CoachPage({ searchParams: sp }: { searchParams: Promise<{ team?: string; tab?: string; asked?: string }> }) {
+export default async function CoachPage({ searchParams: sp }: { searchParams: Promise<{ team?: string; tab?: string; asked?: string; reminded?: string }> }) {
   const searchParams = await sp;
   const { supabase, me, names } = await requireCoach();
   const sel = searchParams.team === "all" || searchParams.team === "none" || isTeam(searchParams.team) ? searchParams.team : "Monday";
@@ -64,7 +64,10 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
         <TeamColumn members={members} names={names} selected={sel} tab={tab} actions={tab === "actions" ? actions : undefined} />
         <main>
           {tab === "actions" ? (
-            <ActionsView actions={actions} teams={teamsShown} members={members} names={names} title={sel === "all" ? "Coaches actions" : `Coaches actions: ${selLabel}`} showGeneral={sel === "all"} />
+            <>
+              {searchParams.reminded && <RemindedNotice reminded={searchParams.reminded} />}
+              <ActionsView actions={actions} teams={teamsShown} members={members} names={names} sel={sel} title={sel === "all" ? "Coaches actions" : `Coaches actions: ${selLabel}`} showGeneral={sel === "all"} />
+            </>
           ) : tab === "progress" ? (
             <ProgressView groups={groups} logs={logs} names={names} title={sel === "all" ? "Progress: all teams" : `${selLabel}: progress`} />
           ) : (
@@ -108,13 +111,21 @@ function AskedNotice({ asked }: { asked: string }) {
   return <div className="notice">{text[asked] ?? "That didn't send. Try again."}</div>;
 }
 
-function ActionsView({ actions, teams, members, names, title, showGeneral }: {
-  actions: Suggestion[]; teams: (Team | null)[]; members: Profile[]; names: TeamNames; title: string; showGeneral: boolean;
+function RemindedNotice({ reminded }: { reminded: string }) {
+  const n = Number(reminded);
+  if (reminded === "nomail") return <div className="notice">Email only sends from the live app, not from a local preview.</div>;
+  if (!Number.isInteger(n) || reminded === "") return <div className="notice">That reminder didn&apos;t send. Try again.</div>;
+  return <div className="notice good">{n ? `Reminder emailed to ${n} ${n === 1 ? "person" : "people"}. Their reminder is ticked off below; it comes back next week if their details are still blank.` : "No one needed an email: their details are filled in, or they're Example members."}</div>;
+}
+
+function ActionsView({ actions, teams, members, names, sel, title, showGeneral }: {
+  actions: Suggestion[]; teams: (Team | null)[]; members: Profile[]; names: TeamNames; sel: string; title: string; showGeneral: boolean;
 }) {
   const scoped = actions.filter((a) => teams.includes(a.team) || (showGeneral && a.custom && !a.memberId));
   const open = scoped.filter((a) => !a.done);
   const done = scoped.filter((a) => a.done);
   const general = showGeneral ? open.filter((a) => a.custom && !a.memberId) : [];
+  const details = open.filter((a) => a.kind === "details" && a.memberId);
   return (
     <>
       <div className="intro">
@@ -139,6 +150,14 @@ function ActionsView({ actions, teams, members, names, title, showGeneral }: {
         </select>
         <button className="btn" type="submit">Add action</button>
       </form>
+      {details.length > 0 && (
+        <form className="notice remind-all" action={remindDetails}>
+          <input type="hidden" name="team" value={sel} />
+          {details.map((a) => <input key={a.id} type="hidden" name="member_id" value={a.memberId ?? ""} />)}
+          <span><b>{details.length} {details.length === 1 ? "member hasn't" : "members haven't"}</b> filled out all their details yet. Send each one a friendly email listing what&apos;s missing.</span>
+          <button className="btn small" type="submit">Email {details.length === 1 ? "them" : `all ${details.length}`}</button>
+        </form>
+      )}
       {teams.map((t) => {
         const list = open.filter((a) => a.team === t && !(a.custom && !a.memberId));
         if (!list.length) return teams.length > 1 ? null : (
@@ -147,12 +166,12 @@ function ActionsView({ actions, teams, members, names, title, showGeneral }: {
         return (
           <section key={t ?? "none"} className="team-block">
             {teams.length > 1 && <h2>{teamLabel(t, names)}</h2>}
-            <ul className="actlist">{list.map((a) => <ActionRow key={a.id} a={a} />)}</ul>
+            <ul className="actlist">{list.map((a) => <ActionRow key={a.id} a={a} sel={sel} />)}</ul>
           </section>
         );
       })}
       {general.length > 0 && (
-        <section className="team-block"><h2>General</h2><ul className="actlist">{general.map((a) => <ActionRow key={a.id} a={a} />)}</ul></section>
+        <section className="team-block"><h2>General</h2><ul className="actlist">{general.map((a) => <ActionRow key={a.id} a={a} sel={sel} />)}</ul></section>
       )}
       {teams.length > 1 && open.length === 0 && (
         <div className="empty"><h3>Nothing open right now</h3><p>Everyone is on track this week.</p></div>
@@ -160,14 +179,14 @@ function ActionsView({ actions, teams, members, names, title, showGeneral }: {
       {done.length > 0 && (
         <details>
           <summary className="muted" style={{ cursor: "pointer", fontWeight: 600 }}>Done this week ({done.length})</summary>
-          <ul className="actlist" style={{ marginTop: 10 }}>{done.map((a) => <ActionRow key={a.id} a={a} />)}</ul>
+          <ul className="actlist" style={{ marginTop: 10 }}>{done.map((a) => <ActionRow key={a.id} a={a} sel={sel} />)}</ul>
         </details>
       )}
     </>
   );
 }
 
-function ActionRow({ a }: { a: Suggestion }) {
+function ActionRow({ a, sel }: { a: Suggestion; sel: string }) {
   return (
     <li className={`act ${a.level}${a.done ? " isdone" : ""}`}>
       <AutoSubmitCheckbox id={`act-${a.id}`} label={`Done: ${a.text}`} checked={a.done} action={setActionDone.bind(null, a.id)} />
@@ -177,6 +196,13 @@ function ActionRow({ a }: { a: Suggestion }) {
       </div>
       <div style={{ display: "grid", gap: 4, justifyItems: "end" }}>
         <span className={`kind ${a.level}`}>{KIND[a.kind]}</span>
+        {a.kind === "details" && !a.done && a.memberId && (
+          <form action={remindDetails}>
+            <input type="hidden" name="team" value={sel} />
+            <input type="hidden" name="member_id" value={a.memberId} />
+            <button className="btn ghost small" type="submit">Email reminder</button>
+          </form>
+        )}
         {a.custom && <form action={deleteAction.bind(null, a.id)}><button className="linkbtn" style={{ fontSize: "0.8rem" }} type="submit">Delete</button></form>}
       </div>
     </li>
