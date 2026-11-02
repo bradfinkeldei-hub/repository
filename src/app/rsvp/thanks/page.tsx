@@ -22,7 +22,7 @@ export default async function RsvpThanks({ searchParams }: { searchParams: Promi
             <div className={`rsvp-big ${a === "in" ? "in" : "out"}`} aria-hidden="true">{a === "in" ? "✓" : "✕"}</div>
             <h1 style={{ margin: 0, fontFamily: "var(--display)" }}>{a === "in" ? "You're attending" : "You're marked absent"}</h1>
             <p className="muted" style={{ margin: 0 }}>
-              {a === "in" ? `See you ${when}.` : `Thanks for letting the group know. We'll miss you ${when}.`} You can change this in the app.
+              {a === "in" ? `See you ${when}.` : `We'll miss you ${when}. If you haven't yet, please also let the group know you can't make it.`} You can change this in the app.
             </p>
           </>
         )}

@@ -21,7 +21,7 @@ export async function ConfirmRsvp({ m, d, a, k }: { m: string; d: string; a?: st
     <div className="wrap" style={{ maxWidth: 520, paddingTop: 64 }}>
       <div className="card" style={{ textAlign: "center", alignItems: "center" }}>
         <h1 style={{ margin: 0, fontFamily: "var(--display)" }}>{going ? `See you ${when}?` : `Can't make it ${when}?`}</h1>
-        {!going && <p className="muted" style={{ margin: 0 }}>Please let the group know, too.</p>}
+        {!going && <p style={{ margin: 0 }}><b>Don&apos;t forget to also let the group know you can&apos;t make it.</b></p>}
         <form action={answerFromEmail} style={{ width: "100%" }}>
           {hidden}
           <input type="hidden" name="a" value={going ? "in" : "out"} />

@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCoach, requireEditor, requireProfile, requireRealCoach, VIEW_AS_COOKIE } from "@/lib/session";
-import { AREAS, ASSUMED, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
+import { ABSENT_STEPS, AREAS, ASSUMED, CANT_MAKE_IT, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
 import { sendEmails } from "@/lib/mail";
 import { rsvpLink } from "@/lib/rsvp";
 
@@ -262,7 +262,9 @@ function attendanceEmail(m: Profile, to: string, o: { when: string; at: string; 
     "",
     ASSUMED,
     "",
-    `Mark me absent: ${o.no}`,
+    CANT_MAKE_IT,
+    `1. ${ABSENT_STEPS[0]}`,
+    `2. ${ABSENT_STEPS[1]} ${o.no}`,
     o.url ? `\nJoin the meeting: ${o.url}` : "",
     "",
     `Your team: ${o.site}/team`,
@@ -275,7 +277,12 @@ function attendanceEmail(m: Profile, to: string, o: { when: string; at: string; 
 <p style="font-size:18px;font-weight:700">${esc(head)}</p>
 ${o.url ? `<p><a href="${esc(o.url)}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#0b7d6e;color:#fff;font-weight:700;text-decoration:none">Join the meeting</a><br><span style="color:#5a6b66;font-size:14px">${esc(o.url)}</span></p>` : ""}
 <p>${esc(ASSUMED)}</p>
-<p><a href="${esc(o.no)}" style="display:inline-block;padding:10px 18px;border-radius:10px;border:2px solid #c23b25;color:#c23b25;font-weight:700;text-decoration:none">Mark me absent</a></p>
+<div style="border:2px solid #c23b25;border-radius:12px;padding:14px 16px;margin:0 0 16px;background:#fdf0ed">
+<p style="margin:0 0 10px;font-weight:700;color:#c23b25">${esc(CANT_MAKE_IT)}</p>
+<p style="margin:0 0 8px"><b>1. ${esc(ABSENT_STEPS[0])}</b></p>
+<p style="margin:0 0 10px"><b>2. ${esc(ABSENT_STEPS[1])}</b></p>
+<a href="${esc(o.no)}" style="display:inline-block;padding:10px 18px;border-radius:10px;background:#c23b25;color:#fff;font-weight:700;text-decoration:none">Mark me absent</a>
+</div>
 <p><a href="${esc(o.site)}/team" style="color:#0b7d6e">Your team</a></p>
 <p>${esc(o.coach)}</p>
 </div>`;
