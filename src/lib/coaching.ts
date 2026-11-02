@@ -274,7 +274,7 @@ export function fmt(v: number | null | undefined) {
 
 export type Suggestion = {
   id: string;
-  kind: "checkin" | "commit" | "wheel" | "team" | "remind" | "refresh" | "call" | "custom";
+  kind: "checkin" | "commit" | "details" | "wheel" | "team" | "remind" | "refresh" | "call" | "custom";
   level: "high" | "mid" | "low";
   text: string;
   why: string;
@@ -283,6 +283,34 @@ export type Suggestion = {
   done: boolean;
   custom?: boolean;
 };
+
+/** The parts of a profile a member is asked to fill in, in the order the profile page shows them. */
+export const DETAILS = [
+  ["photo", "Photo"],
+  ["wheel", "Life wheel"],
+  ["becoming", "Who I'm going to be"],
+  ["creating", "What I'm creating"],
+  ["commitment", "A commitment"],
+  ["mission", "My mission"],
+] as const;
+
+/** What a member hasn't filled in yet, as labels from DETAILS. Empty once their profile is complete. */
+export function missingDetails(m: Pick<Profile, "avatar_url" | "wheel" | "becoming" | "creating" | "accountability" | "mission">) {
+  const has: Record<(typeof DETAILS)[number][0], boolean> = {
+    photo: !!m.avatar_url,
+    wheel: Object.keys(m.wheel ?? {}).length > 0,
+    becoming: !!m.becoming?.trim(),
+    creating: !!m.creating?.trim(),
+    commitment: commitmentList(m.accountability).length > 0,
+    mission: !!m.mission?.trim(),
+  };
+  return DETAILS.filter(([k]) => !has[k]).map(([, label]) => label);
+}
+
+/** "Photo, Life wheel and My mission" */
+export function listJoin(items: string[]) {
+  return items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+}
 
 const DAY_INDEX: Record<string, number> = { Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7 };
 
@@ -329,6 +357,9 @@ export function coachActions(
       if (vague.length)
         add("commit", "mid", `Help ${fn} make their commitment specific`, `"${vague.join("; ")}" is hard to check off. Ask for one action they can finish before the next meeting.`);
     }
+    const missing = missingDetails(m);
+    if (missing.length && m.team)
+      add("details", "mid", `Remind ${fn} to fill out their details`, `Still missing: ${listJoin(missing)}.`);
     if (m.accountability && m.team && today >= DAY_INDEX[m.team] && m.done_week !== wk)
       add("checkin", "high", `Check in with ${fn}`, `Not marked done since ${m.team}'s meeting: ${commitmentList(m.accountability).join("; ")}`);
     const low = AREAS.filter(([k]) => Number(m.wheel?.[k]) > 0 && Number(m.wheel?.[k]) <= 3);
