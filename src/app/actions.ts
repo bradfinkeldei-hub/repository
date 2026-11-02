@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCoach, requireEditor, requireProfile, requireRealCoach, VIEW_AS_COOKIE } from "@/lib/session";
-import { AREAS, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
+import { AREAS, ASSUMED, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
 import { sendEmails } from "@/lib/mail";
 import { rsvpLink } from "@/lib/rsvp";
 
@@ -175,8 +175,9 @@ export async function setAttendance(memberId: string, going: boolean) {
 }
 
 /**
- * Coach only: emails everyone on the team who hasn't answered yet, asking if
- * they'll be at the next meeting, with one-tap In and Out links and the meeting link.
+ * Coach only: emails a meeting reminder to everyone on the team who isn't marked
+ * absent. Attendance is assumed, so the email has the meeting link and one
+ * "Mark me absent" link.
  */
 export async function askAttendance(team: string, formData: FormData) {
   const { supabase, names } = await requireCoach();
@@ -190,11 +191,11 @@ export async function askAttendance(team: string, formData: FormData) {
 
   const [{ data: members }, { data: answers }, { data: standing }] = await Promise.all([
     supabase.from("profiles").select("*").eq("team", team).neq("role", "coach").is("archived_at", null),
-    supabase.from("attendance").select("member_id").eq("meeting", meeting),
+    supabase.from("attendance").select("member_id").eq("meeting", meeting).eq("going", false),
     supabase.from("team_names").select("meeting_time, meeting_tz").eq("team", team).maybeSingle(),
   ]);
-  const answered = new Set((answers ?? []).map((a) => a.member_id as string));
-  const waiting = ((members ?? []) as Profile[]).filter((m) => !answered.has(m.id));
+  const absent = new Set((answers ?? []).map((a) => a.member_id as string));
+  const waiting = ((members ?? []) as Profile[]).filter((m) => !absent.has(m.id));
   const { data: contacts } = waiting.length
     ? await supabase.from("member_contacts").select("id, email").in("id", waiting.map((m) => m.id))
     : { data: [] };
@@ -212,7 +213,6 @@ export async function askAttendance(team: string, formData: FormData) {
     if (!to || to.toLowerCase().endsWith("@example.com")) continue;
     emails.push(attendanceEmail(m, to, {
       when, at, team: teamLabel(team, names), coach, site, url,
-      yes: await rsvpLink(site, secret, m.id, meeting, true),
       no: await rsvpLink(site, secret, m.id, meeting, false),
     }));
   }
@@ -253,33 +253,33 @@ export async function saveIntention(team: string, formData: FormData) {
   redirect(`/coach?team=${team}&asked=${error ? "intentfail" : "intentsaved"}#intention-${team}`);
 }
 
-function attendanceEmail(m: Profile, to: string, o: { when: string; at: string; team: string; coach: string; site: string; url: string; yes: string; no: string }) {
-  const q = `Will you be at ${o.team}'s meeting ${[o.when, o.at].filter(Boolean).join(" ")}?`;
+function attendanceEmail(m: Profile, to: string, o: { when: string; at: string; team: string; coach: string; site: string; url: string; no: string }) {
+  const head = `${o.team} meets ${[o.when, o.at].filter(Boolean).join(" ")}.`;
   const text = [
     `Hi ${firstName(m.name)},`,
     "",
-    q,
+    head,
     "",
-    `I'll be there: ${o.yes}`,
-    `Can't make it: ${o.no}`,
+    ASSUMED,
+    "",
+    `Mark me absent: ${o.no}`,
     o.url ? `\nJoin the meeting: ${o.url}` : "",
     "",
-    `See who's coming: ${o.site}/team`,
+    `Your team: ${o.site}/team`,
     "",
     o.coach,
   ].join("\n");
   const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  const button = (href: string, label: string, bg: string) =>
-    `<a href="${esc(href)}" style="display:inline-block;padding:12px 22px;margin:0 8px 8px 0;border-radius:10px;background:${bg};color:#fff;font-weight:700;text-decoration:none">${label}</a>`;
   const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:16px;line-height:1.5;color:#15302b">
 <p>Hi ${esc(firstName(m.name))},</p>
-<p style="font-size:18px;font-weight:700">${esc(q)}</p>
-<p>${button(o.yes, "I'm in", "#16803c")}${button(o.no, "I'm out", "#c23b25")}</p>
-${o.url ? `<p><a href="${esc(o.url)}" style="color:#0b7d6e;font-weight:700">Join the meeting</a><br><span style="color:#5a6b66;font-size:14px">${esc(o.url)}</span></p>` : ""}
-<p><a href="${esc(o.site)}/team" style="color:#0b7d6e">See who's coming</a></p>
+<p style="font-size:18px;font-weight:700">${esc(head)}</p>
+${o.url ? `<p><a href="${esc(o.url)}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#0b7d6e;color:#fff;font-weight:700;text-decoration:none">Join the meeting</a><br><span style="color:#5a6b66;font-size:14px">${esc(o.url)}</span></p>` : ""}
+<p>${esc(ASSUMED)}</p>
+<p><a href="${esc(o.no)}" style="display:inline-block;padding:10px 18px;border-radius:10px;border:2px solid #c23b25;color:#c23b25;font-weight:700;text-decoration:none">Mark me absent</a></p>
+<p><a href="${esc(o.site)}/team" style="color:#0b7d6e">Your team</a></p>
 <p>${esc(o.coach)}</p>
 </div>`;
-  return { to, subject: `${o.when === "tonight" ? "Tonight" : o.when}: are you coming?`, text, html };
+  return { to, subject: `${o.when === "tonight" ? "Tonight" : o.when}: ${o.team} meeting reminder`, text, html };
 }
 
 export async function setTeam(memberId: string, team: string) {

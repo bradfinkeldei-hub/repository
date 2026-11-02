@@ -3,9 +3,9 @@ import { meetingWhen } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 const ERRORS: Record<string, string> = {
-  link: "That link didn't work. Open the app to answer instead.",
+  link: "That link didn't work. Open the app to mark yourself absent instead.",
   past: "That meeting has already happened.",
-  save: "Your answer didn't save. Try the link again, or answer in the app.",
+  save: "That didn't save. Try the link again, or mark it in the app.",
 };
 
 /** Where the email's In and Out links land. Public, since the link itself proves who it's for. */
@@ -20,13 +20,13 @@ export default async function RsvpThanks({ searchParams }: { searchParams: Promi
         ) : (
           <>
             <div className={`rsvp-big ${a === "in" ? "in" : "out"}`} aria-hidden="true">{a === "in" ? "✓" : "✕"}</div>
-            <h1 style={{ margin: 0, fontFamily: "var(--display)" }}>{a === "in" ? "You're in" : "Got it, you're out"}</h1>
+            <h1 style={{ margin: 0, fontFamily: "var(--display)" }}>{a === "in" ? "You're attending" : "You're marked absent"}</h1>
             <p className="muted" style={{ margin: 0 }}>
-              {a === "in" ? `See you ${when}.` : `Thanks for letting the team know. We'll miss you ${when}.`} You can change your answer in the app.
+              {a === "in" ? `See you ${when}.` : `Thanks for letting the group know. We'll miss you ${when}.`} You can change this in the app.
             </p>
           </>
         )}
-        <Link className="btn" href="/team">See who&apos;s coming</Link>
+        <Link className="btn" href="/team">Go to your team</Link>
       </div>
     </div>
   );

@@ -103,7 +103,7 @@ function AskedNotice({ asked }: { asked: string }) {
   };
   if ((asked.startsWith("link") && asked !== "linkfail") || asked === "intentsaved") return <div className="notice good">{text[asked]}</div>;
   if (Number.isInteger(n)) {
-    return <div className="notice good">{n ? `Asked ${n} ${n === 1 ? "person" : "people"} by email. Answers show up below as they come in.` : "Saved. No one needed an email (everyone's answered, or they're Example members)."}</div>;
+    return <div className="notice good">{n ? `Reminder emailed to ${n} ${n === 1 ? "person" : "people"}. Anyone who marks themselves absent shows up below.` : "Saved. No one needed an email (everyone's marked absent, or they're Example members)."}</div>;
   }
   return <div className="notice">{text[asked] ?? "That didn't send. Try again."}</div>;
 }

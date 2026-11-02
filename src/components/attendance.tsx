@@ -1,21 +1,23 @@
 import Link from "next/link";
 import { askAttendance, saveMeetingLink, setAttendance } from "@/app/actions";
 import { Avatar } from "@/components/avatar";
-import { calendarEvent, clockLabel, firstName, googleCalendarUrl, meetingWhen, zonedTime, zoneLabel, type Profile, type Team } from "@/lib/coaching";
+import { ASSUMED, calendarEvent, clockLabel, firstName, googleCalendarUrl, meetingWhen, zonedTime, zoneLabel, type Profile, type Team } from "@/lib/coaching";
 import { YourTime } from "@/components/client";
 import { calendarDetails, type Checkin } from "@/lib/checkin";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 
-/** Who's in and who's out for a team's next meeting. Members answer here; the coach can email the team. */
+/**
+ * A team's next meeting. Everyone counts as attending unless they mark themselves
+ * absent (an attendance row with going = false). The coach can email a reminder.
+ */
 export function MeetingCheckin({ team, label, members, viewer, c }: { team: Team; label: string; members: Profile[]; viewer: Profile; c: Checkin }) {
-  const answer = new Map(c.rsvps.map((r) => [r.member_id, r.going]));
-  const inList = members.filter((m) => answer.get(m.id) === true);
-  const outList = members.filter((m) => answer.get(m.id) === false);
-  const waiting = members.filter((m) => !answer.has(m.id));
+  const absent = new Set(c.rsvps.filter((r) => !r.going).map((r) => r.member_id));
+  const inList = members.filter((m) => !absent.has(m.id));
+  const outList = members.filter((m) => absent.has(m.id));
   const when = meetingWhen(c.meeting, new Date(), TZ);
   const coach = viewer.role === "coach";
-  const mine = answer.get(viewer.id);
+  const imOut = absent.has(viewer.id);
   const joinUrl = c.url || c.standing.url;
   const cal = calendarEvent(team, c.standing, { title: `${label} meeting`, details: calendarDetails(label, c.standing.url), timeZone: TZ });
   const pct = (n: number) => `${members.length ? (n / members.length) * 100 : 0}%`;
@@ -25,25 +27,33 @@ export function MeetingCheckin({ team, label, members, viewer, c }: { team: Team
       <div className="checkin-head">
         <div>
           <h2>{when === "tonight" ? "Tonight's meeting" : `Next meeting: ${when}`}</h2>
-          <p className="sub"><b className="in-ink">{inList.length} in</b> · <b className="out-ink">{outList.length} out</b> · {waiting.length} haven&apos;t answered</p>
+          <p className="sub"><b className="in-ink">{inList.length} attending</b> · <b className="out-ink">{outList.length} absent</b></p>
         </div>
         {joinUrl && <a className="btn sun" href={joinUrl} target="_blank" rel="noopener noreferrer">Join the meeting</a>}
       </div>
 
-      <div className="tally" role="img" aria-label={`${inList.length} in, ${outList.length} out, ${waiting.length} no answer yet`}>
+      <div className="tally" role="img" aria-label={`${inList.length} attending, ${outList.length} absent`}>
         <i className="in" style={{ width: pct(inList.length) }} />
         <i className="out" style={{ width: pct(outList.length) }} />
       </div>
 
       {!coach && viewer.team === team && (
-        <div className="rsvp-ask">
-          <span>Will you be there {when}?</span>
-          <form action={setAttendance.bind(null, viewer.id, true)}>
-            <button className={`btn rsvp in${mine === true ? " picked" : ""}`} type="submit" aria-pressed={mine === true}>✓ I&apos;m in</button>
-          </form>
-          <form action={setAttendance.bind(null, viewer.id, false)}>
-            <button className={`btn rsvp out${mine === false ? " picked" : ""}`} type="submit" aria-pressed={mine === false}>✕ I&apos;m out</button>
-          </form>
+        <div className={`rsvp-ask${imOut ? " is-out" : ""}`}>
+          {imOut ? (
+            <>
+              <span>You&apos;re marked absent {when}. Thanks for letting the group know.</span>
+              <form action={setAttendance.bind(null, viewer.id, true)}>
+                <button className="btn rsvp in" type="submit">✓ I can make it after all</button>
+              </form>
+            </>
+          ) : (
+            <>
+              <p className="assumed">{ASSUMED}</p>
+              <form action={setAttendance.bind(null, viewer.id, false)}>
+                <button className="btn rsvp out" type="submit">✕ Mark me absent</button>
+              </form>
+            </>
+          )}
         </div>
       )}
 
@@ -60,10 +70,9 @@ export function MeetingCheckin({ team, label, members, viewer, c }: { team: Team
         <p className="hint">Set this team&apos;s meeting time on the <Link href="/coach/teams">Teams page</Link> so members can add the meeting to their calendars.</p>
       )}
 
-      <div className="rsvp-cols">
-        <Column label="In" kind="in" list={inList} viewer={viewer} />
-        <Column label="Out" kind="out" list={outList} viewer={viewer} />
-        <Column label="No answer yet" kind="wait" list={waiting} viewer={viewer} />
+      <div className="rsvp-cols two">
+        <Column label="Attending" kind="in" list={inList} viewer={viewer} />
+        <Column label="Absent" kind="out" list={outList} viewer={viewer} />
       </div>
 
       {coach && (
@@ -73,8 +82,8 @@ export function MeetingCheckin({ team, label, members, viewer, c }: { team: Team
             <input className="input" name="meeting_url" type="url" inputMode="url" maxLength={500} defaultValue={c.url || c.standing.url || c.lastUrl} placeholder="https://zoom.us/j/… or https://meet.google.com/…" />
           </label>
           <div className="rsvp-btns">
-            <button className="btn" type="submit" disabled={!waiting.length}>
-              {c.askedAt ? `Ask again (${waiting.length} to go)` : "Email the team: are you coming?"}
+            <button className="btn" type="submit" disabled={!inList.length}>
+              {c.askedAt ? "Send the reminder again" : "Email the team a reminder"}
             </button>
             <button className="btn ghost" type="submit" formAction={saveMeetingLink.bind(null, team)} formNoValidate>Save link</button>
           </div>
@@ -84,8 +93,9 @@ export function MeetingCheckin({ team, label, members, viewer, c }: { team: Team
           </label>
           <span className="hint">
             {c.askedAt
-              ? `Asked ${new Intl.DateTimeFormat("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: TZ }).format(new Date(c.askedAt))}. Asking again only emails people who haven't answered.`
-              : "Each person gets I'm in and I'm out buttons, plus the meeting link."}
+              ? `Reminded ${new Intl.DateTimeFormat("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: TZ }).format(new Date(c.askedAt))}. `
+              : ""}
+            The reminder goes to everyone not marked absent, with the meeting link and a &ldquo;Mark me absent&rdquo; button.
             {c.standing.url ? " This team has a saved link, so it fills in here every week." : " Save link keeps it for every week without emailing anyone."}
           </span>
         </form>
@@ -94,18 +104,19 @@ export function MeetingCheckin({ team, label, members, viewer, c }: { team: Team
   );
 }
 
-/** The coach can answer for anyone, say when they texted instead. */
-function CoachAnswer({ m, kind }: { m: Profile; kind: "in" | "out" | "wait" }) {
+/** The coach can mark anyone absent (say when they texted instead), or back to attending. */
+function CoachAnswer({ m, kind }: { m: Profile; kind: "in" | "out" }) {
   const first = firstName(m.name);
   return (
     <span className="rsvp-set">
-      {kind !== "in" && <form action={setAttendance.bind(null, m.id, true)}><button className="rsvp-mini in" type="submit" aria-label={`Mark ${first} in`} title={`Mark ${first} in`}>✓</button></form>}
-      {kind !== "out" && <form action={setAttendance.bind(null, m.id, false)}><button className="rsvp-mini out" type="submit" aria-label={`Mark ${first} out`} title={`Mark ${first} out`}>✕</button></form>}
+      {kind === "out"
+        ? <form action={setAttendance.bind(null, m.id, true)}><button className="rsvp-mini in" type="submit" aria-label={`Mark ${first} attending`} title={`Mark ${first} attending`}>✓</button></form>
+        : <form action={setAttendance.bind(null, m.id, false)}><button className="rsvp-mini out" type="submit" aria-label={`Mark ${first} absent`} title={`Mark ${first} absent`}>✕</button></form>}
     </span>
   );
 }
 
-function Column({ label, kind, list, viewer }: { label: string; kind: "in" | "out" | "wait"; list: Profile[]; viewer: Profile }) {
+function Column({ label, kind, list, viewer }: { label: string; kind: "in" | "out"; list: Profile[]; viewer: Profile }) {
   return (
     <div className={`rsvp-col ${kind}`}>
       <div className="label">{label} <span>{list.length}</span></div>
@@ -119,7 +130,7 @@ function Column({ label, kind, list, viewer }: { label: string; kind: "in" | "ou
             </li>
           ))}
         </ul>
-      ) : <p className="muted">{kind === "wait" ? "Everyone's answered." : "No one yet."}</p>}
+      ) : <p className="muted">{kind === "out" ? "No one's marked absent." : "No one yet."}</p>}
     </div>
   );
 }
