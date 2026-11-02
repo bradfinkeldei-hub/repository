@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { askAttendance, saveMeetingLink, setAttendance } from "@/app/actions";
 import { Avatar } from "@/components/avatar";
-import { ASSUMED, calendarEvent, clockLabel, firstName, googleCalendarUrl, meetingWhen, zonedTime, zoneLabel, type Profile, type Team } from "@/lib/coaching";
+import { ABSENT_STEPS, ASSUMED, CANT_MAKE_IT, calendarEvent, clockLabel, firstName, googleCalendarUrl, meetingWhen, zonedTime, zoneLabel, type Profile, type Team } from "@/lib/coaching";
 import { YourTime } from "@/components/client";
 import { calendarDetails, type Checkin } from "@/lib/checkin";
 
@@ -41,14 +41,20 @@ export function MeetingCheckin({ team, label, members, viewer, c }: { team: Team
         <div className={`rsvp-ask${imOut ? " is-out" : ""}`}>
           {imOut ? (
             <>
-              <span>You&apos;re marked absent {when}. Thanks for letting the group know.</span>
+              <span>You&apos;re marked absent {when}. Don&apos;t forget to also let the group know you can&apos;t make it.</span>
               <form action={setAttendance.bind(null, viewer.id, true)}>
                 <button className="btn rsvp in" type="submit">✓ I can make it after all</button>
               </form>
             </>
           ) : (
             <>
-              <p className="assumed">{ASSUMED}</p>
+              <div className="assumed">
+                <p>{ASSUMED}</p>
+                <p className="cant">{CANT_MAKE_IT}</p>
+                <ol className="absent-steps">
+                  {ABSENT_STEPS.map((s, i) => <li key={i}><b>{s}</b></li>)}
+                </ol>
+              </div>
               <form action={setAttendance.bind(null, viewer.id, false)}>
                 <button className="btn rsvp out" type="submit">✕ Mark me absent</button>
               </form>
