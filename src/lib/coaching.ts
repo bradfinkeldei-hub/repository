@@ -284,9 +284,8 @@ export type Suggestion = {
   custom?: boolean;
 };
 
-/** The parts of a profile a member is asked to fill in, in the order the profile page shows them. */
+/** The parts of a profile a member is asked to fill in, in the order the profile page shows them. A photo is optional, so it isn't one. */
 export const DETAILS = [
-  ["photo", "Photo"],
   ["wheel", "Life wheel"],
   ["becoming", "Who I'm going to be"],
   ["creating", "What I'm creating"],
@@ -295,9 +294,8 @@ export const DETAILS = [
 ] as const;
 
 /** What a member hasn't filled in yet, as labels from DETAILS. Empty once their profile is complete. */
-export function missingDetails(m: Pick<Profile, "avatar_url" | "wheel" | "becoming" | "creating" | "accountability" | "mission">) {
+export function missingDetails(m: Pick<Profile, "wheel" | "becoming" | "creating" | "accountability" | "mission">) {
   const has: Record<(typeof DETAILS)[number][0], boolean> = {
-    photo: !!m.avatar_url,
     wheel: Object.keys(m.wheel ?? {}).length > 0,
     becoming: !!m.becoming?.trim(),
     creating: !!m.creating?.trim(),

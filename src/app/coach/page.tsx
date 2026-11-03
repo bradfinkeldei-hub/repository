@@ -6,6 +6,7 @@ import { Avatar } from "@/components/avatar";
 import { TeamViews, type DetailsNudge, type Tab } from "@/components/cards";
 import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitCheckbox } from "@/components/client";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { addAction, deleteAction, remindDetails, setActionDone } from "@/app/actions";
 import { loadCheckins } from "@/lib/checkin";
 import { loadChecked, loadIntentions, loadNotes, loadSocial } from "@/lib/social";
@@ -37,7 +38,10 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
   if (error) throw new Error(`Couldn't load members: ${error.message}`);
   const logs = progressByMember((log ?? []) as LogRow[], weekKey(new Date(), TZ));
   const members = (profiles ?? []) as Profile[];
-  const actions = coachActions(members, (rows ?? []) as CoachActionRow[], (bookings ?? []) as Booking[], new Date(), TZ, names);
+  // Anyone who hasn't accepted their invite yet can't fill anything in, so they aren't counted as missing details.
+  const notJoined = await neverSignedIn();
+  const actions = coachActions(members, (rows ?? []) as CoachActionRow[], (bookings ?? []) as Booking[], new Date(), TZ, names)
+    .filter((a) => !(a.kind === "details" && a.memberId && notJoined.has(a.memberId)));
   const openCount = actions.filter((a) => !a.done).length;
 
   const teamsShown: (Team | null)[] = sel === "all"
@@ -55,7 +59,7 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
   const nudges: Record<string, DetailsNudge> = {};
   for (const m of groups.flatMap((g) => g.members)) {
     const missing = missingDetails(m);
-    if (missing.length && m.team) nudges[m.id] = { missing, reminded: reminded.has(m.id) };
+    if (missing.length && m.team && !notJoined.has(m.id)) nudges[m.id] = { missing, reminded: reminded.has(m.id) };
   }
   const notYet = Object.keys(nudges).filter((id) => !nudges[id].reminded);
   const selLabel = sel === "all" ? "All teams" : teamLabel(sel === "none" ? null : (sel as Team), names);
@@ -108,6 +112,17 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
       </div>
     </>
   );
+}
+
+/** Ids of people who have never signed in (their invite is still open). Empty if the service key isn't set. */
+async function neverSignedIn() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return new Set<string>();
+  try {
+    const { data } = await createAdminClient().auth.admin.listUsers({ perPage: 1000 });
+    return new Set((data?.users ?? []).filter((u) => !u.last_sign_in_at).map((u) => u.id));
+  } catch {
+    return new Set<string>();
+  }
 }
 
 function AskedNotice({ asked }: { asked: string }) {

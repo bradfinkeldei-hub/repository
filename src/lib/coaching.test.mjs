@@ -206,15 +206,15 @@ test("meeting time zones: labels, checks and the real moment", () => {
 
 test("missing details lists what a member hasn't filled in", async () => {
   const { missingDetails, listJoin } = await import("./coaching.ts");
-  assert.deepEqual(missingDetails(member({ accountability: "" })), ["Photo", "Life wheel", "Who I'm going to be", "What I'm creating", "A commitment", "My mission"]);
-  assert.deepEqual(missingDetails(member({ avatar_url: "x", wheel: { health: 5 }, becoming: "calm", creating: "a book", mission: "serve" })), []);
+  assert.deepEqual(missingDetails(member({ accountability: "" })), ["Life wheel", "Who I'm going to be", "What I'm creating", "A commitment", "My mission"]);
+  assert.deepEqual(missingDetails(member({ wheel: { health: 5 }, becoming: "calm", creating: "a book", mission: "serve" })), []);
   assert.equal(listJoin(["Photo", "Life wheel", "My mission"]), "Photo, Life wheel and My mission");
   assert.equal(listJoin(["Photo"]), "Photo");
 });
 
 test("the coach gets a details reminder only for members on a team with blanks", () => {
   const now = new Date("2026-11-02T18:00:00Z");
-  const full = { avatar_url: "x", wheel: { health: 5 }, becoming: "calm", creating: "a book", mission: "serve" };
+  const full = { wheel: { health: 5 }, becoming: "calm", creating: "a book", mission: "serve" };
   const acts = coachActions([
     member({ id: "a", name: "Ann", team: "Monday", ...full }),
     member({ id: "b", name: "Bo", team: "Monday", ...full, mission: "" }),
