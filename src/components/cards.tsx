@@ -234,10 +234,10 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins,
         if (tab === "team") {
           body = members.length ? (
             <>
-              {team && checkins?.[team] && <MeetingCheckin team={team} label={teamLabel(team, names)} members={members} viewer={viewer} c={checkins[team]} />}
               {team && <TeamPulse team={team} names={names} ownTeam={ownTeam} coach={viewer.role === "coach"}
                 p={teamPulse(members, { logs, checked, kudos: social?.kudos, milestones: social?.milestones, timeZone: TZ })} />}
               <div className="grid">{members.map((m) => <MemberCard key={m.id} m={m} viewer={viewer} names={names} p={logs?.[m.id]} social={social} avatars={avatars} checked={checked?.[m.id]} notes={notes ? notes[m.id] ?? [] : undefined} nudge={nudges?.[m.id]} sel={sel} />)}</div>
+              {team && checkins?.[team] && <MeetingCheckin team={team} label={teamLabel(team, names)} members={members} viewer={viewer} c={checkins[team]} />}
             </>
           ) : <EmptyTeam label={teamLabel(team, names)} coach={viewer.role === "coach"} />;
         } else if (tab === "accountability") {

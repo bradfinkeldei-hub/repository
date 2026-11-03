@@ -251,22 +251,24 @@ span.tick { cursor: default; width: 22px; height: 22px; border-radius: 7px; }
 .pill.done::before { content: "\2713"; font-weight: 800; }
 .pill.warn { background: var(--sun-soft); border-color: transparent; color: var(--sun); }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.pulse { padding: 22px 24px; background: linear-gradient(135deg, var(--surface) 55%, color-mix(in srgb, var(--accent-soft) 70%, var(--surface))); }
-.pulse h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1.4rem; }
-.pulse .sub { margin: 2px 0 0; color: var(--muted); font-size: 0.88rem; }
-.pulse-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
-.pulse-stats .stat { display: flex; flex-direction: column; gap: 6px; }
-.pulse-stats .muted { font-size: 0.8rem; }
-.meter { height: 10px; border-radius: 999px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); }
+.pulse { padding: 16px 20px; gap: 12px; background: linear-gradient(135deg, var(--surface) 55%, color-mix(in srgb, var(--accent-soft) 70%, var(--surface))); }
+.pulse h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1.15rem; }
+.pulse-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.pstat { display: grid; grid-template-columns: auto 1fr; align-items: baseline; align-content: start; gap: 2px 8px; min-width: 0; }
+.pstat b { font-family: var(--display); font-weight: 600; font-size: 1.45rem; line-height: 1.25; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pstat b small { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+.pstat span { font-size: 0.8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pstat .meter, .pstat .bars { grid-column: 1 / -1; margin-top: 4px; }
+.meter { height: 8px; border-radius: 999px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); }
 .meter i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent-bright), var(--ok)); }
-.bars { list-style: none; margin: 0; padding: 0; display: flex; align-items: flex-end; gap: 4px; height: 34px; }
-.bars li { flex: 1; height: 100%; display: flex; align-items: flex-end; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
-.bars i { display: block; width: 100%; background: var(--sun-fill); border-radius: 4px; }
-.pulse-wins, .pulse-nudge { display: grid; gap: 6px; }
-.pulse-wins ul, .pulse-nudge ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-.pulse-wins li { background: var(--ok-soft); border-radius: 999px; padding: 5px 12px; font-size: 0.88rem; }
-.pulse-nudge li { background: var(--sun-soft); border-radius: 999px; padding: 5px 12px; font-size: 0.88rem; }
-.pulse-cheer { margin: 0; font-size: 0.9rem; color: var(--muted); }
+.bars { list-style: none; margin: 0; padding: 0; display: flex; align-items: flex-end; gap: 3px; height: 20px; }
+.bars li { flex: 1; height: 100%; display: flex; align-items: flex-end; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.bars i { display: block; width: 100%; background: var(--sun-fill); border-radius: 3px; }
+.pulse-wins { margin: 0; display: flex; flex-wrap: wrap; gap: 6px; font-size: 0.84rem; }
+.pulse-wins span { background: var(--ok-soft); border-radius: 999px; padding: 3px 10px; }
+.pulse-nudge summary { cursor: pointer; font-size: 0.84rem; font-weight: 650; color: var(--muted); }
+.pulse-nudge ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.pulse-nudge li { background: var(--sun-soft); border-radius: 999px; padding: 3px 10px; font-size: 0.84rem; }
 .mission blockquote { margin: 0; font-family: var(--display); font-weight: 500; font-size: 1.3rem; line-height: 1.35; overflow-wrap: anywhere; }
 .mission blockquote::before { content: "\201C"; color: var(--sun-line); }
 .mission blockquote::after { content: "\201D"; color: var(--sun-line); }
@@ -456,9 +458,10 @@ tr:last-child td { border-bottom: 0; }
   .intro { align-items: stretch; }
   .intro > .btn, .intro > a.btn { width: 100%; }
   .card { padding: 16px; border-radius: 18px; }
-  .pulse { padding: 18px; }
-  .pulse-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .pulse-stats .stat:first-child { grid-column: 1 / -1; }
+  .pulse { padding: 14px 16px; }
+  .pulse-strip { gap: 10px; }
+  .pstat { grid-template-columns: 1fr; }
+  .pstat b { font-size: 1.25rem; }
   .who .end { flex-wrap: nowrap; }
   .coach-tools { padding: 10px; }
   .team-pick { flex-basis: 100%; }
@@ -515,26 +518,21 @@ tr:last-child td { border-bottom: 0; }
 }
 
 /* Meeting check-in: who's in and who's out for the next meeting. */
-.checkin { gap: 16px; border-top: 4px solid var(--ok); }
-.checkin-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
-.checkin h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1.4rem; }
-.checkin .sub { margin: 2px 0 0; color: var(--muted); }
+.checkin { gap: 10px; padding: 14px 18px; border-top: 3px solid var(--ok); }
+.checkin-head { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.checkin-title { min-width: 0; }
+.checkin h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1.05rem; }
+.checkin .sub { margin: 2px 0 0; color: var(--muted); font-size: 0.86rem; }
+.checkin-more > summary { cursor: pointer; font-size: 0.84rem; font-weight: 650; color: var(--accent); }
+.checkin-body { display: grid; gap: 12px; margin-top: 10px; }
 .in-ink { color: var(--ok); }
 .out-ink { color: var(--alert); }
-.tally { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); }
-.tally i { display: block; height: 100%; transition: width 0.3s; }
-.tally .in { background: var(--ok); }
-.tally .out { background: var(--alert); }
-.rsvp-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--r); background: var(--surface-2); border: 1px solid var(--line); }
-.rsvp-ask span { font-weight: 650; margin-right: auto; }
-.rsvp-ask .assumed { flex: 1 1 280px; line-height: 1.45; display: grid; gap: 6px; }
-.rsvp-ask .assumed p { margin: 0; }
-.rsvp-ask .assumed .cant { font-weight: 750; color: var(--alert); margin-top: 4px; }
-.absent-steps { margin: 0; padding-left: 1.4em; display: grid; gap: 4px; }
-.absent-steps li::marker { font-weight: 800; color: var(--alert); }
+.rsvp-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); }
+.rsvp-ask p { flex: 1 1 260px; margin: 0; font-size: 0.84rem; line-height: 1.4; }
+.rsvp-ask p b { color: var(--alert); }
 .rsvp-ask.is-out { background: var(--alert-soft); border-color: transparent; }
 .rsvp-cols.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.btn.rsvp { min-width: 120px; background: var(--surface); box-shadow: none; }
+.btn.rsvp { min-width: 0; background: var(--surface); box-shadow: none; }
 .btn.rsvp.in { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
 .btn.rsvp.out { color: var(--alert); border-color: color-mix(in srgb, var(--alert) 45%, var(--line)); }
 .btn.rsvp.in.picked { background: var(--ok); color: #fff; border-color: transparent; }
@@ -560,7 +558,7 @@ tr:last-child td { border-bottom: 0; }
 .rsvp-send label { flex: 1 1 280px; display: grid; gap: 4px; font-size: 0.86rem; font-weight: 650; }
 .cal-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font-size: 0.9rem; }
 .cal-add span { flex: 1 1 220px; color: var(--muted); }
-.checkin > .hint { margin: 0; color: var(--muted); font-size: 0.86rem; }
+.checkin-body .hint { margin: 0; color: var(--muted); font-size: 0.86rem; }
 /* The coach's team settings: one box per team. */
 .team-settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; align-items: start; }
 .team-settings > .btn { grid-column: 1 / -1; justify-self: start; min-height: 42px; }
@@ -577,7 +575,7 @@ tr:last-child td { border-bottom: 0; }
 .rsvp-big.out { background: var(--alert); }
 @media (max-width: 640px) {
   .rsvp-cols { grid-template-columns: 1fr; }
-  .rsvp-ask span { flex: 1 1 100%; }
+  .rsvp-ask p { flex: 1 1 100%; }
   .rsvp-ask form { flex: 1 1 0; }
   .btn.rsvp { width: 100%; min-width: 0; }
 }
