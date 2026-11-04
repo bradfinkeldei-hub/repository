@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { Commitments, Who } from "@/components/cards";
+import { Who } from "@/components/cards";
 import { Thread } from "@/components/thread";
 import { CoachNotes } from "@/components/notes";
-import { commitmentList, firstName, type Profile, type TeamNames } from "@/lib/coaching";
+import { firstName, type Profile, type TeamNames } from "@/lib/coaching";
 import { focusProgress, MEASURE_KINDS, progressLabel, type Focus } from "@/lib/focus";
 import type { CoachNote, Social } from "@/lib/social";
 
@@ -65,23 +65,23 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
             <p>{f.focus}</p>
           </div>
           <dl className="focus-rows">
-            <dt>Creating</dt><dd>{f.outcome}</dd>
-            <dt>I&apos;ll know when</dt>
-            <dd>
-              {f.measure}
-              {pct !== null && (
-                <span className="focus-meter">
-                  <span className="meter" role="img" aria-label={`${pct}% of the way there`}><i style={{ width: `${pct}%` }} /></span>
-                  <span>{progressLabel(f)}{kind ? ` · ${kind}` : ""}</span>
-                </span>
-              )}
-            </dd>
-            <dt>Why it matters</dt><dd>{f.meaning}</dd>
-            {/* The starting point is usually already their first commitment below; only show it when it isn't. */}
-            {!commitmentList(m.accountability).includes(f.start_point) && <><dt>Starting with</dt><dd>{f.start_point}</dd></>}
-            <dt>Accountable by</dt><dd>{f.held_by}</dd>
+            <div className="fr creating"><dt>Creating</dt><dd>{f.outcome}</dd></div>
+            <div className="fr know">
+              <dt>I&apos;ll know when</dt>
+              <dd>
+                {f.measure}
+                {pct !== null && (
+                  <span className="focus-meter">
+                    <span className="meter" role="img" aria-label={`${pct}% of the way there`}><i style={{ width: `${pct}%` }} /></span>
+                    <span>{progressLabel(f)}{kind ? ` · ${kind}` : ""}</span>
+                  </span>
+                )}
+              </dd>
+            </div>
+            <div className="fr why"><dt>Why it matters</dt><dd>{f.meaning}</dd></div>
+            <div className="fr start"><dt>Starting with</dt><dd>{f.start_point}</dd></div>
+            <div className="fr held"><dt>Accountable by</dt><dd>{f.held_by}</dd></div>
           </dl>
-          {!practice && <Commitments m={m} viewer={viewer} checked={checked} />}
           {f.later.length > 0 && (
             <details className="fold later-list">
               <summary><h4>Also on my list</h4><span className="pill">{f.later.length}</span></summary>
