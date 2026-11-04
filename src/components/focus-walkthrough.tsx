@@ -111,12 +111,22 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
         {step === "topic" && (
           <>
             <h1>What would {you} like to change in {forCoach ? "their" : "your"} life, or create, through being part of this group?</h1>
+            <p className="hint">It can be anything {you} want to change or create, in any part of {forCoach ? "their" : "your"} life. Write it in {forCoach ? "their" : "your"} own words.</p>
+            <div className="walk-examples">
+              <span>Just examples, to get you thinking:</span>
+              <ul>
+                <li>Get more clients for my business</li>
+                <li>Feel healthier and have more energy</li>
+                <li>Be more present with my kids</li>
+                <li>Figure out my next career move</li>
+              </ul>
+            </div>
             <p className="hint">If there&apos;s more than one thing, add each one on its own line.</p>
             <div className="walk-topics">
               {a.topics.map((t, i) => (
                 <div className="walk-topic" key={i}>
                   <input className="input" id={`topic-${i}`} aria-label={`Topic ${i + 1}`} value={t} maxLength={300} autoFocus={i === a.topics.length - 1}
-                    placeholder={i === 0 ? "e.g. Get more clients for my business" : "Another thing"}
+                    placeholder={i === 0 ? "Write your own here" : "Another thing"}
                     onChange={(e) => set("topics", a.topics.map((x, j) => (j === i ? e.target.value : x)))} />
                   {a.topics.length > 1 && (
                     <button type="button" className="walk-remove" aria-label={`Remove topic ${i + 1}`} title="Remove"
