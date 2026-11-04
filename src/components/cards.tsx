@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AREAS, commitmentList, firstName, listJoin, fmt, isVagueCommitment, MAX_COMMITMENTS, teamLabel, teamOptions, teamPulse, weekKey, type Profile, type Progress, type Team, type TeamNames, type Wheel } from "@/lib/coaching";
+import { AREAS, commitmentList, isPilot, firstName, listJoin, fmt, isVagueCommitment, MAX_COMMITMENTS, teamLabel, teamOptions, teamPulse, weekKey, type Profile, type Progress, type Team, type TeamNames, type Wheel } from "@/lib/coaching";
 import { addCommitment, remindDetails, setTeam, startViewAs, toggleCommitment } from "@/app/actions";
 import { AutoSubmitSelect } from "@/components/client";
 import { Avatar } from "@/components/avatar";
@@ -11,6 +11,8 @@ import { TeamPulse } from "@/components/pulse";
 import { Intention } from "@/components/intention";
 import type { Checkin } from "@/lib/checkin";
 import type { CoachNote, Social } from "@/lib/social";
+import type { Focus } from "@/lib/focus";
+import { FocusBoard } from "@/components/focus-card";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 
@@ -45,7 +47,7 @@ export function Legend({ wheel, two = false }: { wheel: Partial<Record<string, n
   );
 }
 
-function Who({ m, viewer, coachTools, names }: { m: Profile; viewer: Profile; coachTools?: boolean; names?: TeamNames }) {
+export function Who({ m, viewer, coachTools, names }: { m: Profile; viewer: Profile; coachTools?: boolean; names?: TeamNames }) {
   const isMe = m.id === viewer.id;
   const tools = coachTools && viewer.role === "coach" && !isMe;
   return (
@@ -66,6 +68,8 @@ function Who({ m, viewer, coachTools, names }: { m: Profile; viewer: Profile; co
 function EditLink({ m, viewer }: { m: Profile; viewer: Profile }) {
   const isMe = m.id === viewer.id;
   if (!isMe && viewer.role !== "coach") return null;
+  // Pilot members edit their Focus card by stepping back through their answers.
+  if (isMe && isPilot(m.team)) return <Link className="btn ghost small" href="/focus?edit=1">Edit my card</Link>;
   return <Link className="btn ghost small" href={isMe ? "/profile" : `/profile?id=${m.id}`}>{isMe ? "Edit my profile" : "Edit profile"}</Link>;
 }
 
@@ -100,7 +104,7 @@ function Field({ label, value, className = "", note }: { label: string; value: s
 }
 
 /** A member's commitments for the week, each ticked off on its own, plus a way to add up to three. */
-function Commitments({ m, viewer, checked = [] }: { m: Profile; viewer: Profile; checked?: string[] }) {
+export function Commitments({ m, viewer, checked = [] }: { m: Profile; viewer: Profile; checked?: string[] }) {
   const items = commitmentList(m.accountability);
   const isMe = m.id === viewer.id;
   const canEdit = isMe || viewer.role === "coach";
@@ -212,7 +216,7 @@ export function MissionCard({ m, viewer }: { m: Profile; viewer: Profile }) {
 export type Tab = "team" | "accountability" | "missions";
 
 /** The Team, Accountability and Missions views for one or more teams. */
-export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins, social, checked, notes, intentions, nudges, sel }: {
+export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins, social, checked, notes, intentions, nudges, sel, focus }: {
   tab: Tab; groups: { team: Team | null; members: Profile[] }[]; viewer: Profile; ownTeam?: boolean; logs?: Record<string, Progress>; names?: TeamNames;
   checkins?: Partial<Record<Team, Checkin>>; social?: Social | null; checked?: Record<string, string[]>;
   /** The coach's private notes by member id. Only the coach page passes these. */
@@ -222,6 +226,8 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins,
   /** Coach only: members with blank details, by member id, and the team menu's selection to come back to. */
   nudges?: Record<string, DetailsNudge>;
   sel?: string;
+  /** The Pilot group's Focus cards by member id. Its Team tab shows these as a Group board. */
+  focus?: Record<string, Focus> | null;
 }) {
   const multi = groups.length > 1;
   const avatars = Object.fromEntries(groups.flatMap((g) => g.members).filter((m) => m.avatar_url).map((m) => [m.id, m.avatar_url]));
@@ -231,7 +237,14 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins,
       {groups.map(({ team, members }) => {
         const key = team ?? "none";
         let body: React.ReactNode;
-        if (tab === "team") {
+        if (tab === "team" && isPilot(team)) {
+          body = (
+            <>
+              <FocusBoard members={members} focus={focus ?? {}} viewer={viewer} names={names} social={social} avatars={avatars} checked={checked} notes={notes} />
+              {team && checkins?.[team] && <MeetingCheckin team={team} label={teamLabel(team, names)} members={members} viewer={viewer} c={checkins[team]} />}
+            </>
+          );
+        } else if (tab === "team") {
           body = members.length ? (
             <>
               {team && <TeamPulse team={team} names={names} ownTeam={ownTeam} coach={viewer.role === "coach"}

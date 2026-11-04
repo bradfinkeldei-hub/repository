@@ -312,4 +312,19 @@ await check("only the coach writes a team's intention; members see their own tea
   assert.equal((await as(coach, `select team from public.team_intentions`)).length, 2);
   await assert.rejects(as(coach, `update public.team_intentions set body = repeat('x', 501) where team = 'Monday'`));
 });
+await check("Pilot group: focus cards are seen by the group and coach, written by the member or coach", async () => {
+  assert.deepEqual((await db.query(`select name from public.team_names where team = 'Pilot'`)).rows.map((r) => r.name), ["Pilot group"]);
+  await db.query(`update public.profiles set team = 'Pilot' where id in ($1, $2)`, [mon1, mon2]);
+  await as(mon1, `insert into public.focus_cards (member_id, focus, outcome, confirmed_at) values ($1, 'Get clients', 'Two ideas', now())`, [mon1]);
+  // Nobody writes someone else's card, except the coach.
+  await assert.rejects(as(mon2, `insert into public.focus_cards (member_id, focus) values ($1, 'Hacked')`, [tue1]));
+  await as(mon2, `update public.focus_cards set focus = 'Hacked' where member_id = $1`, [mon1]);
+  await as(coach, `insert into public.focus_cards (member_id, focus) values ($1, 'Set by coach')`, [mon2]);
+  assert.deepEqual((await as(mon2, `select focus from public.focus_cards order by focus`)).map((r) => r.focus), ["Get clients", "Set by coach"]);
+  // Other teams can't see them.
+  assert.equal((await as(tue1, `select 1 from public.focus_cards`)).length, 0);
+  await assert.rejects(as(mon1, `update public.focus_cards set measure_kind = 'vibes' where member_id = $1`, [mon1]));
+  await as(mon1, `delete from public.focus_cards where member_id = $1`, [mon1]);
+  assert.equal((await db.query(`select 1 from public.focus_cards`)).rows.length, 2);
+});
 console.log(`\n${passed} checks passed`);

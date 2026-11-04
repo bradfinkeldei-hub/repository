@@ -9,6 +9,7 @@ import { requireCoach, requireEditor, requireProfile, requireRealCoach, VIEW_AS_
 import { ABSENT_STEPS, AREAS, ASSUMED, CANT_MAKE_IT, missingDetails, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
 import { sendEmails } from "@/lib/mail";
 import { rsvpLink } from "@/lib/rsvp";
+import { cleanFocus, focusGaps, type FocusAnswers } from "@/lib/focus";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 const str = (v: FormDataEntryValue | null, max: number) => String(v ?? "").trim().slice(0, max);
@@ -755,4 +756,40 @@ export async function markThreadSeen() {
   const { supabase, me, viewing } = await requireProfile();
   if (viewing) return;
   await supabase.from("thread_seen").upsert({ member_id: me.id, seen_at: new Date().toISOString() });
+}
+
+/**
+ * Saves the Focus walkthrough as the member goes (Pilot group). Members save their own;
+ * the coach can save anyone's, and their own when trying the walkthrough. finish builds
+ * the card: it needs every answer, and the starting point becomes their first commitment
+ * if they don't have one yet.
+ */
+export async function saveFocus(memberId: string, answers: Partial<Record<keyof FocusAnswers, unknown>>, finish = false): Promise<{ ok: boolean; error?: string }> {
+  const { supabase, me } = await requireEditor();
+  const id = memberId || me.id;
+  if (id !== me.id && me.role !== "coach") return { ok: false, error: "You can only change your own card." };
+  const f = cleanFocus(answers);
+  if (finish && focusGaps(f).length) return { ok: false, error: `Still blank: ${focusGaps(f).map(([, l]) => l).join(", ")}.` };
+  const row = { member_id: id, ...f, updated_at: new Date().toISOString(), ...(finish ? { confirmed_at: new Date().toISOString() } : {}) };
+  const { error } = await supabase.from("focus_cards").upsert(row);
+  if (error) return { ok: false, error: "That didn't save. Check your connection and try again." };
+  if (finish) {
+    const { data: p } = await supabase.from("profiles").select("role, accountability").eq("id", id).single();
+    if (p && p.role !== "coach" && !commitmentList(p.accountability).length)
+      await supabase.from("profiles").update({ accountability: joinCommitments([f.start_point]) }).eq("id", id);
+    revalidatePath("/", "layout");
+  }
+  return { ok: true };
+}
+
+/** Moves the "now" number on a counted finish line (a number or a feeling scale). */
+export async function setFocusNow(memberId: string, formData: FormData) {
+  const { supabase, me } = await requireEditor();
+  if (memberId !== me.id && me.role !== "coach") return;
+  const { data } = await supabase.from("focus_cards").select("measure_kind, measure_goal").eq("member_id", memberId).single();
+  if (!data || (data.measure_kind !== "number" && data.measure_kind !== "feeling")) return;
+  const hi = data.measure_kind === "feeling" ? 10 : 1000;
+  const n = Math.max(0, Math.min(hi, Math.round(Number(formData.get("now")))));
+  if (Number.isFinite(n)) await supabase.from("focus_cards").update({ measure_now: n, updated_at: new Date().toISOString() }).eq("member_id", memberId);
+  revalidatePath("/", "layout");
 }

@@ -17,9 +17,13 @@ export const AREAS = [
 export type AreaKey = (typeof AREAS)[number][0];
 export type Wheel = Partial<Record<AreaKey, number>>;
 
-/** "Example" holds made-up demo members (supabase/seed/example_team.sql). */
-export const TEAMS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Example"] as const;
+/** "Example" holds made-up demo members (supabase/seed/example_team.sql). "Pilot" tests the Focus walkthrough and Group board. */
+export const TEAMS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Example", "Pilot"] as const;
 export type Team = (typeof TEAMS)[number];
+
+/** The test group whose members get the Focus walkthrough and a Group board instead of the usual cards. */
+export const PILOT: Team = "Pilot";
+export const isPilot = (team: Team | null | undefined) => team === PILOT;
 export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
 
 export type Profile = {
@@ -65,7 +69,7 @@ export function isTeam(v: unknown): v is Team {
 export type TeamNames = Partial<Record<Team, string>>;
 
 export function teamLabel(team: Team | null, names: TeamNames = {}) {
-  return team ? names[team]?.trim() || `${team} team` : "Not on a team";
+  return team ? names[team]?.trim() || (team === PILOT ? "Pilot group" : `${team} team`) : "Not on a team";
 }
 
 /** The team menu's choices: [team key, its current name]. */
@@ -355,19 +359,21 @@ export function coachActions(
       if (vague.length)
         add("commit", "mid", `Help ${fn} make their commitment specific`, `"${vague.join("; ")}" is hard to check off. Ask for one action they can finish before the next meeting.`);
     }
-    const missing = missingDetails(m);
+    // Pilot members answer the Focus questions instead of the life wheel and profile details.
+    const pilot = isPilot(m.team);
+    const missing = pilot ? [] : missingDetails(m);
     if (missing.length && m.team)
       add("details", "mid", `Remind ${fn} to fill out their details`, `Still missing: ${listJoin(missing)}.`);
     if (m.accountability && m.team && today >= DAY_INDEX[m.team] && m.done_week !== wk)
       add("checkin", "high", `Check in with ${fn}`, `Not marked done since ${m.team}'s meeting: ${commitmentList(m.accountability).join("; ")}`);
-    const low = AREAS.filter(([k]) => Number(m.wheel?.[k]) > 0 && Number(m.wheel?.[k]) <= 3);
+    const low = pilot ? [] : AREAS.filter(([k]) => Number(m.wheel?.[k]) > 0 && Number(m.wheel?.[k]) <= 3);
     if (low.length)
       add("wheel", "mid", `Talk with ${fn} about ${low.map(([, l]) => l).join(" and ")}`,
         `Rated ${low.map(([k, l]) => `${l} ${m.wheel[k]}/10`).join(", ")} on their wheel.`);
     if (!m.team) add("team", "mid", `Put ${fn} on a team`, "They signed in but aren't on a team yet, so they can't see anyone.");
     if (!m.reminder_enabled) add("remind", "low", `Invite ${fn} to turn on weekly reminder emails`, "Their reminder is off.");
     const age = m.updated_at ? (now.getTime() - Date.parse(m.updated_at)) / 864e5 : 0;
-    if (age > 30) add("refresh", "low", `Ask ${fn} to refresh their life wheel`, `Last updated ${Math.floor(age)} days ago.`);
+    if (age > 30 && !pilot) add("refresh", "low", `Ask ${fn} to refresh their life wheel`, `Last updated ${Math.floor(age)} days ago.`);
     const recent = bookings.filter((b) => b.member_id === m.id && now.getTime() - Date.parse(b.created_at) < 7 * 864e5);
     for (const b of recent) {
       const id = `g_${wk}_${m.id}_call_${b.id}`;

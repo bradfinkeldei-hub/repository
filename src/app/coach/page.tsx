@@ -9,9 +9,9 @@ import { AutoSubmitCheckbox } from "@/components/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { addAction, deleteAction, remindDetails, setActionDone } from "@/app/actions";
 import { loadCheckins } from "@/lib/checkin";
-import { loadChecked, loadIntentions, loadNotes, loadSocial } from "@/lib/social";
+import { loadChecked, loadFocus, loadIntentions, loadNotes, loadSocial } from "@/lib/social";
 import {
-  BOOKING_ENABLED, coachActions, missingDetails, isTeam, progressByMember, teamLabel, TEAMS, weekKey,
+  BOOKING_ENABLED, coachActions, missingDetails, isPilot, isTeam, progressByMember, teamLabel, TEAMS, weekKey,
   type Booking, type CoachActionRow, type LogRow, type Profile, type Progress, type Suggestion, type Team, type TeamNames,
 } from "@/lib/coaching";
 
@@ -58,9 +58,11 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
   const reminded = new Set(actions.filter((a) => a.kind === "details" && a.done).map((a) => a.memberId));
   const nudges: Record<string, DetailsNudge> = {};
   for (const m of groups.flatMap((g) => g.members)) {
-    const missing = missingDetails(m);
+    const missing = isPilot(m.team) ? [] : missingDetails(m);
     if (missing.length && m.team && !notJoined.has(m.id)) nudges[m.id] = { missing, reminded: reminded.has(m.id) };
   }
+  const pilotIds = groups.filter((g) => isPilot(g.team)).flatMap((g) => g.members.map((m) => m.id));
+  const focus = tab === "team" && pilotIds.length ? await loadFocus(supabase, pilotIds) : undefined;
   const notYet = Object.keys(nudges).filter((id) => !nudges[id].reminded);
   const selLabel = sel === "all" ? "All teams" : teamLabel(sel === "none" ? null : (sel as Team), names);
 
@@ -105,7 +107,7 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
                   <button className="btn small" type="submit">Email {notYet.length === 1 ? "them" : `all ${notYet.length}`}</button>
                 </form>
               )}
-              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} names={names} checkins={checkins} social={social} checked={checked} notes={notes} intentions={intentions} nudges={tab === "team" ? nudges : undefined} sel={sel} />
+              <TeamViews tab={tab} groups={groups} viewer={me} logs={logs} names={names} checkins={checkins} social={social} checked={checked} notes={notes} intentions={intentions} nudges={tab === "team" ? nudges : undefined} sel={sel} focus={focus} />
             </>
           )}
         </main>
