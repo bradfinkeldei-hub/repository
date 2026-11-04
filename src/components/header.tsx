@@ -12,13 +12,20 @@ export const MEMBER_TABS = [
   { key: "progress", label: "My progress", href: "/progress" },
 ];
 
+/** The Pilot group's tabs: a Group board instead of Team, and no Missions. */
+export const PILOT_TABS = [
+  { key: "team", label: "Group board", href: "/team?tab=team" },
+  { key: "accountability", label: "Accountability", href: "/team?tab=accountability" },
+  { key: "progress", label: "My progress", href: "/progress" },
+];
+
 /** The coach's top tabs for the selected team. */
 export function coachTabs(team: string, openCount?: number) {
   const href = (t: string) => `/coach?team=${team}&tab=${t}`;
   return [
-    { key: "team", label: "Team", href: href("team") },
+    { key: "team", label: team === "Pilot" ? "Group board" : "Team", href: href("team") },
     { key: "accountability", label: "Accountability", href: href("accountability") },
-    { key: "missions", label: "Missions", href: href("missions") },
+    ...(team === "Pilot" ? [] : [{ key: "missions", label: "Missions", href: href("missions") }]),
     { key: "progress", label: "Progress", href: href("progress") },
     { key: "actions", label: "Coaches actions", href: href("actions"), count: openCount },
   ];

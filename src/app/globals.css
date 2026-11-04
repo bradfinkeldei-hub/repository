@@ -604,3 +604,82 @@ tr:last-child td { border-bottom: 0; }
 .details-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 2px 0 12px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--sun-soft); border: 1px solid color-mix(in srgb, var(--sun-line) 45%, transparent); font-size: 0.9rem; }
 .details-card p { margin: 0; flex: 1 1 180px; }
 .details-card.sent { background: transparent; }
+
+/* ---------- Focus walkthrough and Group board (Pilot group) ---------- */
+.walk-wrap { max-width: 640px; padding-block: 28px 64px; display: flex; flex-direction: column; gap: 18px; }
+.walk { display: flex; flex-direction: column; gap: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 22px; box-shadow: var(--shadow); }
+.walk-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 0.82rem; font-weight: 650; color: var(--muted); }
+.walk-dots { display: flex; gap: 4px; }
+.walk-dots i { width: 18px; height: 5px; border-radius: 3px; background: var(--line); }
+.walk-dots i.on { background: var(--accent); }
+.walk-practice { margin: 0; }
+.walk-screen { display: flex; flex-direction: column; gap: 14px; }
+.walk-screen h1 { font-family: var(--display); font-weight: 600; font-size: clamp(1.3rem, 4.5vw, 1.7rem); line-height: 1.25; margin: 0; text-wrap: balance; }
+.walk-screen h2 { font-size: 1.15rem; margin: 4px 0 0; }
+.walk-screen p { margin: 0; }
+.walk-screen .hint { color: var(--muted); font-size: 0.92rem; }
+.walk-screen textarea.input { width: 100%; resize: vertical; }
+.walk-topics { display: flex; flex-direction: column; gap: 8px; }
+.walk-topic { display: flex; gap: 8px; align-items: center; }
+.walk-topic .input { flex: 1; min-width: 0; }
+.linkish { background: none; border: 0; padding: 4px 0; color: var(--accent); font: inherit; font-weight: 650; cursor: pointer; text-align: left; }
+.walk-pick { display: flex; flex-direction: column; gap: 8px; }
+.walk-pick button, .walk-kinds button { font: inherit; text-align: left; cursor: pointer; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 14px; padding: 12px 14px; }
+.walk-kinds { display: flex; flex-wrap: wrap; gap: 8px; }
+.walk-kinds button { border-radius: 999px; padding: 8px 14px; font-size: 0.92rem; font-weight: 600; }
+.walk-pick button.sel, .walk-kinds button.sel { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+.walk-nums { display: flex; flex-wrap: wrap; gap: 12px; }
+.walk-num { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; font-weight: 600; color: var(--muted); }
+.walk-num .input { width: 7rem; }
+.walk-summary { list-style: none; margin: 0; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; border-radius: 14px; background: var(--accent-soft); }
+.walk-summary li { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; }
+.walk-summary li span { overflow-wrap: anywhere; }
+.walk-error { color: var(--alert); font-weight: 600; }
+.walk-nav { display: flex; gap: 10px; }
+.walk-nav .btn:last-child { flex: 1; }
+.walk-leave { text-align: center; font-size: 0.9rem; margin: 0; }
+.walk-after { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.focus-try { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.focus-try span { flex: 1 1 260px; }
+.focus-topic { background: var(--accent-soft); border-radius: 14px; padding: 10px 14px; }
+.focus-topic p { margin: 2px 0 0; font-family: var(--display); font-size: 1.15rem; font-weight: 650; color: var(--accent); overflow-wrap: anywhere; }
+.focus-start { background: var(--sun-soft); border-radius: 14px; padding: 10px 14px; }
+.focus-start p { margin: 3px 0 0; overflow-wrap: anywhere; }
+.focus-card .kind { text-transform: none; letter-spacing: 0; color: var(--accent); }
+.focus-meter { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.focus-meter .meter { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.focus-meter .meter i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.now-form { align-items: center; flex-wrap: wrap; }
+.now-form label { font-size: 0.82rem; font-weight: 600; }
+.now-form .input { flex: 0 0 5.5rem; }
+.focus-pending { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); border: 1px dashed var(--line); color: var(--muted); }
+.focus-pending p { margin: 0; }
+.later-list ul { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.later-list li { background: var(--sun-soft); border-radius: 999px; padding: 4px 11px; font-size: 0.86rem; }
+.later-list h4 { margin: 0; font-size: 0.95rem; }
+.edit-focus { align-self: flex-start; }
+.walk-remove { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 1.3rem; line-height: 1; cursor: pointer; }
+.walk-remove:hover { color: var(--alert); border-color: var(--alert); }
+.walk-examples { border-left: 3px solid var(--line); padding: 2px 0 2px 12px; color: var(--muted); font-size: 0.9rem; }
+.walk-examples span { font-weight: 600; }
+.walk-examples ul { margin: 4px 0 0; padding-left: 18px; font-style: italic; display: grid; gap: 2px; }
+/* Condensed Focus card: label beside answer, tighter spacing. */
+.focus-card { gap: 10px; padding: 16px; }
+.focus-card .focus-topic { padding: 8px 12px; }
+.focus-card .focus-topic p { font-size: 1.05rem; line-height: 1.3; }
+.focus-rows { display: grid; grid-template-columns: 6.6rem minmax(0, 1fr); gap: 7px 12px; margin: 0; font-size: 0.92rem; line-height: 1.4; }
+.focus-rows dt { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
+.focus-rows dd { margin: 0; overflow-wrap: anywhere; }
+.focus-rows .focus-meter { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.focus-card .acct { padding: 10px 12px; }
+.focus-card .later-list li { font-size: 0.82rem; padding: 3px 10px; }
+.edit-focus { align-self: flex-start; font-size: 0.84rem; font-weight: 650; color: var(--accent); }
+/* Answers as striped rows, like a spreadsheet: one shade, then white, and so on. */
+.focus-rows { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.focus-rows .fr { display: grid; grid-template-columns: 6.6rem minmax(0, 1fr); gap: 4px 12px; padding: 9px 12px; background: var(--surface); }
+.focus-card { --tint: var(--accent); }
+.focus-rows .fr:nth-child(odd) { background: color-mix(in srgb, var(--tint) 10%, var(--surface)); }
+.focus-rows { border-color: color-mix(in srgb, var(--tint) 25%, var(--line)); }
+.focus-card .focus-topic { background: color-mix(in srgb, var(--tint) 16%, var(--surface)); }
+.focus-card .focus-topic p { color: color-mix(in srgb, var(--tint) 65%, var(--ink)); }

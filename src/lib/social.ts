@@ -1,5 +1,6 @@
 import type { createClient } from "@/lib/supabase/server";
 import type { Team } from "@/lib/coaching";
+import type { Focus } from "@/lib/focus";
 
 /** edited_at and edited_by are set by the database when someone changes the words; null until then. */
 type Edited = { edited_at?: string | null; edited_by?: string | null };
@@ -75,4 +76,11 @@ export async function loadIntentions(supabase: Awaited<ReturnType<typeof createC
   if (!teams.length) return {};
   const { data } = await supabase.from("team_intentions").select("team, body").in("team", teams);
   return Object.fromEntries((data ?? []).map((r) => [r.team, r.body]));
+}
+
+/** The Pilot group's Focus cards, by member id. Null if the table isn't there yet. */
+export async function loadFocus(supabase: Awaited<ReturnType<typeof createClient>>, ids: string[]): Promise<Record<string, Focus> | null> {
+  if (!ids.length) return {};
+  const { data, error } = await supabase.from("focus_cards").select("*").in("member_id", ids);
+  return error ? null : Object.fromEntries(((data ?? []) as Focus[]).map((f) => [f.member_id, f]));
 }
