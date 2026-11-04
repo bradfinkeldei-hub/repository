@@ -14,6 +14,8 @@ import { EMPTY_FOCUS, FOCUS_STEPS, type Focus, type FocusAnswers } from "@/lib/f
  */
 export default async function FocusPage({ searchParams: sp }: { searchParams: Promise<{ id?: string; practice?: string; edit?: string; done?: string; restart?: string }> }) {
   const searchParams = await sp;
+  // Starting over is only for the coach's practice run.
+  if (searchParams.restart && !searchParams.practice) delete searchParams.restart;
   const { supabase, me } = await requireEditor();
   const coach = me.role === "coach";
   const coachName = process.env.COACH_NAME || "your coach";

@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { setFocusNow } from "@/app/actions";
 import { Commitments, Who } from "@/components/cards";
 import { Thread } from "@/components/thread";
 import { CoachNotes } from "@/components/notes";
-import { firstName, type Profile, type TeamNames } from "@/lib/coaching";
+import { commitmentList, firstName, type Profile, type TeamNames } from "@/lib/coaching";
 import { focusProgress, MEASURE_KINDS, progressLabel, type Focus } from "@/lib/focus";
 import type { CoachNote, Social } from "@/lib/social";
 
@@ -65,31 +64,23 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
             <span className="label">Focus</span>
             <p>{f.focus}</p>
           </div>
-          <FocusField label="I'm creating" value={f.outcome} />
-          <div className="field">
-            <span className="label">I&apos;ll know when{kind ? <> · <span className="kind">{kind}</span></> : null}</span>
-            <p>{f.measure}</p>
-            {pct !== null && (
-              <div className="focus-meter">
-                <div className="meter" role="img" aria-label={`${pct}% of the way there`}><i style={{ width: `${pct}%` }} /></div>
-                <span>{progressLabel(f)}</span>
-                {(isMe || coach) && (
-                  <form className="inline-form now-form" action={setFocusNow.bind(null, m.id)}>
-                    <label htmlFor={`now-${m.id}`}>{f.measure_kind === "feeling" ? "Today I'm at" : "Done so far"}</label>
-                    <input className="input" id={`now-${m.id}`} name="now" type="number" inputMode="numeric" min={0} max={f.measure_kind === "feeling" ? 10 : 1000}
-                      defaultValue={f.measure_now ?? f.measure_start ?? 0} />
-                    <button className="btn small ghost" type="submit">Update</button>
-                  </form>
-                )}
-              </div>
-            )}
-          </div>
-          <FocusField label="Why it matters" value={f.meaning} />
-          <div className="focus-start">
-            <span className="label">Starting with</span>
-            <p>{f.start_point}</p>
-          </div>
-          <FocusField label="Hold me accountable by" value={f.held_by} />
+          <dl className="focus-rows">
+            <dt>Creating</dt><dd>{f.outcome}</dd>
+            <dt>I&apos;ll know when</dt>
+            <dd>
+              {f.measure}
+              {pct !== null && (
+                <span className="focus-meter">
+                  <span className="meter" role="img" aria-label={`${pct}% of the way there`}><i style={{ width: `${pct}%` }} /></span>
+                  <span>{progressLabel(f)}{kind ? ` · ${kind}` : ""}</span>
+                </span>
+              )}
+            </dd>
+            <dt>Why it matters</dt><dd>{f.meaning}</dd>
+            {/* The starting point is usually already their first commitment below; only show it when it isn't. */}
+            {!commitmentList(m.accountability).includes(f.start_point) && <><dt>Starting with</dt><dd>{f.start_point}</dd></>}
+            <dt>Accountable by</dt><dd>{f.held_by}</dd>
+          </dl>
           {!practice && <Commitments m={m} viewer={viewer} checked={checked} />}
           {f.later.length > 0 && (
             <details className="fold later-list">
@@ -97,20 +88,11 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
               <ul>{f.later.map((t) => <li key={t}>{t}</li>)}</ul>
             </details>
           )}
-          {coach && !isMe && <Link className="btn ghost small edit-focus" href={`/focus?id=${m.id}`}>Edit {firstName(m.name)}&apos;s answers</Link>}
+          {coach && !isMe && <Link className="edit-focus" href={`/focus?id=${m.id}`}>Edit {firstName(m.name)}&apos;s answers</Link>}
         </>
       )}
       {social && <Thread m={m} viewer={viewer} comments={social.comments[m.id] ?? []} kudos={kudos} avatars={avatars} fresh={social.fresh?.memberId === m.id ? social.fresh : undefined} />}
       {notes && coach && <CoachNotes m={m} notes={notes} />}
     </article>
-  );
-}
-
-function FocusField({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="field">
-      <span className="label">{label}</span>
-      <p>{value}</p>
-    </div>
   );
 }

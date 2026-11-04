@@ -770,6 +770,11 @@ export async function saveFocus(memberId: string, answers: Partial<Record<keyof 
   if (id !== me.id && me.role !== "coach") return { ok: false, error: "You can only change your own card." };
   const f = cleanFocus(answers);
   if (finish && focusGaps(f).length) return { ok: false, error: `Still blank: ${focusGaps(f).map(([, l]) => l).join(", ")}.` };
+  // A finished card being edited only changes when they confirm again, so the board never shows half-done edits.
+  if (!finish) {
+    const { data: was } = await supabase.from("focus_cards").select("confirmed_at").eq("member_id", id).maybeSingle();
+    if (was?.confirmed_at) return { ok: true };
+  }
   const row = { member_id: id, ...f, updated_at: new Date().toISOString(), ...(finish ? { confirmed_at: new Date().toISOString() } : {}) };
   const { error } = await supabase.from("focus_cards").upsert(row);
   if (error) return { ok: false, error: "That didn't save. Check your connection and try again." };
