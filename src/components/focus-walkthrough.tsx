@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { saveFocus } from "@/app/actions";
-import { FOCUS_STEPS, type FocusAnswers, type FocusStep } from "@/lib/focus";
+import { FOCUS_STEPS, isShared, SHARE_IN_GROUP, type FocusAnswers, type FocusStep } from "@/lib/focus";
 
 /** The seven questions, counted for the "3 of 7" label. "pick" belongs to question 1. */
 const QUESTION: Partial<Record<FocusStep, number>> = { topic: 1, pick: 1, outcome: 2, measure: 3, meaning: 4, start: 5, summary: 6, held: 7 };
@@ -136,6 +136,7 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
               ))}
             </div>
             {a.topics.length < 10 && <button type="button" className="linkish" onClick={() => set("topics", [...a.topics, ""])}>+ Add another</button>}
+            <ShareToggle on={topics.length === 1 && isShared(topics[0])} onChange={(on) => setA((x) => ({ ...x, topics: [on ? SHARE_IN_GROUP : ""], focus: on ? SHARE_IN_GROUP : "" }))} />
           </>
         )}
 
@@ -153,10 +154,11 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
 
         {step === "outcome" && (
           <>
-            <h1>When it comes to &ldquo;{a.focus}&rdquo;, what would {you} like to create, and by when?</h1>
+            <h1>{isShared(a.focus) ? "For what you'll share in the group" : <>When it comes to &ldquo;{a.focus}&rdquo;</>}, what would {you} like to create, and by when?</h1>
             <p className="hint">Include a date or a timeframe, like &ldquo;by March 1&rdquo; or &ldquo;in the next 8 weeks.&rdquo;</p>
-            <textarea className="input" id="outcome" rows={3} maxLength={600} value={a.outcome} onChange={(e) => set("outcome", e.target.value)}
+            <textarea className="input" readOnly={isShared(a.outcome)} id="outcome" rows={3} maxLength={600} value={a.outcome} onChange={(e) => set("outcome", e.target.value)}
               placeholder="e.g. A simple, repeatable way to find new clients by the end of January" />
+            <ShareToggle on={isShared(a.outcome)} onChange={(on) => set("outcome", on ? SHARE_IN_GROUP : "")} />
           </>
         )}
 
@@ -164,7 +166,8 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
           <>
             <h1>How will {you} know {forCoach ? "they've" : "you've"} achieved that?</h1>
             <p className="hint">Make it a finish line {you} can actually reach. Example: someone wanting to get clients would leave with two ideas.</p>
-            <textarea className="input" id="measure" rows={3} maxLength={600} value={a.measure} onChange={(e) => set("measure", e.target.value)} />
+            <textarea className="input" readOnly={isShared(a.measure)} id="measure" rows={3} maxLength={600} value={a.measure} onChange={(e) => set("measure", e.target.value)} />
+            <ShareToggle on={isShared(a.measure)} onChange={(on) => set("measure", on ? SHARE_IN_GROUP : "")} />
           </>
         )}
 
@@ -172,7 +175,8 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
           <>
             <h1>What will it mean to {forCoach ? "them" : "you"} to have that?</h1>
             <p className="hint">How will having it change {forCoach ? "their" : "your"} life?</p>
-            <textarea className="input" id="meaning" rows={4} maxLength={600} value={a.meaning} onChange={(e) => set("meaning", e.target.value)} />
+            <textarea className="input" readOnly={isShared(a.meaning)} id="meaning" rows={4} maxLength={600} value={a.meaning} onChange={(e) => set("meaning", e.target.value)} />
+            <ShareToggle on={isShared(a.meaning)} onChange={(on) => set("meaning", on ? SHARE_IN_GROUP : "")} />
           </>
         )}
 
@@ -180,8 +184,9 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
           <>
             <h1>Where should we start to get this outcome?</h1>
             <p className="hint">This also becomes {your} first weekly commitment, so make it something {you} can do before the next meeting.</p>
-            <textarea className="input" id="start" rows={3} maxLength={300} value={a.start_point} onChange={(e) => set("start_point", e.target.value)}
+            <textarea className="input" readOnly={isShared(a.start_point)} id="start" rows={3} maxLength={300} value={a.start_point} onChange={(e) => set("start_point", e.target.value)}
               placeholder="e.g. List the people who already know what I do and reach out to five of them" />
+            <ShareToggle on={isShared(a.start_point)} onChange={(on) => set("start_point", on ? SHARE_IN_GROUP : "")} />
           </>
         )}
 
@@ -189,9 +194,9 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
           <>
             <h1>Here&apos;s what I heard</h1>
             <ul className="walk-summary">
-              <li><span>{forCoach ? `${firstName} wants` : "You want"} to work on <b>{a.focus}</b>.</span><button type="button" className="linkish" onClick={() => fix(topics.length > 1 ? "pick" : "topic")}>Change</button></li>
-              <li><span>{forCoach ? "They want" : "You want"} to create <b>{a.outcome}</b>.</span><button type="button" className="linkish" onClick={() => fix("outcome")}>Change</button></li>
-              <li><span>{forCoach ? "They'll" : "You'll"} know {forCoach ? "they've" : "you've"} got it when <b>{a.measure}</b>.</span><button type="button" className="linkish" onClick={() => fix("measure")}>Change</button></li>
+              <li><span>{forCoach ? `${firstName} wants` : "You want"} to work on <Said v={a.focus} />.</span><button type="button" className="linkish" onClick={() => fix(topics.length > 1 ? "pick" : "topic")}>Change</button></li>
+              <li><span>{forCoach ? "They want" : "You want"} to create <Said v={a.outcome} />.</span><button type="button" className="linkish" onClick={() => fix("outcome")}>Change</button></li>
+              <li><span>{forCoach ? "They'll" : "You'll"} know {forCoach ? "they've" : "you've"} got it when <Said v={a.measure} />.</span><button type="button" className="linkish" onClick={() => fix("measure")}>Change</button></li>
             </ul>
             <h2>Do I have that right?</h2>
             {topics.length > 1 && <p className="hint">Saved for later: {topics.filter((t) => t !== a.focus).join(", ")}.</p>}
@@ -202,7 +207,8 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
           <>
             <h1>How {forCoach ? "do they" : "do you"} want to be held accountable for this?</h1>
             <p className="hint">In {forCoach ? "their" : "your"} own words. Example: a text from someone in my group every Friday asking how it went.</p>
-            <textarea className="input" id="held" rows={3} maxLength={400} value={a.held_by} onChange={(e) => set("held_by", e.target.value)} />
+            <textarea className="input" readOnly={isShared(a.held_by)} id="held" rows={3} maxLength={400} value={a.held_by} onChange={(e) => set("held_by", e.target.value)} />
+            <ShareToggle on={isShared(a.held_by)} onChange={(on) => set("held_by", on ? SHARE_IN_GROUP : "")} />
           </>
         )}
 
@@ -214,11 +220,25 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
         {step === "summary" ? (
           <button type="button" className="btn" onClick={next} disabled={saving}>Yes, that&apos;s it</button>
         ) : step === "held" ? (
-          <button type="button" className="btn" onClick={() => valid() && save("held", true)} disabled={saving}>{saving ? "Building…" : forCoach ? "Save their card" : "Build my card"}</button>
+          <button type="button" className="btn" onClick={() => valid() && save("held", true)} disabled={saving}>{saving ? "Building…" : forCoach ? "Save their card" : "Build my member info card"}</button>
         ) : (
           <button type="button" className="btn" onClick={next} disabled={saving}>{saving ? "Saving…" : step === "welcome" ? "Let's start" : backTo ? "Back to summary" : "Next"}</button>
         )}
       </div>
     </div>
   );
+}
+
+/** "I'll share it in the group": for an answer that feels private. It stays off the board; they say it in person. */
+function ShareToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <label className="walk-share">
+      <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
+      <span>I&apos;ll share it in the group <small>(it&apos;s kind of private to me)</small></span>
+    </label>
+  );
+}
+
+function Said({ v }: { v: string }) {
+  return isShared(v) ? <i>something you&apos;ll share in the group</i> : <b>{v}</b>;
 }

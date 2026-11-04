@@ -3,7 +3,7 @@ import { Who } from "@/components/cards";
 import { Thread } from "@/components/thread";
 import { CoachNotes } from "@/components/notes";
 import { firstName, type Profile, type TeamNames } from "@/lib/coaching";
-import { focusProgress, MEASURE_KINDS, progressLabel, type Focus } from "@/lib/focus";
+import { focusProgress, isShared, MEASURE_KINDS, progressLabel, type Focus } from "@/lib/focus";
 import type { CoachNote, Social } from "@/lib/social";
 
 /** The Pilot group's Team tab: everyone's Focus card, your own first. */
@@ -62,14 +62,14 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
         <>
           <div className="focus-topic">
             <span className="label">Focus</span>
-            <p>{f.focus}</p>
+            <p>{isShared(f.focus) ? <Private /> : f.focus}</p>
           </div>
           <dl className="focus-rows">
-            <div className="fr creating"><dt>Creating</dt><dd>{f.outcome}</dd></div>
+            <div className="fr creating"><dt>Creating</dt><dd>{isShared(f.outcome) ? <Private /> : f.outcome}</dd></div>
             <div className="fr know">
               <dt>I&apos;ll know when</dt>
               <dd>
-                {f.measure}
+                {isShared(f.measure) ? <Private /> : f.measure}
                 {pct !== null && (
                   <span className="focus-meter">
                     <span className="meter" role="img" aria-label={`${pct}% of the way there`}><i style={{ width: `${pct}%` }} /></span>
@@ -78,9 +78,9 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
                 )}
               </dd>
             </div>
-            <div className="fr why"><dt>Why it matters</dt><dd>{f.meaning}</dd></div>
-            <div className="fr start"><dt>Starting with</dt><dd>{f.start_point}</dd></div>
-            <div className="fr held"><dt>Accountable by</dt><dd>{f.held_by}</dd></div>
+            <div className="fr why"><dt>Why it matters</dt><dd>{isShared(f.meaning) ? <Private /> : f.meaning}</dd></div>
+            <div className="fr start"><dt>Starting with</dt><dd>{isShared(f.start_point) ? <Private /> : f.start_point}</dd></div>
+            <div className="fr held"><dt>Accountable by</dt><dd>{isShared(f.held_by) ? <Private /> : f.held_by}</dd></div>
           </dl>
           {f.later.length > 0 && (
             <details className="fold later-list">
@@ -102,4 +102,8 @@ function memberTint(id: string) {
   let h = 0;
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return `var(--w${(h % 8) + 1})`;
+}
+
+function Private() {
+  return <span className="shared-later">Will share in the group</span>;
 }
