@@ -153,9 +153,10 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
 
         {step === "outcome" && (
           <>
-            <h1>When it comes to &ldquo;{a.focus}&rdquo;, what would {you} like to have created by the end of our time together?</h1>
+            <h1>When it comes to &ldquo;{a.focus}&rdquo;, what would {you} like to create, and by when?</h1>
+            <p className="hint">Include a date or a timeframe, like &ldquo;by March 1&rdquo; or &ldquo;in the next 8 weeks.&rdquo;</p>
             <textarea className="input" id="outcome" rows={3} maxLength={600} value={a.outcome} onChange={(e) => set("outcome", e.target.value)}
-              placeholder="e.g. A simple, repeatable way to find new clients" />
+              placeholder="e.g. A simple, repeatable way to find new clients by the end of January" />
           </>
         )}
 
