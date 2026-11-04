@@ -50,7 +50,7 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
   const kind = MEASURE_KINDS.find(([k]) => k === f?.measure_kind)?.[1];
   const kudos = social?.kudos[m.id] ?? [];
   return (
-    <article className="card focus-card" id={`member-${m.id}`}>
+    <article className="card focus-card" id={`member-${m.id}`} style={{ "--tint": memberTint(m.id) } as React.CSSProperties}>
       <Who m={m} viewer={viewer} coachTools names={names} />
       {!done ? (
         <div className="focus-pending">
@@ -95,4 +95,11 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
       {notes && coach && <CoachNotes m={m} notes={notes} />}
     </article>
   );
+}
+
+/** Each member's own shade, the same on every screen: one of the app's eight colors, picked from their id. */
+function memberTint(id: string) {
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return `var(--w${(h % 8) + 1})`;
 }
