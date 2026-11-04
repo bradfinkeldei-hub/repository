@@ -34,6 +34,10 @@ export type FocusAnswers = Omit<Focus, "member_id" | "confirmed_at">;
 export const FOCUS_STEPS = ["welcome", "topic", "pick", "outcome", "measure", "meaning", "start", "summary", "held"] as const;
 export type FocusStep = (typeof FOCUS_STEPS)[number];
 
+/** What a member chooses instead of writing an answer they'd rather say in person. */
+export const SHARE_IN_GROUP = "I'll share it in the group.";
+export const isShared = (v: string | null | undefined) => v === SHARE_IN_GROUP;
+
 /** Ideas to tap on the last question. */
 export const HELD_IDEAS = ["A weekly check-in from my coach", "Someone in my group checks on me", "I report back at our meeting"];
 
