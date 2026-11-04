@@ -675,12 +675,7 @@ tr:last-child td { border-bottom: 0; }
 .focus-card .acct { padding: 10px 12px; }
 .focus-card .later-list li { font-size: 0.82rem; padding: 3px 10px; }
 .edit-focus { align-self: flex-start; font-size: 0.84rem; font-weight: 650; color: var(--accent); }
-/* Each answer on its own lightly tinted band, so they read as separate parts. */
-.focus-rows { display: flex; flex-direction: column; gap: 6px; }
-.focus-rows .fr { display: grid; grid-template-columns: 6.6rem minmax(0, 1fr); gap: 4px 12px; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--tint) 11%, var(--surface)); }
-.focus-rows .fr dt { color: color-mix(in srgb, var(--tint) 70%, var(--ink)); }
-.focus-rows .creating { --tint: var(--w2); }
-.focus-rows .know { --tint: var(--w7); }
-.focus-rows .why { --tint: var(--w4); }
-.focus-rows .start { --tint: var(--w3); }
-.focus-rows .held { --tint: var(--w5); }
+/* Answers as striped rows, like a spreadsheet: one shade, then white, and so on. */
+.focus-rows { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.focus-rows .fr { display: grid; grid-template-columns: 6.6rem minmax(0, 1fr); gap: 4px 12px; padding: 9px 12px; background: var(--surface); }
+.focus-rows .fr:nth-child(odd) { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
