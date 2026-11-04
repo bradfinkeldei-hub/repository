@@ -82,11 +82,11 @@ export function cleanFocus(input: Partial<Record<keyof FocusAnswers, unknown>>):
 }
 
 /** Which answers are still blank, in question order. Empty once the card can be built. */
-export function focusGaps(f: Pick<FocusAnswers, "focus" | "outcome" | "measure" | "measure_kind" | "meaning" | "start_point" | "held_by">) {
+export function focusGaps(f: Pick<FocusAnswers, "focus" | "outcome" | "measure" | "meaning" | "start_point" | "held_by">) {
   const gaps: [FocusStep, string][] = [];
   if (!f.focus) gaps.push(["topic", "your focus"]);
   if (!f.outcome) gaps.push(["outcome", "what you want to create"]);
-  if (!f.measure_kind || !f.measure) gaps.push(["measure", "how you'll know"]);
+  if (!f.measure) gaps.push(["measure", "how you'll know"]);
   if (!f.meaning) gaps.push(["meaning", "what it will mean to you"]);
   if (!f.start_point) gaps.push(["start", "where to start"]);
   if (!f.held_by) gaps.push(["held", "how to hold you accountable"]);

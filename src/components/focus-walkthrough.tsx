@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { saveFocus } from "@/app/actions";
-import { FOCUS_STEPS, HELD_IDEAS, MEASURE_KINDS, type FocusAnswers, type FocusStep, type MeasureKind } from "@/lib/focus";
+import { FOCUS_STEPS, type FocusAnswers, type FocusStep } from "@/lib/focus";
 
 /** The seven questions, counted for the "3 of 7" label. "pick" belongs to question 1. */
 const QUESTION: Partial<Record<FocusStep, number>> = { topic: 1, pick: 1, outcome: 2, measure: 3, meaning: 4, start: 5, summary: 6, held: 7 };
@@ -80,20 +80,15 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
   function valid() {
     const blank: Partial<Record<FocusStep, boolean>> = {
       topic: !topics.length, pick: !topics.includes(a.focus), outcome: !a.outcome.trim(),
-      measure: !a.measure_kind || !a.measure.trim(), meaning: !a.meaning.trim(), start: !a.start_point.trim(), held: !a.held_by.trim(),
+      measure: !a.measure.trim(), meaning: !a.meaning.trim(), start: !a.start_point.trim(), held: !a.held_by.trim(),
     };
-    if (step === "measure" && a.measure_kind && (a.measure_kind === "number" || a.measure_kind === "feeling") && a.measure_goal === null) {
-      setError(a.measure_kind === "number" ? "Add how many, so the card can show progress." : "Add where you want to be out of 10.");
-      return false;
-    }
-    if (blank[step]) { setError(step === "measure" && !a.measure_kind ? "Pick the kind of finish line first." : "Write an answer to go on."); return false; }
+    if (blank[step]) { setError("Write an answer to go on."); return false; }
     return true;
   }
 
   function fix(s: FocusStep) { setBackTo(s); setStep(s); setError(""); }
 
   const q = QUESTION[step];
-  const num = (v: string) => (v === "" ? null : Math.max(0, Math.round(Number(v))));
 
   return (
     <div className="walk">
@@ -157,31 +152,8 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
         {step === "measure" && (
           <>
             <h1>How will {you} know {forCoach ? "they've" : "you've"} achieved that?</h1>
-            <p className="hint">Pick a finish line {you} can actually reach.</p>
-            <div className="walk-kinds" role="radiogroup" aria-label="Kind of finish line">
-              {MEASURE_KINDS.map(([k, l]) => (
-                <button type="button" key={k} role="radio" aria-checked={a.measure_kind === k} className={a.measure_kind === k ? "sel" : ""}
-                  onClick={() => setA((x) => ({ ...x, measure_kind: k as MeasureKind, measure_start: k === "number" ? 0 : k === "feeling" ? x.measure_start : null, measure_goal: k === x.measure_kind ? x.measure_goal : null, measure_now: null }))}>{l}</button>
-              ))}
-            </div>
-            <textarea className="input" id="measure" rows={3} maxLength={600} value={a.measure} onChange={(e) => set("measure", e.target.value)}
-              placeholder={{ decision: "e.g. I'll have decided yes or no on moving", plan: "e.g. A written month-by-month payoff plan", number: "e.g. I'll leave with two ideas I've tested for getting clients", feeling: "e.g. Feel confident speaking up in meetings" }[a.measure_kind || "number"]} />
-            {a.measure_kind === "number" && (
-              <label className="walk-num" htmlFor="goal">How many?
-                <input className="input" id="goal" type="number" inputMode="numeric" min={1} max={1000} value={a.measure_goal ?? ""} onChange={(e) => set("measure_goal", num(e.target.value))} />
-              </label>
-            )}
-            {a.measure_kind === "feeling" && (
-              <div className="walk-nums">
-                <label className="walk-num" htmlFor="from">Where {forCoach ? "are they" : "are you"} now, out of 10?
-                  <input className="input" id="from" type="number" inputMode="numeric" min={0} max={10} value={a.measure_start ?? ""} onChange={(e) => set("measure_start", num(e.target.value))} />
-                </label>
-                <label className="walk-num" htmlFor="goal">Where {forCoach ? "do they" : "do you"} want to be?
-                  <input className="input" id="goal" type="number" inputMode="numeric" min={0} max={10} value={a.measure_goal ?? ""} onChange={(e) => set("measure_goal", num(e.target.value))} />
-                </label>
-              </div>
-            )}
-            <p className="hint">Example: someone wanting to get clients would leave with two ideas.</p>
+            <p className="hint">Make it a finish line {you} can actually reach. Example: someone wanting to get clients would leave with two ideas.</p>
+            <textarea className="input" id="measure" rows={3} maxLength={600} value={a.measure} onChange={(e) => set("measure", e.target.value)} />
           </>
         )}
 
@@ -218,13 +190,7 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
         {step === "held" && (
           <>
             <h1>How {forCoach ? "do they" : "do you"} want to be held accountable for this?</h1>
-            <p className="hint">Tap an idea to start from, or write {forCoach ? "theirs" : "your own"}.</p>
-            <div className="walk-kinds">
-              {HELD_IDEAS.map((t) => {
-                const idea = t.replace("my coach", coachName);
-                return <button type="button" key={t} className={a.held_by === idea ? "sel" : ""} onClick={() => set("held_by", idea)}>{idea}</button>;
-              })}
-            </div>
+            <p className="hint">In {forCoach ? "their" : "your"} own words. Example: a text from someone in my group every Friday asking how it went.</p>
             <textarea className="input" id="held" rows={3} maxLength={400} value={a.held_by} onChange={(e) => set("held_by", e.target.value)} />
           </>
         )}
