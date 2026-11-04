@@ -103,7 +103,7 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
         {step === "welcome" && (
           <>
             <h1>Welcome to the group{forCoach ? "" : `, ${firstName}`}</h1>
-            <p>Before your first meeting, seven short questions help {coachName} and your group understand what you&apos;re here for. Your answers become your card on the Group board.</p>
+            <p>Before your first meeting, please fill out the information in the next seven short questions. Your group and {coachName} will use it to help you get what you want.</p>
             <p className="hint">About 5 minutes. Your answers save as you go, so you can stop and finish later.</p>
           </>
         )}
