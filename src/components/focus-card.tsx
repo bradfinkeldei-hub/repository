@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { Commitments, Who } from "@/components/cards";
 import { CardTabs } from "@/components/card-tabs";
-import { MiniProgress, StripKey } from "@/components/progress";
 import { Thread } from "@/components/thread";
 import { CoachNotes } from "@/components/notes";
-import { firstName, type Profile, type Progress, type TeamNames } from "@/lib/coaching";
+import { firstName, shortDate, sprintOf, weekKey, type Profile, type Progress, type TeamNames } from "@/lib/coaching";
 import { focusProgress, isShared, MEASURE_KINDS, progressLabel, type Focus } from "@/lib/focus";
 import type { CoachNote, Social } from "@/lib/social";
 
@@ -101,7 +100,7 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
         <CardTabs tabs={[{ key: "focus", label: "Focus", dot: !done && (isMe || coach) }, { key: "mission", label: "Mission", dot: !m.mission && (isMe || coach) }, { key: "progress", label: "Progress" }]}>
           {focusPanel}
           <MissionPanel m={m} viewer={viewer} />
-          <ProgressPanel m={m} viewer={viewer} checked={checked} p={p} />
+          <ProgressPanel m={m} viewer={viewer} checked={checked} p={p} startedAt={f?.confirmed_at ?? null} />
         </CardTabs>
       )}
       {social && <Thread m={m} viewer={viewer} comments={social.comments[m.id] ?? []} kudos={kudos} avatars={avatars} fresh={social.fresh?.memberId === m.id ? social.fresh : undefined} />}
@@ -143,20 +142,36 @@ function MissionPanel({ m, viewer }: { m: Profile; viewer: Profile }) {
   );
 }
 
-/** The Progress tab: tick off this week's commitment, and see the weeks so far. */
-function ProgressPanel({ m, viewer, checked, p }: { m: Profile; viewer: Profile; checked?: string[]; p?: Progress }) {
+const TZ = process.env.REMINDER_TIMEZONE;
+const CELL: Record<string, string> = { done: "Done", missed: "Not marked done", open: "This week", ahead: "Coming up" };
+
+/** The Progress tab: tick off this week's commitment, and see this 12-week sprint week by week. */
+function ProgressPanel({ m, viewer, checked, p, startedAt }: { m: Profile; viewer: Profile; checked?: string[]; p?: Progress; startedAt: string | null }) {
   const isMe = m.id === viewer.id;
+  const now = weekKey(new Date(), TZ);
+  // The sprint starts the week their card was built (or their first tracked week).
+  const start = startedAt ? weekKey(new Date(startedAt), TZ) : p?.weeks[0]?.week ?? now;
+  const s = sprintOf(start, now, p, m.team);
   return (
     <div className="focus-progress">
-      <p className="muted">{isMe ? "Did you do what you said this week? Tap the circle when it's done." : `What ${firstName(m.name)} said they'd do this week.`}</p>
+      <p className="muted">{isMe ? "Did you do what you said this week? Tap the box when it's done." : `What ${firstName(m.name)} said they'd do this week.`}</p>
       <Commitments m={m} viewer={viewer} checked={checked} />
-      {p && p.weeks.length > 0 ? (
-        <div className="focus-weeks">
-          <span className="label">Week by week</span>
-          <MiniProgress p={p} team={m.team} />
-          <StripKey />
+      <div className="sprint">
+        <div className="sprint-head">
+          <span className="label">{s.number > 1 ? `Sprint ${s.number} · ` : "12-week sprint · "}Week {s.weekNo} of 12</span>
+          <span className="sprint-count">{s.done} done</span>
         </div>
-      ) : <p className="muted small-note">Each week you mark it done shows up here as a streak.</p>}
+        <ol className="sprint-grid">
+          {s.cells.map((c) => (
+            <li key={c.week} className={c.status} title={`Week ${c.n}, ${shortDate(c.date)}: ${CELL[c.status]}`}>
+              <b>{c.status === "done" ? "\u2713" : c.n}</b>
+              <small>{shortDate(c.date)}</small>
+              <span className="sr">Week {c.n}, {shortDate(c.date)}: {CELL[c.status]}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="muted small-note">Started the week of {shortDate(s.cells[0].date)}. A new 12-week sprint starts after week 12.</p>
+      </div>
     </div>
   );
 }

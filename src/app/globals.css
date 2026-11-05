@@ -743,3 +743,16 @@ tr:last-child td { border-bottom: 0; }
 .focus-card .btn.ghost, .focus-card .btn.small:not(.ghost) { border-radius: 6px; }
 .focus-card .btn.ghost { background: var(--earth-card); color: var(--tint); border-color: color-mix(in srgb, var(--tint) 40%, var(--earth-line)); }
 .focus-card .avatar { border-radius: 8px; background: var(--tint); color: #fff; box-shadow: none; }
+/* The 12-week sprint on the Progress tab */
+.sprint { display: flex; flex-direction: column; gap: 8px; }
+.sprint-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.sprint-count { font-size: 0.82rem; font-weight: 700; color: var(--tint, var(--accent)); }
+.sprint-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.sprint-grid li { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; border-radius: 6px; border: 1px solid var(--earth-line, var(--line)); background: var(--earth-card, var(--surface)); font-variant-numeric: tabular-nums; }
+.sprint-grid li b { font-size: 0.92rem; line-height: 1.2; }
+.sprint-grid li small { font-size: 0.68rem; color: var(--muted); white-space: nowrap; }
+.sprint-grid li.done { background: var(--tint, var(--ok)); border-color: var(--tint, var(--ok)); color: #fff; }
+.sprint-grid li.done small { color: rgb(255 255 255 / 0.85); }
+.sprint-grid li.missed { background: color-mix(in srgb, var(--alert) 10%, var(--earth-card, var(--surface))); border-color: color-mix(in srgb, var(--alert) 30%, var(--earth-line, var(--line))); }
+.sprint-grid li.open { border: 2px dashed var(--tint, var(--accent)); }
+.sprint-grid li.ahead { opacity: 0.55; border-style: dotted; }

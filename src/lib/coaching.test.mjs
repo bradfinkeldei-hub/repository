@@ -224,3 +224,17 @@ test("the coach gets a details reminder only for members on a team with blanks",
   assert.deepEqual(details.map((a) => a.memberId), ["b"]);
   assert.equal(details[0].why, "Still missing: My mission.");
 });
+
+test("a 12-week sprint counts from the week they started, with each meeting date", async () => {
+  const { sprintOf } = await import("./coaching.ts");
+  const p = { weeks: [{ week: "2026-W45", status: "done" }, { week: "2026-W46", status: "missed" }, { week: "2026-W47", status: "open" }], streak: 0, best: 1, done: 1, total: 2 };
+  const s = sprintOf("2026-W45", "2026-W47", p, "Tuesday");
+  assert.equal(s.number, 1);
+  assert.equal(s.weekNo, 3);
+  assert.equal(s.cells.length, 12);
+  assert.deepEqual(s.cells.slice(0, 4).map((c) => c.status), ["done", "missed", "open", "ahead"]);
+  assert.equal(s.cells[0].date.toISOString().slice(0, 10), "2026-11-03");
+  const later = sprintOf("2026-W45", "2027-W04", undefined, "Tuesday");
+  assert.equal(later.number, 2);
+  assert.equal(later.weekNo, 1);
+});
