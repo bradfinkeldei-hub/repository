@@ -3,7 +3,7 @@ import { requireCoach } from "@/lib/session";
 import { Header } from "@/components/header";
 import { TeamColumn } from "@/components/team-column";
 import { renameTeams } from "@/app/actions";
-import { teamLabel, TEAMS, TIME_ZONES, zoneLabel, type MeetingTime, type Profile, type Team } from "@/lib/coaching";
+import { meetingDay, teamLabel, TEAMS, TIME_ZONES, zoneLabel, type MeetingTime, type Profile, type Team } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE || "America/Chicago";
 
@@ -38,7 +38,7 @@ export default async function TeamsPage({ searchParams: sp }: { searchParams: Pr
               const mt = times[t];
               return (
                 <fieldset key={t} className="card team-set">
-                  <legend>{t === "Example" ? "Example (demo) team" : `Team that meets ${t}`}</legend>
+                  <legend>{t === "Example" ? "Example (demo) team" : t === "Pilot" ? "Pilot group" : `Team that meets ${meetingDay(t)}`}</legend>
                   <label>Name
                     <input className="input" type="text" name={`name_${t}`} maxLength={40} defaultValue={teamLabel(t, names)} placeholder={`${t} team`} />
                   </label>
