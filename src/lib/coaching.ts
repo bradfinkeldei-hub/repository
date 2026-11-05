@@ -17,8 +17,9 @@ export const AREAS = [
 export type AreaKey = (typeof AREAS)[number][0];
 export type Wheel = Partial<Record<AreaKey, number>>;
 
-/** "Example" holds made-up demo members (supabase/seed/example_team.sql). "Pilot" tests the Focus walkthrough and Group board. */
-export const TEAMS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Example", "Pilot"] as const;
+/** "Example" holds made-up demo members (supabase/seed/example_team.sql). "Pilot" tests the Focus walkthrough and Group board.
+ * "Tuesday2" is a second Tuesday group on the Focus cards, beside the original Tuesday group. */
+export const TEAMS = ["Monday", "Tuesday", "Tuesday2", "Wednesday", "Thursday", "Example", "Pilot"] as const;
 export type Team = (typeof TEAMS)[number];
 
 /** The test group whose members get the Focus walkthrough and a Group board instead of the usual cards. */
@@ -28,6 +29,8 @@ export const isPilot = (team: Team | null | undefined) => team === PILOT;
 export const CLASSIC_TEAMS: readonly Team[] = ["Tuesday"];
 /** Whether a group uses the Focus cards: the seven questions, then Focus / Mission / Progress tabs on each card. */
 export const usesFocusCards = (team: Team | null | undefined) => !!team && !CLASSIC_TEAMS.includes(team);
+/** The weekday a team meets: its key, except "Tuesday2" meets Tuesday. Teams with no weekday return their key. */
+export const meetingDay = (team: Team) => (team === "Tuesday2" ? "Tuesday" : team);
 export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
 
 export type Profile = {
@@ -73,7 +76,7 @@ export function isTeam(v: unknown): v is Team {
 export type TeamNames = Partial<Record<Team, string>>;
 
 export function teamLabel(team: Team | null, names: TeamNames = {}) {
-  return team ? names[team]?.trim() || (team === PILOT ? "Pilot group" : `${team} team`) : "Not on a team";
+  return team ? names[team]?.trim() || (team === PILOT ? "Pilot group" : team === "Tuesday2" ? "Tuesday group 2" : `${team} team`) : "Not on a team";
 }
 
 /** The team menu's choices: [team key, its current name]. */
@@ -204,7 +207,7 @@ export function clockLabel(time: string) {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
 
-const BYDAY: Record<string, string> = { Monday: "MO", Tuesday: "TU", Wednesday: "WE", Thursday: "TH", Friday: "FR", Saturday: "SA", Sunday: "SU" };
+const BYDAY: Record<string, string> = { Monday: "MO", Tuesday: "TU", Tuesday2: "TU", Wednesday: "WE", Thursday: "TH", Friday: "FR", Saturday: "SA", Sunday: "SU" };
 
 /** "20261029T190000" for a meeting date and time, plus some minutes. Local time, no zone. */
 function calStamp(date: string, time: string, plusMinutes = 0) {
@@ -318,7 +321,7 @@ export function listJoin(items: string[]) {
   return items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 }
 
-const DAY_INDEX: Record<string, number> = { Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7 };
+const DAY_INDEX: Record<string, number> = { Monday: 1, Tuesday: 2, Tuesday2: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7 };
 
 const COUNTED = /\d|\b(one|two|three|four|five|six|seven|eight|nine|ten|once|twice|daily|every|each)\b/i;
 const FUZZY = /\bgoals?\b|\bwork(ing)? on\b|\bfocus(ing)? on\b|\bbetter\b|\bimprov(e|ing)\b|\bmore\b|\bless\b/i;
@@ -369,7 +372,7 @@ export function coachActions(
     if (missing.length && m.team)
       add("details", "mid", `Remind ${fn} to fill out their details`, `Still missing: ${listJoin(missing)}.`);
     if (m.accountability && m.team && today >= DAY_INDEX[m.team] && m.done_week !== wk)
-      add("checkin", "high", `Check in with ${fn}`, `Not marked done since ${m.team}'s meeting: ${commitmentList(m.accountability).join("; ")}`);
+      add("checkin", "high", `Check in with ${fn}`, `Not marked done since ${meetingDay(m.team)}'s meeting: ${commitmentList(m.accountability).join("; ")}`);
     const low = pilot ? [] : AREAS.filter(([k]) => Number(m.wheel?.[k]) > 0 && Number(m.wheel?.[k]) <= 3);
     if (low.length)
       add("wheel", "mid", `Talk with ${fn} about ${low.map(([, l]) => l).join(" and ")}`,

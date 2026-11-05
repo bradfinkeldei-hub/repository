@@ -145,7 +145,7 @@ function MissionPanel({ m, viewer }: { m: Profile; viewer: Profile }) {
 const TZ = process.env.REMINDER_TIMEZONE;
 const CELL: Record<string, string> = { done: "Done", missed: "Not marked done", open: "This week", ahead: "Coming up" };
 
-/** The Progress tab: tick off this week's commitment, and see this 12-week sprint week by week. */
+/** The Progress tab: tick off this week's commitment, and see the 12 weeks ahead, week by week. */
 function ProgressPanel({ m, viewer, checked, p, startedAt }: { m: Profile; viewer: Profile; checked?: string[]; p?: Progress; startedAt: string | null }) {
   const isMe = m.id === viewer.id;
   const now = weekKey(new Date(), TZ);
@@ -158,7 +158,7 @@ function ProgressPanel({ m, viewer, checked, p, startedAt }: { m: Profile; viewe
       <Commitments m={m} viewer={viewer} checked={checked} />
       <div className="sprint">
         <div className="sprint-head">
-          <span className="label">{s.number > 1 ? `Sprint ${s.number} · ` : "12-week sprint · "}Week {s.weekNo} of 12</span>
+          <span className="label">Weeks ahead · Week {s.weekNo} of 12{s.number > 1 ? ` (round ${s.number})` : ""}</span>
           <span className="sprint-count">{s.done} done</span>
         </div>
         <ol className="sprint-grid">
@@ -170,7 +170,7 @@ function ProgressPanel({ m, viewer, checked, p, startedAt }: { m: Profile; viewe
             </li>
           ))}
         </ol>
-        <p className="muted small-note">Started the week of {shortDate(s.cells[0].date)}. A new 12-week sprint starts after week 12.</p>
+        <p className="muted small-note">Started the week of {shortDate(s.cells[0].date)}. After week 12, the next 12 weeks begin.</p>
       </div>
     </div>
   );
