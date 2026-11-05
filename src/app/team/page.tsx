@@ -4,7 +4,7 @@ import { requireProfile } from "@/lib/session";
 import { Header, MEMBER_TABS } from "@/components/header";
 import { TeamViews, type Tab } from "@/components/cards";
 import { loadCheckins } from "@/lib/checkin";
-import { loadChecked, loadFocus, loadIntentions, loadSocial, loadThreadSeen, unseen } from "@/lib/social";
+import { loadChecked, loadFocus, loadProud, loadIntentions, loadSocial, loadThreadSeen, unseen } from "@/lib/social";
 import { BOOKING_ENABLED, usesFocusCards, listJoin, missingDetails, monthKey, monthName, progressByMember, teamLabel, weekKey, type LogRow, type Profile } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
@@ -56,6 +56,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
   if (social && seenAt !== undefined) social.fresh = { memberId: me.id, ...unseen(social, me.id, seenAt) };
   const missing = pilot ? [] : missingDetails(me);
   const focusCards = pilot && tab === "team" ? await loadFocus(supabase, members.map((m) => m.id)) : undefined;
+  const proud = pilot && tab === "team" ? await loadProud(supabase, members.map((m) => m.id)) : undefined;
   const checked = tab !== "missions" ? await loadChecked(supabase, members.map((m) => m.id), weekKey(new Date(), TZ)) : undefined;
 
   return (
@@ -98,7 +99,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
             <Link className="btn small" href="/profile">Fill them in</Link>
           </div>
         )}
-        <TeamViews tab={tab} groups={[{ team: me.team, members }]} viewer={me} logs={logs} names={names} checkins={checkins} social={social} checked={checked} intentions={intentions} focus={focusCards} ownTeam />
+        <TeamViews tab={tab} groups={[{ team: me.team, members }]} viewer={me} logs={logs} names={names} checkins={checkins} social={social} checked={checked} intentions={intentions} focus={focusCards} proud={proud} ownTeam />
       </main></div>
     </>
   );

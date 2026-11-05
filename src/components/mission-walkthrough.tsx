@@ -17,6 +17,8 @@ export function MissionWalkthrough({ memberId, firstName, initial, doneHref, for
   const [notes, setNotes] = useState({ matters: "", difference: "", best: "" });
   const [mission, setMission] = useState(initial);
   const [error, setError] = useState("");
+  /** They said they already have a mission, so the questions were skipped. */
+  const [skipped, setSkipped] = useState(false);
   const [saving, start] = useTransition();
   const i = STEPS.indexOf(step);
   const you = forCoach ? firstName : "you";
@@ -79,7 +81,7 @@ export function MissionWalkthrough({ memberId, firstName, initial, doneHref, for
         )}
         {step === "write" && (
           <>
-            <h1>Now put it in one sentence</h1>
+            <h1>{skipped ? `Write ${forCoach ? "their" : "your"} mission` : "Now put it in one sentence"}</h1>
             {(notes.matters || notes.difference || notes.best) && (
               <ul className="walk-summary">
                 {notes.matters && <li><span>What matters: <b>{notes.matters}</b></span></li>}
@@ -87,7 +89,11 @@ export function MissionWalkthrough({ memberId, firstName, initial, doneHref, for
                 {notes.best && <li><span>At {your} best: <b>{notes.best}</b></span></li>}
               </ul>
             )}
-            <p className="hint">Example: My mission is to raise kind, brave kids and build a business that gives us freedom.</p>
+            <div className="walk-examples">
+              <span>An example to compare with:</span>
+              <ul><li>My mission is to raise kind, brave kids and build a business that gives us freedom.</li></ul>
+            </div>
+            {skipped && <p className="hint">One or two sentences is plenty. Want help putting it into words? <button type="button" className="linkish" onClick={() => { setSkipped(false); go(1); }}>Answer the three questions</button></p>}
             <textarea className="input" rows={3} maxLength={600} readOnly={isShared(mission)} value={mission} placeholder="My mission is to…"
               onChange={(e) => { setMission(e.target.value); setError(""); }} />
             <label className="walk-share">
@@ -100,7 +106,12 @@ export function MissionWalkthrough({ memberId, firstName, initial, doneHref, for
       </section>
 
       <div className="walk-nav">
-        {i > 0 && <button type="button" className="btn ghost" onClick={() => go(i - 1)} disabled={saving}>Back</button>}
+        {i > 0 && <button type="button" className="btn ghost" onClick={() => go(skipped && step === "write" ? 0 : i - 1)} disabled={saving}>Back</button>}
+        {step === "welcome" && (
+          <button type="button" className="btn ghost" onClick={() => { setSkipped(true); go(STEPS.indexOf("write")); }}>
+            {forCoach ? "They already have a mission" : "I already have a mission"}
+          </button>
+        )}
         {step === "write"
           ? <button type="button" className="btn" onClick={finish} disabled={saving}>{saving ? "Saving…" : forCoach ? "Save their mission" : "Save my mission"}</button>
           : <button type="button" className="btn" onClick={next}>{step === "welcome" ? "Let's start" : "Next"}</button>}

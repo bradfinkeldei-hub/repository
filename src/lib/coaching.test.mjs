@@ -238,3 +238,14 @@ test("a 12-week sprint counts from the week they started, with each meeting date
   assert.equal(later.number, 2);
   assert.equal(later.weekNo, 1);
 });
+
+test("the tracker is built around the number of weeks they chose", async () => {
+  const { sprintOf } = await import("./coaching.ts");
+  const s = sprintOf("2026-W45", "2026-W47", undefined, "Monday", 6);
+  assert.equal(s.length, 6);
+  assert.equal(s.cells.length, 6);
+  assert.equal(s.weekNo, 3);
+  const next = sprintOf("2026-W45", "2026-W51", undefined, "Monday", 6);
+  assert.equal(next.number, 2);
+  assert.equal(next.weekNo, 1);
+});

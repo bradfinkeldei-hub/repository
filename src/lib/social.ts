@@ -8,6 +8,9 @@ export type CardComment = { id: string; member_id: string; author_id: string; au
 export type Kudo = { member_id: string; author_id: string; author_name: string; week: string; created_at: string; note?: string };
 export type Milestone = { id: string; member_id: string; author_id: string; author_name: string; title: string; achieved_on: string } & Edited;
 
+/** Something a member is proud of, written down to build confidence. Private ones show only to them and the coach. */
+export type ProudMoment = { id: string; member_id: string; body: string; happened_on: string; private: boolean; created_at: string };
+
 export type CoachNote = { id: string; member_id: string; body: string; created_at: string } & Edited;
 
 /** Comments, kudos and milestones under each member's card, by member id. */
@@ -83,4 +86,15 @@ export async function loadFocus(supabase: Awaited<ReturnType<typeof createClient
   if (!ids.length) return {};
   const { data, error } = await supabase.from("focus_cards").select("*").in("member_id", ids);
   return error ? null : Object.fromEntries(((data ?? []) as Focus[]).map((f) => [f.member_id, f]));
+}
+
+/** Proud moments by member id, newest first. Null if the table isn't there yet (the tab then hides). */
+export async function loadProud(supabase: Awaited<ReturnType<typeof createClient>>, ids: string[]): Promise<Record<string, ProudMoment[]> | null> {
+  if (!ids.length) return {};
+  const { data, error } = await supabase.from("proud_moments").select("*").in("member_id", ids)
+    .order("happened_on", { ascending: false }).order("created_at", { ascending: false });
+  if (error) return null;
+  const out: Record<string, ProudMoment[]> = {};
+  for (const r of (data ?? []) as ProudMoment[]) (out[r.member_id] ??= []).push(r);
+  return out;
 }

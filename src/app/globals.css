@@ -758,3 +758,37 @@ tr:last-child td { border-bottom: 0; }
 .sprint-grid li.ahead { opacity: 0.55; border-style: dotted; }
 .focus-card .card-tabs button { line-height: 1.15; text-align: center; padding-inline: 4px; }
 .focus-card .card-tabs button:last-child { flex: 1.7; }
+/* Four card tabs, in two rows (cards are narrow even on a computer). */
+.focus-card .card-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.focus-card .card-tabs button:last-child { flex: none; }
+/* How many weeks to track */
+.track-pick { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 6px; border: 1px dashed color-mix(in srgb, var(--tint) 45%, var(--earth-line)); background: color-mix(in srgb, var(--tint) 6%, var(--earth-card)); }
+.track-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.track-choices button { font: inherit; font-size: 0.86rem; font-weight: 700; padding: 7px 12px; border-radius: 6px; cursor: pointer; border: 1px solid color-mix(in srgb, var(--tint) 45%, var(--earth-line)); background: var(--earth-card); color: var(--tint); }
+.track-choices button.on, .track-choices button:hover { background: var(--tint); color: #fff; }
+.track-change summary { cursor: pointer; font-size: 0.84rem; font-weight: 650; color: var(--tint); }
+.track-change .track-choices { margin-top: 8px; }
+/* Proud moments */
+.proud { display: flex; flex-direction: column; gap: 10px; }
+.proud > p { margin: 0; font-size: 0.9rem; }
+.proud-form { display: flex; flex-direction: column; gap: 8px; }
+.proud-form textarea { width: 100%; resize: vertical; }
+.proud-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 0.86rem; }
+.proud-date { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.proud-date .input { width: auto; padding: 6px 8px; }
+.proud-private { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.proud-form .btn { align-self: flex-start; }
+.proud-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.proud-list li { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border-radius: 6px; background: color-mix(in srgb, var(--tint) 9%, var(--earth-card)); }
+.proud-list li > div { flex: 1; min-width: 0; }
+.proud-list p { margin: 0; overflow-wrap: anywhere; }
+.proud-star { color: var(--e4); font-size: 1.05rem; line-height: 1.4; }
+.proud-del { border: 0; background: none; color: var(--muted); font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 2px 4px; }
+.proud-del:hover { color: var(--alert); }
+.focus-card .btn:not(.ghost) { background: var(--tint); border-color: var(--tint); color: #fff; }
+.sprint-grid li form { display: contents; }
+.sprint-grid li button { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; }
+.sprint-grid li:has(button) { padding: 0; }
+.sprint-grid li button { padding: 6px 2px; border-radius: 6px; }
+.sprint-grid li button:focus-visible { outline: 2px solid var(--tint, var(--accent)); outline-offset: 2px; }
+.sprint-grid li:has(button):hover { filter: brightness(0.96); }

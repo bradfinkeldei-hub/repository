@@ -26,9 +26,11 @@ export type Focus = {
   held_by: string;
   step: number;
   confirmed_at: string | null;
+  /** How many weeks they chose to be held accountable and tracked. Null until they choose. */
+  track_weeks?: number | null;
 };
 
-export type FocusAnswers = Omit<Focus, "member_id" | "confirmed_at">;
+export type FocusAnswers = Omit<Focus, "member_id" | "confirmed_at" | "track_weeks">;
 
 /** The walkthrough's screens, in order. "pick" only shows when they named more than one topic. */
 export const FOCUS_STEPS = ["welcome", "topic", "pick", "outcome", "measure", "meaning", "start", "summary", "held"] as const;

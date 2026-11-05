@@ -327,4 +327,18 @@ await check("Pilot group: focus cards are seen by the group and coach, written b
   await as(mon1, `delete from public.focus_cards where member_id = $1`, [mon1]);
   assert.equal((await db.query(`select 1 from public.focus_cards`)).rows.length, 2);
 });
+await check("proud moments: the group sees shared ones; private ones only the member and coach", async () => {
+  await as(mon1, `insert into public.proud_moments (member_id, body) values ($1, 'Spoke up at work')`, [mon1]);
+  await as(mon1, `insert into public.proud_moments (member_id, body, private) values ($1, 'Called my dad', true)`, [mon1]);
+  assert.deepEqual((await as(mon2, `select body from public.proud_moments`)).map((r) => r.body), ["Spoke up at work"]);
+  assert.equal((await as(mon1, `select 1 from public.proud_moments`)).length, 2);
+  assert.equal((await as(coach, `select 1 from public.proud_moments`)).length, 2);
+  assert.equal((await as(tue1, `select 1 from public.proud_moments`)).length, 0);
+  await assert.rejects(as(mon2, `insert into public.proud_moments (member_id, body) values ($1, 'Not mine')`, [mon1]));
+  await as(mon2, `delete from public.proud_moments where member_id = $1`, [mon1]);
+  assert.equal((await db.query(`select 1 from public.proud_moments`)).rows.length, 2);
+  await assert.rejects(as(mon1, `insert into public.proud_moments (member_id, body) values ($1, '   ')`, [mon1]));
+  await as(mon2, `insert into public.focus_cards (member_id, track_weeks) values ($1, 8) on conflict (member_id) do update set track_weeks = 8`, [mon2]);
+  await assert.rejects(as(mon2, `update public.focus_cards set track_weeks = 99 where member_id = $1`, [mon2]));
+});
 console.log(`\n${passed} checks passed`);
