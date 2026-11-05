@@ -822,6 +822,29 @@ export async function setTrackWeeks(memberId: string, weeks: number) {
   revalidatePath("/", "layout");
 }
 
+/** Adds another focus to a member's list ("My other focuses" on the Focus tab). */
+export async function addLaterFocus(memberId: string, formData: FormData) {
+  const { supabase, me } = await requireEditor();
+  if (memberId !== me.id && me.role !== "coach") return;
+  const item = str(formData.get("focus"), 300);
+  if (!item) return;
+  const { data: card } = await supabase.from("focus_cards").select("focus, later").eq("member_id", memberId).maybeSingle();
+  if (!card) return;
+  const later: string[] = card.later ?? [];
+  if (item === card.focus || later.includes(item) || later.length >= 10) return;
+  await supabase.from("focus_cards").update({ later: [...later, item], updated_at: new Date().toISOString() }).eq("member_id", memberId);
+  revalidatePath("/", "layout");
+}
+
+export async function removeLaterFocus(memberId: string, item: string) {
+  const { supabase, me } = await requireEditor();
+  if (memberId !== me.id && me.role !== "coach") return;
+  const { data: card } = await supabase.from("focus_cards").select("later").eq("member_id", memberId).maybeSingle();
+  if (!card) return;
+  await supabase.from("focus_cards").update({ later: (card.later ?? []).filter((t: string) => t !== item), updated_at: new Date().toISOString() }).eq("member_id", memberId);
+  revalidatePath("/", "layout");
+}
+
 /** Writes down a proud moment on a member's card. */
 export async function addProudMoment(memberId: string, formData: FormData) {
   const { supabase, me } = await requireEditor();
