@@ -238,7 +238,7 @@ export function MemberViewSwitch({ on, action }: { on: boolean; action: (on: boo
       title={value ? "Turn off to see your coach tools again" : "Hide the team list and coach tools, so your screen looks like a member's"}
       onClick={() => { const v = !value; setValue(v); start(() => action(v)); }}>
       <span className="member-switch-track" aria-hidden="true"><i /></span>
-      <span>Member view</span>
+      <span>Hide Coaches View</span>
     </button>
   );
 }
