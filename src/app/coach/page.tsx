@@ -1,13 +1,14 @@
 import Link from "next/link";
-import { requireCoach } from "@/lib/session";
+import { MEMBER_VIEW_COOKIE, requireCoach } from "@/lib/session";
 import { coachTabs, Header } from "@/components/header";
+import { cookies } from "next/headers";
 import { StripKey, WeekStrip } from "@/components/progress";
 import { Avatar } from "@/components/avatar";
 import { TeamViews, type DetailsNudge, type Tab } from "@/components/cards";
 import { TeamColumn } from "@/components/team-column";
-import { AutoSubmitCheckbox } from "@/components/client";
+import { AutoSubmitCheckbox, MemberViewSwitch } from "@/components/client";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { addAction, deleteAction, remindDetails, setActionDone } from "@/app/actions";
+import { addAction, deleteAction, remindDetails, setActionDone, setMemberView } from "@/app/actions";
 import { loadCheckins } from "@/lib/checkin";
 import { loadChecked, loadFocus, loadProud, loadIntentions, loadNotes, loadSocial } from "@/lib/social";
 import {
@@ -25,8 +26,10 @@ const KIND: Record<Suggestion["kind"], string> = {
 export default async function CoachPage({ searchParams: sp }: { searchParams: Promise<{ team?: string; tab?: string; asked?: string; reminded?: string }> }) {
   const searchParams = await sp;
   const { supabase, me, names } = await requireCoach();
+  // "Member view": the coach's screen looks like a member's, for sharing in a meeting.
+  const memberView = (await cookies()).get(MEMBER_VIEW_COOKIE)?.value === "1";
   const sel = searchParams.team === "all" || searchParams.team === "none" || isTeam(searchParams.team) ? searchParams.team : "Monday";
-  const tab = (["team", "accountability", "missions", "progress", "actions"].includes(searchParams.tab ?? "") ? searchParams.tab : "team") as CoachTab;
+  const tab = (!memberView && ["team", "accountability", "missions", "progress", "actions"].includes(searchParams.tab ?? "") ? searchParams.tab : "team") as CoachTab;
 
   const [{ data: profiles, error }, { data: rows }, { data: bookings }, { data: log }] = await Promise.all([
     supabase.from("profiles").select("*").neq("role", "coach").is("archived_at", null).order("name"),
@@ -70,11 +73,21 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
   return (
     <>
       <Header me={me}
-        sub="Coach view"
-        tabs={coachTabs(sel, openCount)}
+        sub={memberView ? selLabel : "Coach view"}
+        tabs={memberView ? [] : coachTabs(sel, openCount)}
         current={tab}
-        right={<Link className="btn small" href="/coach/members">+ Add member</Link>}
+        right={<>
+          <MemberViewSwitch on={memberView} action={setMemberView} />
+          {!memberView && <Link className="btn small" href="/coach/members">+ Add member</Link>}
+        </>}
       />
+      {memberView ? (
+        <div className="wrap layout"><main>
+          <div className="intro"><div><h1>{selLabel}</h1></div></div>
+          {/* Seen as a member would: no coach tools, notes or nudges. */}
+          <TeamViews tab="team" groups={groups} viewer={{ ...me, role: "member" }} logs={logs} names={names} checkins={checkins} social={social} checked={checked} intentions={intentions} focus={focus} proud={proud} />
+        </main></div>
+      ) : (
       <div className="wrap layout coach">
         <TeamColumn members={members} names={names} selected={sel} tab={tab} actions={tab === "actions" ? actions : undefined} />
         <main>
@@ -113,6 +126,7 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
           )}
         </main>
       </div>
+      )}
     </>
   );
 }

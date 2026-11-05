@@ -5,6 +5,8 @@ import type { Profile, TeamNames } from "@/lib/coaching";
 
 /** Set while the coach looks at the app the way one member sees it. Holds that member's id. */
 export const VIEW_AS_COOKIE = "view_as";
+/** The coach's "Member view" switch: hides the team column and every coach-only part, for screen sharing. */
+export const MEMBER_VIEW_COOKIE = "member_view";
 
 async function signedIn() {
   const supabase = await createClient();
