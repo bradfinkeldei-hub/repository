@@ -5,7 +5,7 @@ import { Header, MEMBER_TABS } from "@/components/header";
 import { TeamViews, type Tab } from "@/components/cards";
 import { loadCheckins } from "@/lib/checkin";
 import { loadChecked, loadFocus, loadIntentions, loadSocial, loadThreadSeen, unseen } from "@/lib/social";
-import { BOOKING_ENABLED, isPilot, listJoin, missingDetails, monthKey, monthName, progressByMember, teamLabel, weekKey, type LogRow, type Profile } from "@/lib/coaching";
+import { BOOKING_ENABLED, usesFocusCards, listJoin, missingDetails, monthKey, monthName, progressByMember, teamLabel, weekKey, type LogRow, type Profile } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 
@@ -13,7 +13,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
   const searchParams = await sp;
   const { supabase, me, names, viewing } = await requireProfile();
   if (me.role === "coach") redirect("/coach");
-  const pilot = isPilot(me.team);
+  const pilot = usesFocusCards(me.team);
   const tab = ((pilot ? ["team"] : ["team", "accountability", "missions"]).includes(searchParams.tab ?? "") ? searchParams.tab : "team") as Tab;
   const coach = process.env.COACH_NAME || "your coach";
 

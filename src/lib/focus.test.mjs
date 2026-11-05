@@ -42,6 +42,13 @@ test("the Pilot group is called a group and skips life-wheel nudges", () => {
   };
   const kinds = coachActions([m], [], [], new Date("2026-11-04T15:00:00Z"), "UTC").map((a) => a.kind);
   assert.ok(!kinds.includes("details") && !kinds.includes("refresh") && !kinds.includes("wheel"), kinds.join());
-  const other = coachActions([{ ...m, team: "Monday" }], [], [], new Date("2026-11-04T15:00:00Z"), "UTC").map((a) => a.kind);
+  const other = coachActions([{ ...m, team: "Tuesday" }], [], [], new Date("2026-11-04T15:00:00Z"), "UTC").map((a) => a.kind);
   assert.ok(other.includes("details"));
+});
+
+test("every group except Tuesday uses the Focus cards", async () => {
+  const { usesFocusCards } = await import("./coaching.ts");
+  assert.equal(usesFocusCards("Tuesday"), false);
+  for (const t of ["Monday", "Wednesday", "Thursday", "Example", "Pilot"]) assert.equal(usesFocusCards(t), true, t);
+  assert.equal(usesFocusCards(null), false);
 });

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { signOut } from "@/app/actions";
 import { Avatar } from "@/components/avatar";
 import { Menu } from "@/components/client";
-import { firstName, type Profile } from "@/lib/coaching";
+import { firstName, isTeam, usesFocusCards, type Profile } from "@/lib/coaching";
 
 /** The member's top tabs. Team, Accountability and Missions live on /team. */
 export const MEMBER_TABS = [
@@ -23,7 +23,7 @@ export const PILOT_TABS = [
 export function coachTabs(team: string, openCount?: number) {
   const href = (t: string) => `/coach?team=${team}&tab=${t}`;
   // The Pilot group's cards carry Focus, Mission and Progress, so the board needs only Coaches actions beside it.
-  if (team === "Pilot") return [
+  if (isTeam(team) && usesFocusCards(team)) return [
     { key: "team", label: "Group board", href: href("team") },
     { key: "actions", label: "Coaches actions", href: href("actions"), count: openCount },
   ];
