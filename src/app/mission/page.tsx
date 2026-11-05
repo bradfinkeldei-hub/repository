@@ -3,14 +3,14 @@ import { redirect } from "next/navigation";
 import { requireEditor } from "@/lib/session";
 import { Header } from "@/components/header";
 import { MissionWalkthrough } from "@/components/mission-walkthrough";
-import { firstName, PILOT, type Profile } from "@/lib/coaching";
+import { firstName, type Profile } from "@/lib/coaching";
 
 /** Guided mission questions. A member writes their own; the coach can write one for a member (?id=). */
 export default async function MissionPage({ searchParams: sp }: { searchParams: Promise<{ id?: string }> }) {
   const { id } = await sp;
   const { supabase, me } = await requireEditor();
   const coach = me.role === "coach";
-  const board = coach ? `/coach?team=${PILOT}` : "/team";
+  const board = coach ? "/coach" : "/team";
 
   let who: Profile = me;
   if (coach) {
@@ -19,7 +19,7 @@ export default async function MissionPage({ searchParams: sp }: { searchParams: 
     if (!data) redirect(board);
     who = data as Profile;
   }
-  const back = coach ? `/coach?team=${who.team ?? PILOT}#member-${who.id}` : `/team#member-${who.id}`;
+  const back = coach ? `/coach?team=${who.team ?? "all"}#member-${who.id}` : `/team#member-${who.id}`;
 
   return (
     <>

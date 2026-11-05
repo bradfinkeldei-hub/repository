@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Profile, TeamNames } from "@/lib/coaching";
+import { setTeams, type Profile, type TeamNames } from "@/lib/coaching";
 
 /** Set while the coach looks at the app the way one member sees it. Holds that member's id. */
 export const VIEW_AS_COOKIE = "view_as";
@@ -14,10 +14,11 @@ async function signedIn() {
   if (!user) redirect("/login");
   const [{ data }, { data: teams }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
-    supabase.from("team_names").select("team, name"),
+    supabase.from("team_names").select("team, name, meeting_day").order("created_at"),
   ]);
   if (!data) redirect("/login?error=profile");
   if (data.archived_at && data.role !== "coach") redirect("/login?error=archived");
+  setTeams(teams ?? []);
   const names = Object.fromEntries((teams ?? []).map((t) => [t.team, t.name])) as TeamNames;
   return { supabase, user, me: data as Profile, names };
 }

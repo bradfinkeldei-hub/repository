@@ -17,21 +17,50 @@ export const AREAS = [
 export type AreaKey = (typeof AREAS)[number][0];
 export type Wheel = Partial<Record<AreaKey, number>>;
 
-/** "Example" holds made-up demo members (supabase/seed/example_team.sql). "Pilot" tests the Focus walkthrough and Group board.
- * "Tuesday2" is a second Tuesday group on the Focus cards, beside the original Tuesday group. */
-export const TEAMS = ["Monday", "Tuesday", "Tuesday2", "Wednesday", "Thursday", "Example", "Pilot"] as const;
-export type Team = (typeof TEAMS)[number];
+/**
+ * A team's key, like "Tuesday", "Tuesday2", "Example" or "t-friday-3fa2". Teams are rows in
+ * table team_names, which the coach adds to and deletes from on the Teams page; keys never change.
+ * "Example" holds made-up demo members (supabase/seed/example_team.sql).
+ */
+export type Team = string;
 
-/** The test group whose members get the Focus walkthrough and a Group board instead of the usual cards. */
-export const PILOT: Team = "Pilot";
-export const isPilot = (team: Team | null | undefined) => team === PILOT;
-/** Groups that keep the original card (life wheel, becoming, mission). Every other group uses the Focus cards. */
+/** One team, from table team_names. day is the weekday it meets, or "" for no set day (like Example). */
+export type TeamInfo = { team: Team; name: string; day: string };
+
+/**
+ * The teams, in the order the coach made them. session.ts fills this from team_names on
+ * every signed-in request (setTeams), so the helpers below can look up a team's
+ * meeting day without every caller passing it around. Every visitor shares the same list.
+ */
+let TEAM_LIST: TeamInfo[] = [];
+export function setTeams(rows: { team: string; name?: string | null; meeting_day?: string | null }[]) {
+  TEAM_LIST = rows.map((r) => ({ team: r.team, name: r.name ?? "", day: r.meeting_day ?? fallbackDay(r.team) }));
+}
+export function teamList(): TeamInfo[] {
+  return TEAM_LIST;
+}
+/** Team keys, in order. */
+export function teamKeys(): Team[] {
+  return TEAM_LIST.map((t) => t.team);
+}
+
+/** Groups that keep the original card (life wheel, becoming, mission). Every other group, and every new one, uses the Focus cards. */
 export const CLASSIC_TEAMS: readonly Team[] = ["Tuesday"];
 /** Whether a group uses the Focus cards: the seven questions, then Focus / Mission / Progress tabs on each card. */
 export const usesFocusCards = (team: Team | null | undefined) => !!team && !CLASSIC_TEAMS.includes(team);
-/** The weekday a team meets: its key, except "Tuesday2" meets Tuesday. Teams with no weekday return their key. */
-export const meetingDay = (team: Team) => (team === "Tuesday2" ? "Tuesday" : team);
 export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
+
+/** Before team_names had a meeting_day, a weekday key was the day it met. */
+function fallbackDay(team: string) {
+  return (DAYS as readonly string[]).includes(team) ? team : team === "Tuesday2" ? "Tuesday" : "";
+}
+
+/** The weekday a team meets, like "Tuesday", or "" when it has no set day. */
+export function meetingDay(team: Team | null | undefined) {
+  if (!team) return "";
+  return TEAM_LIST.find((t) => t.team === team)?.day ?? fallbackDay(team);
+}
+
 
 export type Profile = {
   id: string;
@@ -68,20 +97,22 @@ export type CoachActionRow = {
 
 export type Booking = { id: string; member_id: string; month: string; kind: "free" | "paid"; created_at: string };
 
+/** Whether v is one of the teams. */
 export function isTeam(v: unknown): v is Team {
-  return typeof v === "string" && (TEAMS as readonly string[]).includes(v);
+  return typeof v === "string" && TEAM_LIST.some((t) => t.team === v);
 }
 
 /** The names the coach has given the teams (table team_names). The keys never change. */
-export type TeamNames = Partial<Record<Team, string>>;
+export type TeamNames = Record<Team, string | undefined>;
 
 export function teamLabel(team: Team | null, names: TeamNames = {}) {
-  return team ? names[team]?.trim() || (team === PILOT ? "Pilot group" : team === "Tuesday2" ? "Tuesday group 2" : `${team} team`) : "Not on a team";
+  if (!team) return "Not on a team";
+  return names[team]?.trim() || TEAM_LIST.find((t) => t.team === team)?.name.trim() || (team === "Tuesday2" ? "Tuesday group 2" : `${team} team`);
 }
 
 /** The team menu's choices: [team key, its current name]. */
 export function teamOptions(names: TeamNames = {}): [string, string][] {
-  return TEAMS.map((t) => [t, teamLabel(t, names)]);
+  return teamKeys().map((t) => [t, teamLabel(t, names)]);
 }
 
 /** Members can hold themselves to up to this many commitments a week. */
@@ -146,7 +177,8 @@ export function dateKey(date = new Date(), timeZone?: string) {
  */
 export function nextMeeting(team: Team, now = new Date(), timeZone?: string) {
   const { year, month, day, weekday } = zonedParts(now, timeZone);
-  const ahead = DAY_INDEX[team] ? (DAY_INDEX[team] - DAY_INDEX[weekday] + 7) % 7 : 0;
+  const d = DAY_INDEX[meetingDay(team)];
+  const ahead = d ? (d - DAY_INDEX[weekday] + 7) % 7 : 0;
   return new Date(Date.UTC(year, month - 1, day + ahead)).toISOString().slice(0, 10);
 }
 
@@ -207,7 +239,7 @@ export function clockLabel(time: string) {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
 
-const BYDAY: Record<string, string> = { Monday: "MO", Tuesday: "TU", Tuesday2: "TU", Wednesday: "WE", Thursday: "TH", Friday: "FR", Saturday: "SA", Sunday: "SU" };
+const BYDAY: Record<string, string> = { Monday: "MO", Tuesday: "TU", Wednesday: "WE", Thursday: "TH", Friday: "FR", Saturday: "SA", Sunday: "SU" };
 
 /** "20261029T190000" for a meeting date and time, plus some minutes. Local time, no zone. */
 function calStamp(date: string, time: string, plusMinutes = 0) {
@@ -222,11 +254,12 @@ export type CalendarEvent = { team: Team; title: string; details: string; start:
 
 /** opts.timeZone is the app's default zone, used when the team hasn't picked one. */
 export function calendarEvent(team: Team, mt: MeetingTime | undefined, opts: { title: string; details: string; now?: Date; timeZone?: string }): CalendarEvent | null {
-  if (!mt?.time || !BYDAY[team]) return null;
+  const byDay = BYDAY[meetingDay(team)];
+  if (!mt?.time || !byDay) return null;
   const timeZone = mt.tz || opts.timeZone || "UTC";
   const date = nextMeeting(team, opts.now ?? new Date(), timeZone);
   return {
-    team, title: opts.title, details: opts.details, url: mt.url, byDay: BYDAY[team], timeZone,
+    team, title: opts.title, details: opts.details, url: mt.url, byDay, timeZone,
     start: calStamp(date, mt.time), end: calStamp(date, mt.time, mt.minutes || 60),
   };
 }
@@ -321,7 +354,7 @@ export function listJoin(items: string[]) {
   return items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 }
 
-const DAY_INDEX: Record<string, number> = { Monday: 1, Tuesday: 2, Tuesday2: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7 };
+const DAY_INDEX: Record<string, number> = { Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7 };
 
 const COUNTED = /\d|\b(one|two|three|four|five|six|seven|eight|nine|ten|once|twice|daily|every|each)\b/i;
 const FUZZY = /\bgoals?\b|\bwork(ing)? on\b|\bfocus(ing)? on\b|\bbetter\b|\bimprov(e|ing)\b|\bmore\b|\bless\b/i;
@@ -371,7 +404,7 @@ export function coachActions(
     const missing = pilot ? [] : missingDetails(m);
     if (missing.length && m.team)
       add("details", "mid", `Remind ${fn} to fill out their details`, `Still missing: ${listJoin(missing)}.`);
-    if (m.accountability && m.team && today >= DAY_INDEX[m.team] && m.done_week !== wk)
+    if (m.accountability && m.team && DAY_INDEX[meetingDay(m.team)] && today >= DAY_INDEX[meetingDay(m.team)] && m.done_week !== wk)
       add("checkin", "high", `Check in with ${fn}`, `Not marked done since ${meetingDay(m.team)}'s meeting: ${commitmentList(m.accountability).join("; ")}`);
     const low = pilot ? [] : AREAS.filter(([k]) => Number(m.wheel?.[k]) > 0 && Number(m.wheel?.[k]) <= 3);
     if (low.length)
@@ -424,7 +457,7 @@ export function addWeeks(week: string, n: number) {
 
 /** The date of a team's meeting in the given ISO week. Teams without a weekday meet Monday. */
 export function meetingDate(week: string, team: Team | null) {
-  return new Date(weekMonday(week) + (((team && DAY_INDEX[team]) || 1) - 1) * 864e5);
+  return new Date(weekMonday(week) + ((DAY_INDEX[meetingDay(team)] || 1) - 1) * 864e5);
 }
 
 export function shortDate(d: Date) {
