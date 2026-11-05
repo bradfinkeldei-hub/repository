@@ -18,7 +18,7 @@ export function FocusBoard({ members, focus, viewer, names, social, avatars, che
     <>
       {coach && (
         <div className="notice focus-try">
-          <span><b>This is the test Group board.</b> New members of this group answer seven questions on their first sign-in, and their answers build the card below. Try it yourself first: nothing you enter shows on the board.</span>
+          <span><b>This is the Group board.</b> Members of this group answer seven questions on their first sign-in, and their answers build the card below. Try it yourself first: nothing you enter shows on the board.</span>
           <Link className="btn small" href="/focus?practice=1">Try the questions</Link>
         </div>
       )}

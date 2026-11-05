@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AREAS, commitmentList, isPilot, firstName, listJoin, fmt, isVagueCommitment, MAX_COMMITMENTS, teamLabel, teamOptions, teamPulse, weekKey, type Profile, type Progress, type Team, type TeamNames, type Wheel } from "@/lib/coaching";
+import { AREAS, commitmentList, usesFocusCards, firstName, listJoin, fmt, isVagueCommitment, MAX_COMMITMENTS, teamLabel, teamOptions, teamPulse, weekKey, type Profile, type Progress, type Team, type TeamNames, type Wheel } from "@/lib/coaching";
 import { addCommitment, remindDetails, setTeam, startViewAs, toggleCommitment } from "@/app/actions";
 import { AutoSubmitSelect } from "@/components/client";
 import { Avatar } from "@/components/avatar";
@@ -69,7 +69,7 @@ function EditLink({ m, viewer }: { m: Profile; viewer: Profile }) {
   const isMe = m.id === viewer.id;
   if (!isMe && viewer.role !== "coach") return null;
   // Pilot members edit their Focus card by stepping back through their answers.
-  if (isMe && isPilot(m.team)) return <Link className="btn ghost small" href="/focus?edit=1">Edit my card</Link>;
+  if (isMe && usesFocusCards(m.team)) return <Link className="btn ghost small" href="/focus?edit=1">Edit my card</Link>;
   return <Link className="btn ghost small" href={isMe ? "/profile" : `/profile?id=${m.id}`}>{isMe ? "Edit my profile" : "Edit profile"}</Link>;
 }
 
@@ -237,7 +237,7 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins,
       {groups.map(({ team, members }) => {
         const key = team ?? "none";
         let body: React.ReactNode;
-        if (tab === "team" && isPilot(team)) {
+        if (tab === "team" && usesFocusCards(team)) {
           body = (
             <>
               <FocusBoard members={members} focus={focus ?? {}} viewer={viewer} names={names} social={social} avatars={avatars} checked={checked} notes={notes} logs={logs} />

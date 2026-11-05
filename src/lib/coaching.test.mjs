@@ -216,8 +216,8 @@ test("the coach gets a details reminder only for members on a team with blanks",
   const now = new Date("2026-11-02T18:00:00Z");
   const full = { wheel: { health: 5 }, becoming: "calm", creating: "a book", mission: "serve" };
   const acts = coachActions([
-    member({ id: "a", name: "Ann", team: "Monday", ...full }),
-    member({ id: "b", name: "Bo", team: "Monday", ...full, mission: "" }),
+    member({ id: "a", name: "Ann", team: "Tuesday", ...full }),
+    member({ id: "b", name: "Bo", team: "Tuesday", ...full, mission: "" }),
     member({ id: "c", name: "Cy", team: null }),
   ], [], [], now, TZ);
   const details = acts.filter((a) => a.kind === "details");

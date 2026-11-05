@@ -4,7 +4,7 @@ import { requireEditor } from "@/lib/session";
 import { Header } from "@/components/header";
 import { FocusWalkthrough } from "@/components/focus-walkthrough";
 import { FocusCard } from "@/components/focus-card";
-import { firstName, isPilot, PILOT, type Profile } from "@/lib/coaching";
+import { firstName, PILOT, usesFocusCards, type Profile } from "@/lib/coaching";
 import { EMPTY_FOCUS, FOCUS_STEPS, type Focus, type FocusAnswers } from "@/lib/focus";
 
 /**
@@ -27,11 +27,11 @@ export default async function FocusPage({ searchParams: sp }: { searchParams: Pr
     who = data as Profile;
   } else if (coach && !searchParams.practice) {
     redirect(`/focus?practice=1`);
-  } else if (!coach && !isPilot(me.team)) {
+  } else if (!coach && !usesFocusCards(me.team)) {
     redirect("/team");
   }
   const practice = coach && who.id === me.id;
-  const board = coach ? `/coach?team=${PILOT}` : "/team";
+  const board = coach ? `/coach?team=${who.team ?? PILOT}` : "/team";
 
   const { data } = await supabase.from("focus_cards").select("*").eq("member_id", who.id).maybeSingle();
   const saved = data as Focus | null;

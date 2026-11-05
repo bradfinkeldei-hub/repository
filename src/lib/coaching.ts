@@ -24,6 +24,10 @@ export type Team = (typeof TEAMS)[number];
 /** The test group whose members get the Focus walkthrough and a Group board instead of the usual cards. */
 export const PILOT: Team = "Pilot";
 export const isPilot = (team: Team | null | undefined) => team === PILOT;
+/** Groups that keep the original card (life wheel, becoming, mission). Every other group uses the Focus cards. */
+export const CLASSIC_TEAMS: readonly Team[] = ["Tuesday"];
+/** Whether a group uses the Focus cards: the seven questions, then Focus / Mission / Progress tabs on each card. */
+export const usesFocusCards = (team: Team | null | undefined) => !!team && !CLASSIC_TEAMS.includes(team);
 export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
 
 export type Profile = {
@@ -360,7 +364,7 @@ export function coachActions(
         add("commit", "mid", `Help ${fn} make their commitment specific`, `"${vague.join("; ")}" is hard to check off. Ask for one action they can finish before the next meeting.`);
     }
     // Pilot members answer the Focus questions instead of the life wheel and profile details.
-    const pilot = isPilot(m.team);
+    const pilot = usesFocusCards(m.team);
     const missing = pilot ? [] : missingDetails(m);
     if (missing.length && m.team)
       add("details", "mid", `Remind ${fn} to fill out their details`, `Still missing: ${listJoin(missing)}.`);

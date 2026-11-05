@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCoach, requireEditor, requireProfile, requireRealCoach, VIEW_AS_COOKIE } from "@/lib/session";
-import { ABSENT_STEPS, AREAS, ASSUMED, CANT_MAKE_IT, missingDetails, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
+import { ABSENT_STEPS, AREAS, ASSUMED, CANT_MAKE_IT, missingDetails, usesFocusCards, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
 import { sendEmails } from "@/lib/mail";
 import { rsvpLink } from "@/lib/rsvp";
 import { cleanFocus, focusGaps, type FocusAnswers } from "@/lib/focus";
@@ -452,7 +452,7 @@ export async function remindDetails(formData: FormData) {
   if (!ids.length) back("reminded=0");
 
   const { data: rows } = await supabase.from("profiles").select("*").in("id", ids).neq("role", "coach").is("archived_at", null);
-  const due = ((rows ?? []) as Profile[]).map((m) => ({ m, missing: missingDetails(m) })).filter((x) => x.missing.length);
+  const due = ((rows ?? []) as Profile[]).map((m) => ({ m, missing: usesFocusCards(m.team) ? [] : missingDetails(m) })).filter((x) => x.missing.length);
   const { data: contacts } = due.length
     ? await supabase.from("member_contacts").select("id, email").in("id", due.map((x) => x.m.id))
     : { data: [] };

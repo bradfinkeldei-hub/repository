@@ -11,7 +11,7 @@ import { addAction, deleteAction, remindDetails, setActionDone } from "@/app/act
 import { loadCheckins } from "@/lib/checkin";
 import { loadChecked, loadFocus, loadIntentions, loadNotes, loadSocial } from "@/lib/social";
 import {
-  BOOKING_ENABLED, coachActions, missingDetails, isPilot, isTeam, progressByMember, teamLabel, TEAMS, weekKey,
+  BOOKING_ENABLED, coachActions, missingDetails, usesFocusCards, isTeam, progressByMember, teamLabel, TEAMS, weekKey,
   type Booking, type CoachActionRow, type LogRow, type Profile, type Progress, type Suggestion, type Team, type TeamNames,
 } from "@/lib/coaching";
 
@@ -58,10 +58,10 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
   const reminded = new Set(actions.filter((a) => a.kind === "details" && a.done).map((a) => a.memberId));
   const nudges: Record<string, DetailsNudge> = {};
   for (const m of groups.flatMap((g) => g.members)) {
-    const missing = isPilot(m.team) ? [] : missingDetails(m);
+    const missing = usesFocusCards(m.team) ? [] : missingDetails(m);
     if (missing.length && m.team && !notJoined.has(m.id)) nudges[m.id] = { missing, reminded: reminded.has(m.id) };
   }
-  const pilotIds = groups.filter((g) => isPilot(g.team)).flatMap((g) => g.members.map((m) => m.id));
+  const pilotIds = groups.filter((g) => usesFocusCards(g.team)).flatMap((g) => g.members.map((m) => m.id));
   const focus = tab === "team" && pilotIds.length ? await loadFocus(supabase, pilotIds) : undefined;
   const notYet = Object.keys(nudges).filter((id) => !nudges[id].reminded);
   const selLabel = sel === "all" ? "All teams" : teamLabel(sel === "none" ? null : (sel as Team), names);
