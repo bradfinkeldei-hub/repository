@@ -97,7 +97,7 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
     <article className="card focus-card" id={`member-${m.id}`} style={{ "--tint": memberTint(m.id) } as React.CSSProperties}>
       <Who m={m} viewer={viewer} coachTools names={names} />
       {practice ? focusPanel : (
-        <CardTabs tabs={[{ key: "focus", label: "Focus", dot: !done && (isMe || coach) }, { key: "mission", label: "Mission", dot: !m.mission && (isMe || coach) }, { key: "progress", label: "Progress" }]}>
+        <CardTabs tabs={[{ key: "focus", label: "Focus", dot: !done && (isMe || coach) }, { key: "mission", label: "Mission", dot: !m.mission && (isMe || coach) }, { key: "progress", label: "Accountability tracker" }]}>
           {focusPanel}
           <MissionPanel m={m} viewer={viewer} />
           <ProgressPanel m={m} viewer={viewer} checked={checked} p={p} startedAt={f?.confirmed_at ?? null} />
@@ -158,7 +158,7 @@ function ProgressPanel({ m, viewer, checked, p, startedAt }: { m: Profile; viewe
       <Commitments m={m} viewer={viewer} checked={checked} />
       <div className="sprint">
         <div className="sprint-head">
-          <span className="label">Weeks ahead · Week {s.weekNo} of 12{s.number > 1 ? ` (round ${s.number})` : ""}</span>
+          <span className="label">Weeks Progress · Week {s.weekNo} of 12{s.number > 1 ? ` (round ${s.number})` : ""}</span>
           <span className="sprint-count">{s.done} done</span>
         </div>
         <ol className="sprint-grid">
