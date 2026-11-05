@@ -12,7 +12,7 @@ import { addAction, deleteAction, remindDetails, setActionDone, setMemberView } 
 import { loadCheckins } from "@/lib/checkin";
 import { loadChecked, loadFocus, loadProud, loadIntentions, loadNotes, loadSocial } from "@/lib/social";
 import {
-  BOOKING_ENABLED, coachActions, missingDetails, usesFocusCards, isTeam, progressByMember, teamLabel, TEAMS, weekKey,
+  BOOKING_ENABLED, coachActions, missingDetails, usesFocusCards, isTeam, progressByMember, teamKeys, teamLabel, weekKey,
   type Booking, type CoachActionRow, type LogRow, type Profile, type Progress, type Suggestion, type Team, type TeamNames,
 } from "@/lib/coaching";
 
@@ -28,7 +28,7 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
   const { supabase, me, names } = await requireCoach();
   // "Member view": the coach's screen looks like a member's, for sharing in a meeting.
   const memberView = (await cookies()).get(MEMBER_VIEW_COOKIE)?.value === "1";
-  const sel = searchParams.team === "all" || searchParams.team === "none" || isTeam(searchParams.team) ? searchParams.team : "Monday";
+  const sel = searchParams.team === "all" || searchParams.team === "none" || isTeam(searchParams.team) ? searchParams.team : (teamKeys()[0] ?? "all");
   const tab = (!memberView && ["team", "accountability", "missions", "progress", "actions"].includes(searchParams.tab ?? "") ? searchParams.tab : "team") as CoachTab;
 
   const [{ data: profiles, error }, { data: rows }, { data: bookings }, { data: log }] = await Promise.all([
@@ -48,7 +48,7 @@ export default async function CoachPage({ searchParams: sp }: { searchParams: Pr
   const openCount = actions.filter((a) => !a.done).length;
 
   const teamsShown: (Team | null)[] = sel === "all"
-    ? [...TEAMS, ...(members.some((m) => !m.team) ? [null] : [])]
+    ? [...teamKeys(), ...(members.some((m) => !m.team) ? [null] : [])]
     : [sel === "none" ? null : (sel as Team)];
   const groups = teamsShown.map((team) => ({ team, members: members.filter((m) => m.team === team) }));
   const shownIds = groups.flatMap((g) => g.members.map((m) => m.id));

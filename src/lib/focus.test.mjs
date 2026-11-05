@@ -33,8 +33,7 @@ test("progress and gaps", () => {
   assert.deepEqual(gaps.map(([s]) => s), ["outcome", "meaning"]);
 });
 
-test("the Pilot group is called a group and skips life-wheel nudges", () => {
-  assert.equal(teamLabel("Pilot"), "Pilot group");
+test("Focus-card groups skip life-wheel nudges", () => {
   assert.equal(teamLabel("Monday"), "Monday team");
   const m = {
     id: "p1", name: "Pat", role: "member", team: "Pilot", wheel: {}, becoming: "", creating: "", accountability: "Call 5 people",

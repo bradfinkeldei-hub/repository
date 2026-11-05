@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addWeeks, calendarEvent, clockLabel, isTimeZone, zonedTime, zoneLabel, coachActions, googleCalendarUrl, meetingIcs, dateKey, meetingDate, meetingWhen, nextMeeting, monthKey, progress, teamAverage, teamLabel, teamOptions, teamPulse, weekKey, weekdayName } from "./coaching.ts";
+import { addWeeks, calendarEvent, clockLabel, isTimeZone, zonedTime, zoneLabel, coachActions, googleCalendarUrl, meetingIcs, dateKey, meetingDate, meetingWhen, nextMeeting, monthKey, progress, teamAverage, setTeams, teamLabel, teamOptions, teamPulse, weekKey, weekdayName } from "./coaching.ts";
 
 const TZ = "America/Chicago";
 const base = {
@@ -86,7 +86,30 @@ test("team names: the coach's name wins, blanks fall back to the day", () => {
   assert.equal(teamLabel("Tuesday", names), "Tuesday team");
   assert.equal(teamLabel("Wednesday"), "Wednesday team");
   assert.equal(teamLabel(null, names), "Not on a team");
+  setTeams([{ team: "Monday", name: "Monday team", meeting_day: "Monday" }, { team: "Tuesday", name: "Tuesday team", meeting_day: "Tuesday" }]);
   assert.deepEqual(teamOptions(names)[0], ["Monday", "Trailblazers"]);
+  setTeams([]);
+});
+
+test("a team the coach adds meets on the day it was given", () => {
+  setTeams([
+    { team: "Tuesday", name: "Tuesday Night Mens Group", meeting_day: "Tuesday" },
+    { team: "t-friday-men-3fa2", name: "Friday Men", meeting_day: "Friday" },
+    { team: "t-no-day-0001", name: "Anytime", meeting_day: "" },
+  ]);
+  try {
+    assert.deepEqual(teamOptions().map(([k]) => k), ["Tuesday", "t-friday-men-3fa2", "t-no-day-0001"]);
+    assert.equal(teamLabel("t-friday-men-3fa2"), "Friday Men");
+    // Tuesday Oct 27, 2026: the Friday team's next meeting is Oct 30, in week 44.
+    assert.equal(nextMeeting("t-friday-men-3fa2", new Date("2026-10-27T15:00:00Z"), TZ), "2026-10-30");
+    assert.equal(meetingDate("2026-W44", "t-friday-men-3fa2").toISOString().slice(0, 10), "2026-10-30");
+    // No set day: meets "today" for check-ins, and has no repeating calendar event.
+    assert.equal(nextMeeting("t-no-day-0001", new Date("2026-10-27T15:00:00Z"), TZ), "2026-10-27");
+    assert.equal(calendarEvent("t-no-day-0001", { time: "19:00", minutes: 60, url: "", tz: "" }, { title: "x", details: "" }), null);
+    assert.equal(calendarEvent("t-friday-men-3fa2", { time: "19:00", minutes: 60, url: "", tz: "" }, { title: "x", details: "", timeZone: TZ }).byDay, "FR");
+  } finally {
+    setTeams([]);
+  }
 });
 
 test("the next meeting counts today, follows the team's day, and Example meets today", () => {

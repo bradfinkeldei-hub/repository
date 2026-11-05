@@ -341,4 +341,24 @@ await check("proud moments: the group sees shared ones; private ones only the me
   await as(mon2, `insert into public.focus_cards (member_id, track_weeks) values ($1, 8) on conflict (member_id) do update set track_weeks = 8`, [mon2]);
   await assert.rejects(as(mon2, `update public.focus_cards set track_weeks = 99 where member_id = $1`, [mon2]));
 });
+await check("the coach adds and deletes teams; new members get the team's meeting day", async () => {
+  await assert.rejects(as(mon1, `insert into public.team_names (team, name) values ('t-x-0001', 'Sneaky')`));
+  await as(coach, `insert into public.team_names (team, name, meeting_day) values ('t-friday-0001', 'Friday Men', 'Friday')`);
+  await assert.rejects(as(coach, `insert into public.team_names (team, name) values ('bad key!', 'Bad')`));
+  await assert.rejects(as(coach, `insert into public.team_names (team, name, meeting_day) values ('t-bad-0001', 'Bad', 'Funday')`));
+  await assert.rejects(as(coach, `insert into public.invites (email, team) values ('nobody@example.com', 'NoSuchTeam')`));
+  await as(coach, `insert into public.invites (email, team) values ('fri1@example.com', 't-friday-0001'), ('fri2@example.com', 't-friday-0001')`);
+  const fri1 = await addUser("fri1@example.com", "Fri One");
+  const p = (await db.query(`select team, reminder_day from public.profiles where id = $1`, [fri1])).rows[0];
+  assert.deepEqual(p, { team: "t-friday-0001", reminder_day: "Friday" });
+  assert.equal((await as(fri1, `select 1 from public.profiles`)).length, 1);
+  await as(coach, `insert into public.team_intentions (team, body) values ('t-friday-0001', 'Show up')`);
+  // Deleting the team: its pending invite and intention go, its member stays with no team.
+  await as(mon1, `delete from public.team_names where team = 't-friday-0001'`);
+  assert.equal((await db.query(`select 1 from public.team_names where team = 't-friday-0001'`)).rows.length, 1);
+  await as(coach, `delete from public.team_names where team = 't-friday-0001'`);
+  assert.equal((await db.query(`select team from public.profiles where id = $1`, [fri1])).rows[0].team, null);
+  assert.equal((await db.query(`select 1 from public.invites where team = 't-friday-0001' or email = 'fri2@example.com'`)).rows.length, 0);
+  assert.equal((await db.query(`select 1 from public.team_intentions where team = 't-friday-0001'`)).rows.length, 0);
+});
 console.log(`\n${passed} checks passed`);

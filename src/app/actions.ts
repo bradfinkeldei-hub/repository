@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCoach, requireEditor, requireProfile, requireRealCoach, MEMBER_VIEW_COOKIE, VIEW_AS_COOKIE } from "@/lib/session";
-import { ABSENT_STEPS, AREAS, ASSUMED, CANT_MAKE_IT, missingDetails, usesFocusCards, TRACK_CHOICES, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
+import { ABSENT_STEPS, AREAS, ASSUMED, CANT_MAKE_IT, missingDetails, usesFocusCards, TRACK_CHOICES, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, teamKeys, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
 import { sendEmails } from "@/lib/mail";
 import { rsvpLink } from "@/lib/rsvp";
 import { cleanFocus, focusGaps, OTHER_FIELDS, swapMainFocus, type Focus, type FocusAnswers, type OtherFocus } from "@/lib/focus";
@@ -297,28 +297,87 @@ export async function setTeam(memberId: string, team: string) {
 }
 
 /**
- * Saves the coach's names for the teams, plus each team's meeting time and link for "Add to calendar".
- * A blank name goes back to "Monday team" and so on; a blank time turns the calendar buttons off.
+ * Saves the coach's names for the teams, plus the day each team meets and its meeting time and link for "Add to calendar".
+ * A blank name keeps the team's current name; a blank time turns the calendar buttons off.
  */
 export async function renameTeams(formData: FormData) {
-  const { supabase } = await requireCoach();
-  if (TEAMS.some((t) => { const u = str(formData.get(`url_${t}`), 500); return u && !/^https?:\/\/\S+$/.test(u); })) redirect("/coach/teams?error=link");
-  const rows = TEAMS.map((team) => {
+  const { supabase, names } = await requireCoach();
+  const teams = teamKeys();
+  if (teams.some((t) => { const u = str(formData.get(`url_${t}`), 500); return u && !/^https?:\/\/\S+$/.test(u); })) redirect("/coach/teams?error=link");
+  for (const team of teams) {
     const time = str(formData.get(`time_${team}`), 5);
     const minutes = Math.round(Number(formData.get(`minutes_${team}`)));
     const url = str(formData.get(`url_${team}`), 500);
     const tz = str(formData.get(`tz_${team}`), 64);
-    return {
-      team, name: str(formData.get(`name_${team}`), 40) || `${team} team`,
+    const day = str(formData.get(`day_${team}`), 10);
+    const { error } = await supabase.from("team_names").update({
+      name: str(formData.get(`name_${team}`), 40) || teamLabel(team, names),
+      meeting_day: (DAYS as readonly string[]).includes(day) ? day : "",
       meeting_time: /^([01]\d|2[0-3]):[0-5]\d$/.test(time) ? time : "",
       meeting_minutes: minutes >= 15 && minutes <= 240 ? minutes : 60,
       meeting_url: /^https?:\/\/\S+$/.test(url) ? url : "",
       meeting_tz: isTimeZone(tz) ? tz : "",
-    };
-  });
-  const { error } = await supabase.from("team_names").upsert(rows);
+    }).eq("team", team);
+    if (error) redirect("/coach/teams?error=1");
+  }
   revalidatePath("/", "layout");
-  redirect(error ? "/coach/teams?error=1" : "/coach/teams?saved=1");
+  redirect("/coach/teams?saved=1");
+}
+
+/** A new team's key: a slug of its name plus a few random characters, like "t-friday-men-3fa2". Keys never change, even on rename. */
+function newTeamKey(name: string) {
+  const slug = name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24).replace(/-+$/, "");
+  const rand = Array.from(crypto.getRandomValues(new Uint8Array(2)), (b) => b.toString(16).padStart(2, "0")).join("");
+  return ["t", slug, rand].filter(Boolean).join("-");
+}
+
+/** Coach only: adds a team. New teams use the Focus cards. */
+export async function createTeam(formData: FormData) {
+  const { supabase } = await requireCoach();
+  const name = str(formData.get("name"), 40);
+  const day = str(formData.get("day"), 10);
+  if (!name) redirect("/coach/teams?error=newname");
+  const team = newTeamKey(name);
+  const { error } = await supabase.from("team_names").insert({
+    team, name, meeting_day: (DAYS as readonly string[]).includes(day) ? day : "", meeting_minutes: 60,
+  });
+  revalidatePath("/", "layout");
+  redirect(error ? "/coach/teams?error=create" : `/coach/teams?created=${team}#team-${team}`);
+}
+
+/**
+ * Coach only: deletes a whole team. Its members (archived ones too) first move to another team,
+ * end up on no team, or are archived, as the coach picked. The team's pending invites, meeting
+ * check-ins and intention go with it. Members' cards, comments and history stay with them.
+ */
+export async function deleteTeam(formData: FormData) {
+  const { supabase } = await requireCoach();
+  const team = str(formData.get("team"), 40);
+  const then = str(formData.get("members"), 60);
+  if (!isTeam(team)) redirect("/coach/teams?error=delete");
+  if (formData.get("confirm") !== "yes") redirect("/coach/teams?error=confirm#delete-team");
+  const { data: rows } = await supabase.from("profiles").select("id, archived_at").eq("team", team).neq("role", "coach");
+  const ids = (rows ?? []).map((r) => r.id as string);
+  if (ids.length) {
+    if (then.startsWith("move:")) {
+      const to = then.slice(5);
+      if (!isTeam(to) || to === team) redirect("/coach/teams?error=moveto#delete-team");
+      const { error } = await supabase.from("profiles").update({ team: to }).in("id", ids);
+      if (error) redirect("/coach/teams?error=delete");
+    } else if (then === "archive") {
+      const active = (rows ?? []).filter((r) => !r.archived_at).map((r) => r.id as string);
+      const { error } = await supabase.from("profiles").update({ archived_at: new Date().toISOString(), team: null }).in("id", active);
+      if (error) redirect("/coach/teams?error=delete");
+      if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        const admin = createAdminClient();
+        for (const id of active) await admin.auth.admin.updateUserById(id, { ban_duration: "876000h" });
+      }
+    } else if (then !== "none") redirect("/coach/teams?error=delete");
+  }
+  // Anyone left (no team, or archived earlier) ends up with no team when the row goes.
+  const { error } = await supabase.from("team_names").delete().eq("team", team);
+  revalidatePath("/", "layout");
+  redirect(error ? "/coach/teams?error=delete" : "/coach/teams?deleted=1");
 }
 
 /** Sends Supabase's invite email. The name fills {{ .Data.name }} in the Invite user template and becomes their profile name. */

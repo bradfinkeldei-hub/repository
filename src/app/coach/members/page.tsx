@@ -4,7 +4,7 @@ import { Header } from "@/components/header";
 import { TeamColumn } from "@/components/team-column";
 import { AutoSubmitSelect } from "@/components/client";
 import { archiveMember, cancelInvite, inviteMember, removeMember, resendInvite, restoreMember, resetFreeCall, setTeam, startViewAs } from "@/app/actions";
-import { BOOKING_ENABLED, isTeam, monthKey, teamLabel, teamOptions, type Booking, type Profile, type Team } from "@/lib/coaching";
+import { BOOKING_ENABLED, isTeam, teamKeys, monthKey, teamLabel, teamOptions, type Booking, type Profile, type Team } from "@/lib/coaching";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 const MESSAGES: Record<string, [string, boolean]> = {
@@ -40,7 +40,7 @@ export default async function MembersPage({ searchParams: sp }: { searchParams: 
   const email = new Map((contacts ?? []).map((c) => [c.id as string, c.email as string]));
   const monthBookings = (bookings ?? []) as Booking[];
   const msg = Object.keys(MESSAGES).find((k) => searchParams[k] || searchParams.error === k);
-  const defaultTeam = isTeam(searchParams.team) ? searchParams.team : "Monday";
+  const defaultTeam = isTeam(searchParams.team) ? searchParams.team : teamKeys()[0];
 
   return (
     <>
