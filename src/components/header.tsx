@@ -22,10 +22,15 @@ export const PILOT_TABS = [
 /** The coach's top tabs for the selected team. */
 export function coachTabs(team: string, openCount?: number) {
   const href = (t: string) => `/coach?team=${team}&tab=${t}`;
+  // The Pilot group's cards carry Focus, Mission and Progress, so the board needs only Coaches actions beside it.
+  if (team === "Pilot") return [
+    { key: "team", label: "Group board", href: href("team") },
+    { key: "actions", label: "Coaches actions", href: href("actions"), count: openCount },
+  ];
   return [
-    { key: "team", label: team === "Pilot" ? "Group board" : "Team", href: href("team") },
+    { key: "team", label: "Team", href: href("team") },
     { key: "accountability", label: "Accountability", href: href("accountability") },
-    ...(team === "Pilot" ? [] : [{ key: "missions", label: "Missions", href: href("missions") }]),
+    { key: "missions", label: "Missions", href: href("missions") },
     { key: "progress", label: "Progress", href: href("progress") },
     { key: "actions", label: "Coaches actions", href: href("actions"), count: openCount },
   ];
