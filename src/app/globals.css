@@ -756,3 +756,5 @@ tr:last-child td { border-bottom: 0; }
 .sprint-grid li.missed { background: color-mix(in srgb, var(--alert) 10%, var(--earth-card, var(--surface))); border-color: color-mix(in srgb, var(--alert) 30%, var(--earth-line, var(--line))); }
 .sprint-grid li.open { border: 2px dashed var(--tint, var(--accent)); }
 .sprint-grid li.ahead { opacity: 0.55; border-style: dotted; }
+.focus-card .card-tabs button { line-height: 1.15; text-align: center; padding-inline: 4px; }
+.focus-card .card-tabs button:last-child { flex: 1.7; }

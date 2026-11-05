@@ -82,7 +82,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
         )}
         {viewing && searchParams.readonly && <div className="notice">You&apos;re viewing as {me.name || "this member"}, so nothing saves. Use Exit member view at the bottom to make changes.</div>}
         {pilot && searchParams.focus === "done" && (
-          <div className="notice good">Your card is on the Group board. Where you&apos;re starting is now your first commitment for this week. Tick it off in the Progress tab on your card.</div>
+          <div className="notice good">Your card is on the Group board. Where you&apos;re starting is now your first commitment for this week. Tick it off in the Accountability tracker tab on your card.</div>
         )}
         {social?.fresh && social.fresh.comments + social.fresh.kudos > 0 && (
           <div className="notice good new-note" data-new-for={`thread-${me.id}`}>
