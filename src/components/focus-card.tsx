@@ -5,7 +5,7 @@ import { CardTabs } from "@/components/card-tabs";
 import { Thread } from "@/components/thread";
 import { CoachNotes } from "@/components/notes";
 import { dateKey, firstName, meetingDate, shortDate, sprintOf, TRACK_CHOICES, weekKey, type Profile, type Progress, type TeamNames } from "@/lib/coaching";
-import { addProudMoment, deleteProudMoment, setTrackWeeks } from "@/app/actions";
+import { addProudMoment, deleteProudMoment, setTrackWeeks, setWeekDone } from "@/app/actions";
 import { focusProgress, isShared, MEASURE_KINDS, progressLabel, type Focus } from "@/lib/focus";
 import type { CoachNote, ProudMoment, Social } from "@/lib/social";
 
@@ -180,18 +180,31 @@ function ProgressPanel({ m, viewer, checked, p, startedAt, trackWeeks, hasCard }
             <span className="sprint-count">{s.done} done</span>
           </div>
           <ol className="sprint-grid">
-            {s.cells.map((c) => (
-              <li key={c.week} className={c.status} title={`Week ${c.n}, ${shortDate(c.date)}: ${CELL[c.status]}`}>
-                <b>{c.status === "done" ? "\u2713" : c.n}</b>
-                <small>{shortDate(c.date)}</small>
-                <span className="sr">Week {c.n}, {shortDate(c.date)}: {CELL[c.status]}</span>
-              </li>
-            ))}
+            {s.cells.map((c) => {
+              const face = (
+                <>
+                  <b>{c.status === "done" ? "\u2713" : c.n}</b>
+                  <small>{shortDate(c.date)}</small>
+                  <span className="sr">Week {c.n}, {shortDate(c.date)}: {CELL[c.status]}</span>
+                </>
+              );
+              // Past weeks (and this one) can be marked done, or undone, with a tap.
+              return (
+                <li key={c.week} className={c.status} title={`Week ${c.n}, ${shortDate(c.date)}: ${CELL[c.status]}${canEdit && c.status !== "ahead" ? ". Tap to change" : ""}`}>
+                  {canEdit && c.status !== "ahead" ? (
+                    <form action={setWeekDone.bind(null, m.id, c.week, c.status !== "done")}>
+                      <button type="submit" aria-pressed={c.status === "done"}>{face}</button>
+                    </form>
+                  ) : face}
+                </li>
+              );
+            })}
           </ol>
+          {canEdit && <p className="muted small-note">Missed marking a week? Tap any past week to mark it done.</p>}
           <p className="muted small-note">{s.length} weeks, starting the week of {shortDate(meetingDate(start, m.team))}. After week {s.length}, the next {s.length} weeks begin.</p>
           {canEdit && (
             <details className="track-change">
-              <summary>Change how many weeks</summary>
+              <summary>How long do you want to be held accountable?</summary>
               <TrackChoices m={m} current={s.length} />
             </details>
           )}
