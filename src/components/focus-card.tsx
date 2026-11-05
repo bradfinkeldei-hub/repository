@@ -166,6 +166,12 @@ function ProgressPanel({ m, viewer, checked, p, startedAt, trackWeeks, hasCard }
     <div className="focus-progress">
       <p className="muted">{isMe ? "Did you do what you said this week? Tap the box when it's done." : `What ${firstName(m.name)} said they'd do this week.`}</p>
       <Commitments m={m} viewer={viewer} checked={checked} />
+      {s && canEdit && (
+        <details className="track-change">
+          <summary>How long do you want to be held accountable?</summary>
+          <TrackChoices m={m} current={s.length} />
+        </details>
+      )}
       {hasCard && !s && (canEdit ? (
         <div className="track-pick">
           <span className="label">{isMe ? "How long do you want to be held accountable?" : `How long does ${firstName(m.name)} want to be held accountable?`}</span>
@@ -202,12 +208,6 @@ function ProgressPanel({ m, viewer, checked, p, startedAt, trackWeeks, hasCard }
           </ol>
           {canEdit && <p className="muted small-note">Missed marking a week? Tap any past week to mark it done.</p>}
           <p className="muted small-note">{s.length} weeks, starting the week of {shortDate(meetingDate(start, m.team))}. After week {s.length}, the next {s.length} weeks begin.</p>
-          {canEdit && (
-            <details className="track-change">
-              <summary>How long do you want to be held accountable?</summary>
-              <TrackChoices m={m} current={s.length} />
-            </details>
-          )}
         </div>
       )}
     </div>
