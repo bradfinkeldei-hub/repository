@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/session";
-import { Header, MEMBER_TABS, PILOT_TABS } from "@/components/header";
+import { Header, MEMBER_TABS } from "@/components/header";
 import { TeamViews, type Tab } from "@/components/cards";
 import { loadCheckins } from "@/lib/checkin";
 import { loadChecked, loadFocus, loadIntentions, loadSocial, loadThreadSeen, unseen } from "@/lib/social";
@@ -14,7 +14,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
   const { supabase, me, names, viewing } = await requireProfile();
   if (me.role === "coach") redirect("/coach");
   const pilot = isPilot(me.team);
-  const tab = ((pilot ? ["team", "accountability"] : ["team", "accountability", "missions"]).includes(searchParams.tab ?? "") ? searchParams.tab : "team") as Tab;
+  const tab = ((pilot ? ["team"] : ["team", "accountability", "missions"]).includes(searchParams.tab ?? "") ? searchParams.tab : "team") as Tab;
   const coach = process.env.COACH_NAME || "your coach";
 
   if (!me.team) {
@@ -62,7 +62,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
     <>
       <Header me={me}
         sub={teamLabel(me.team, names)}
-        tabs={pilot ? PILOT_TABS : MEMBER_TABS}
+        tabs={pilot ? [] : MEMBER_TABS}
         current={tab}
         right={BOOKING_ENABLED ? <Link className="btn sun ghost" href="/book">Feeling stuck? Book a call</Link> : undefined}
       />
@@ -82,7 +82,7 @@ export default async function TeamPage({ searchParams: sp }: { searchParams: Pro
         )}
         {viewing && searchParams.readonly && <div className="notice">You&apos;re viewing as {me.name || "this member"}, so nothing saves. Use Exit member view at the bottom to make changes.</div>}
         {pilot && searchParams.focus === "done" && (
-          <div className="notice good">Your card is on the Group board. Where you&apos;re starting is now your first commitment for this week.</div>
+          <div className="notice good">Your card is on the Group board. Where you&apos;re starting is now your first commitment for this week. Tick it off in the Progress tab on your card.</div>
         )}
         {social?.fresh && social.fresh.comments + social.fresh.kudos > 0 && (
           <div className="notice good new-note" data-new-for={`thread-${me.id}`}>

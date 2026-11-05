@@ -798,3 +798,16 @@ export async function setFocusNow(memberId: string, formData: FormData) {
   if (Number.isFinite(n)) await supabase.from("focus_cards").update({ measure_now: n, updated_at: new Date().toISOString() }).eq("member_id", memberId);
   revalidatePath("/", "layout");
 }
+
+/** Saves a member's mission from the guided mission questions (Pilot group card). */
+export async function saveMission(memberId: string, mission: string): Promise<{ ok: boolean; error?: string }> {
+  const { supabase, me } = await requireEditor();
+  const id = memberId || me.id;
+  if (id !== me.id && me.role !== "coach") return { ok: false, error: "You can only change your own mission." };
+  const text = String(mission ?? "").replace(/\s+/g, " ").trim().slice(0, 600);
+  if (!text) return { ok: false, error: "Write your mission to save it." };
+  const { error } = await supabase.from("profiles").update({ mission: text }).eq("id", id);
+  if (error) return { ok: false, error: "That didn't save. Check your connection and try again." };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
