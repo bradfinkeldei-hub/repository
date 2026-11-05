@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { saveFocus } from "@/app/actions";
+import { saveFocus, saveOtherFocus } from "@/app/actions";
 import { FOCUS_STEPS, isShared, SHARE_IN_GROUP, type FocusAnswers, type FocusStep } from "@/lib/focus";
 
 /** The seven questions, counted for the "3 of 7" label. "pick" belongs to question 1. */
@@ -11,7 +11,7 @@ const TITLE: Partial<Record<FocusStep, string>> = {
   topic: "Topic", pick: "Topic", outcome: "Outcome", measure: "Measurement", meaning: "Meaning", start: "Starting point", summary: "Check", held: "Accountability",
 };
 
-export function FocusWalkthrough({ memberId, firstName, coachName, initial, startAt, doneHref, practice, forCoach }: {
+export function FocusWalkthrough({ memberId, firstName, coachName, initial, startAt, doneHref, practice, forCoach, other }: {
   /** Whose card this is. Empty for your own. */
   memberId: string;
   firstName: string;
@@ -23,6 +23,8 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
   practice?: boolean;
   /** The coach filling in a member's answers. */
   forCoach?: boolean;
+  /** Answering one of their other focuses (by name) instead of the main one. */
+  other?: string;
 }) {
   const router = useRouter();
   const [a, setA] = useState<FocusAnswers>({ ...initial, topics: initial.topics.length ? initial.topics : [""] });
@@ -40,7 +42,7 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
     const answers = { ...a, ...patch, topics, step: FOCUS_STEPS.indexOf(next) };
     if (Object.keys(patch).length) setA((x) => ({ ...x, ...patch }));
     start(async () => {
-      const r = await saveFocus(memberId, answers, finish);
+      const r = other ? await saveOtherFocus(memberId, other, answers, finish) : await saveFocus(memberId, answers, finish);
       if (!r.ok) { setError(r.error ?? "That didn't save."); return; }
       if (finish) { router.push(doneHref); router.refresh(); return; }
       setStep(next);
@@ -93,11 +95,12 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
   return (
     <div className="walk">
       <div className="walk-top">
-        <span>{q ? `${q} of 7 · ${TITLE[step]}` : practice ? "Practice run" : "Welcome"}</span>
-        <span className="walk-dots" aria-hidden="true">{[1, 2, 3, 4, 5, 6, 7].map((i) => <i key={i} className={q && i <= q ? "on" : ""} />)}</span>
+        <span>{other ? `Other focus · ${TITLE[step]}` : q ? `${q} of 7 · ${TITLE[step]}` : practice ? "Practice run" : "Welcome"}</span>
+        {!other && <span className="walk-dots" aria-hidden="true">{[1, 2, 3, 4, 5, 6, 7].map((i) => <i key={i} className={q && i <= q ? "on" : ""} />)}</span>}
       </div>
       {practice && <p className="notice walk-practice">You&apos;re trying the questions as the coach. Your answers are saved to your own practice card and don&apos;t show on the board.</p>}
       {forCoach && <p className="notice walk-practice">You&apos;re filling in {firstName}&apos;s answers. They see them on their card.</p>}
+      {other && !forCoach && <p className="notice walk-practice">These are the same questions as your main focus, for one of your other focuses. Your main focus doesn&apos;t change.</p>}
 
       <section className="walk-screen" aria-live="polite">
         {step === "welcome" && (
@@ -183,7 +186,7 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
         {step === "start" && (
           <>
             <h1>Where should we start to get this outcome?</h1>
-            <p className="hint">This also becomes {your} first weekly commitment, so make it something {you} can do before the next meeting.</p>
+            <p className="hint">{other ? `A first step ${you} could take soon to get going.` : <>This also becomes {your} first weekly commitment, so make it something {you} can do before the next meeting.</>}</p>
             <textarea className="input" readOnly={isShared(a.start_point)} id="start" rows={3} maxLength={300} value={a.start_point} onChange={(e) => set("start_point", e.target.value)}
               placeholder="e.g. List the people who already know what I do and reach out to five of them" />
             <ShareToggle on={isShared(a.start_point)} onChange={(on) => set("start_point", on ? SHARE_IN_GROUP : "")} />
@@ -194,12 +197,12 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
           <>
             <h1>Here&apos;s what I heard</h1>
             <ul className="walk-summary">
-              <li><span>{forCoach ? `${firstName} wants` : "You want"} to work on <Said v={a.focus} />.</span><button type="button" className="linkish" onClick={() => fix(topics.length > 1 ? "pick" : "topic")}>Change</button></li>
+              <li><span>{forCoach ? `${firstName} wants` : "You want"} to work on <Said v={a.focus} />.</span>{!other && <button type="button" className="linkish" onClick={() => fix(topics.length > 1 ? "pick" : "topic")}>Change</button>}</li>
               <li><span>{forCoach ? "They want" : "You want"} to create <Said v={a.outcome} />.</span><button type="button" className="linkish" onClick={() => fix("outcome")}>Change</button></li>
               <li><span>{forCoach ? "They'll" : "You'll"} know {forCoach ? "they've" : "you've"} got it when <Said v={a.measure} />.</span><button type="button" className="linkish" onClick={() => fix("measure")}>Change</button></li>
             </ul>
             <h2>Do I have that right?</h2>
-            {topics.length > 1 && <p className="hint">Saved for later: {topics.filter((t) => t !== a.focus).join(", ")}.</p>}
+            {!other && topics.length > 1 && <p className="hint">Saved for later: {topics.filter((t) => t !== a.focus).join(", ")}.</p>}
           </>
         )}
 
@@ -216,11 +219,11 @@ export function FocusWalkthrough({ memberId, firstName, coachName, initial, star
       </section>
 
       <div className="walk-nav">
-        {step !== "welcome" && <button type="button" className="btn ghost" onClick={back} disabled={saving}>{backTo ? "Cancel" : "Back"}</button>}
+        {step !== "welcome" && !(other && step === "outcome" && !backTo) && <button type="button" className="btn ghost" onClick={back} disabled={saving}>{backTo ? "Cancel" : "Back"}</button>}
         {step === "summary" ? (
           <button type="button" className="btn" onClick={next} disabled={saving}>Yes, that&apos;s it</button>
         ) : step === "held" ? (
-          <button type="button" className="btn" onClick={() => valid() && save("held", true)} disabled={saving}>{saving ? "Building…" : forCoach ? "Save their card" : "Build my member info card"}</button>
+          <button type="button" className="btn" onClick={() => valid() && save("held", true)} disabled={saving}>{saving ? "Saving…" : other ? "Save this focus" : forCoach ? "Save their card" : "Build my member info card"}</button>
         ) : (
           <button type="button" className="btn" onClick={next} disabled={saving}>{saving ? "Saving…" : step === "welcome" ? "Let's start" : backTo ? "Back to summary" : "Next"}</button>
         )}
