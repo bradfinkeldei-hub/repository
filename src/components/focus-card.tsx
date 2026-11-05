@@ -151,7 +151,7 @@ function FocusRows({ a, label }: { a: Pick<Focus, "focus" | "outcome" | "measure
  */
 function LaterList({ m, later, defined, canEdit, isMe, href }: { m: Profile; later: string[]; defined: string[]; canEdit: boolean; isMe: boolean; href: (t: string) => string }) {
   return (
-    <details className="fold later-list">
+    <details className="fold later-list" open={canEdit && later.length === 0}>
       <summary><h4>{isMe ? "My other focuses" : "Other focuses"}</h4><span className="pill">{later.length}</span></summary>
       {later.length > 0 ? (
         <ul className={canEdit ? "later-edit" : undefined}>
@@ -175,12 +175,12 @@ function LaterList({ m, later, defined, canEdit, isMe, href }: { m: Profile; lat
           })}
         </ul>
       ) : (
-        <p className="hint">{isMe ? "Nothing here yet. Add anything else you want to work on later, so it doesn't get lost." : `${firstName(m.name)} hasn't added any other focuses yet.`}</p>
+        <p className="hint">{isMe ? "None yet. Add another focus below, anything else you want to work on, so it doesn't get lost." : `${firstName(m.name)} hasn't added any other focuses yet.`}</p>
       )}
       {canEdit && later.length < 10 && (
         <form className="later-add" action={addLaterFocus.bind(null, m.id)}>
           <input type="text" name="focus" maxLength={300} required aria-label="Another focus" placeholder="e.g. Get back to the gym" />
-          <button className="btn small" type="submit">Add</button>
+          <button className="btn small" type="submit">{later.length ? "Add" : "+ Add a focus"}</button>
         </form>
       )}
     </details>
