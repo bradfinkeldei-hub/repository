@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCoach, requireEditor, requireProfile, requireRealCoach, VIEW_AS_COOKIE } from "@/lib/session";
-import { ABSENT_STEPS, AREAS, ASSUMED, CANT_MAKE_IT, missingDetails, usesFocusCards, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
+import { ABSENT_STEPS, AREAS, ASSUMED, CANT_MAKE_IT, missingDetails, usesFocusCards, TRACK_CHOICES, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
 import { sendEmails } from "@/lib/mail";
 import { rsvpLink } from "@/lib/rsvp";
 import { cleanFocus, focusGaps, type FocusAnswers } from "@/lib/focus";
@@ -810,4 +810,33 @@ export async function saveMission(memberId: string, mission: string): Promise<{ 
   if (error) return { ok: false, error: "That didn't save. Check your connection and try again." };
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/** Sets how many weeks a member wants to be held accountable and tracked. */
+export async function setTrackWeeks(memberId: string, weeks: number) {
+  const { supabase, me } = await requireEditor();
+  if (memberId !== me.id && me.role !== "coach") return;
+  const n = Math.round(Number(weeks));
+  if (!(TRACK_CHOICES as readonly number[]).includes(n)) return;
+  await supabase.from("focus_cards").update({ track_weeks: n, updated_at: new Date().toISOString() }).eq("member_id", memberId);
+  revalidatePath("/", "layout");
+}
+
+/** Writes down a proud moment on a member's card. */
+export async function addProudMoment(memberId: string, formData: FormData) {
+  const { supabase, me } = await requireEditor();
+  if (memberId !== me.id && me.role !== "coach") return;
+  const body = str(formData.get("body"), 600);
+  if (!body) return;
+  const day = String(formData.get("happened_on") ?? "");
+  const happened_on = /^\d{4}-\d{2}-\d{2}$/.test(day) && day <= dateKey(new Date(), TZ) ? day : dateKey(new Date(), TZ);
+  await supabase.from("proud_moments").insert({ member_id: memberId, body, happened_on, private: formData.get("private") === "on" });
+  revalidatePath("/", "layout");
+}
+
+export async function deleteProudMoment(id: string) {
+  const { supabase } = await requireEditor();
+  // The database only lets the member or the coach remove it.
+  await supabase.from("proud_moments").delete().eq("id", id);
+  revalidatePath("/", "layout");
 }

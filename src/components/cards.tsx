@@ -10,7 +10,7 @@ import { CoachNotes } from "@/components/notes";
 import { TeamPulse } from "@/components/pulse";
 import { Intention } from "@/components/intention";
 import type { Checkin } from "@/lib/checkin";
-import type { CoachNote, Social } from "@/lib/social";
+import type { CoachNote, ProudMoment, Social } from "@/lib/social";
 import type { Focus } from "@/lib/focus";
 import { FocusBoard } from "@/components/focus-card";
 
@@ -216,7 +216,7 @@ export function MissionCard({ m, viewer }: { m: Profile; viewer: Profile }) {
 export type Tab = "team" | "accountability" | "missions";
 
 /** The Team, Accountability and Missions views for one or more teams. */
-export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins, social, checked, notes, intentions, nudges, sel, focus }: {
+export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins, social, checked, notes, intentions, nudges, sel, focus, proud }: {
   tab: Tab; groups: { team: Team | null; members: Profile[] }[]; viewer: Profile; ownTeam?: boolean; logs?: Record<string, Progress>; names?: TeamNames;
   checkins?: Partial<Record<Team, Checkin>>; social?: Social | null; checked?: Record<string, string[]>;
   /** The coach's private notes by member id. Only the coach page passes these. */
@@ -228,6 +228,8 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins,
   sel?: string;
   /** The Pilot group's Focus cards by member id. Its Team tab shows these as a Group board. */
   focus?: Record<string, Focus> | null;
+  /** Proud moments by member id, for the Focus cards. */
+  proud?: Record<string, ProudMoment[]> | null;
 }) {
   const multi = groups.length > 1;
   const avatars = Object.fromEntries(groups.flatMap((g) => g.members).filter((m) => m.avatar_url).map((m) => [m.id, m.avatar_url]));
@@ -240,7 +242,7 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins,
         if (tab === "team" && usesFocusCards(team)) {
           body = (
             <>
-              <FocusBoard members={members} focus={focus ?? {}} viewer={viewer} names={names} social={social} avatars={avatars} checked={checked} notes={notes} logs={logs} />
+              <FocusBoard members={members} focus={focus ?? {}} viewer={viewer} names={names} social={social} avatars={avatars} checked={checked} notes={notes} logs={logs} proud={proud} />
               {team && checkins?.[team] && <MeetingCheckin team={team} label={teamLabel(team, names)} members={members} viewer={viewer} c={checkins[team]} />}
             </>
           );
