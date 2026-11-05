@@ -12,7 +12,7 @@ import { EMPTY_FOCUS, FOCUS_STEPS, type Focus, type FocusAnswers } from "@/lib/f
  * can try it on a practice card (?practice=1) or fill in a member's answers (?id=).
  * ?edit=1 opens at the summary so a finished card can be changed.
  */
-export default async function FocusPage({ searchParams: sp }: { searchParams: Promise<{ id?: string; practice?: string; edit?: string; done?: string; restart?: string }> }) {
+export default async function FocusPage({ searchParams: sp }: { searchParams: Promise<{ id?: string; practice?: string; edit?: string; done?: string; restart?: string; other?: string }> }) {
   const searchParams = await sp;
   // Starting over is only for the coach's practice run.
   if (searchParams.restart && !searchParams.practice) delete searchParams.restart;
@@ -51,6 +51,25 @@ export default async function FocusPage({ searchParams: sp }: { searchParams: Pr
             <Link className="btn" href={board}>Back to the Group board</Link>
             <Link className="btn ghost" href="/focus?practice=1&restart=1">Start over</Link>
           </div>
+        </div>
+      </>
+    );
+  }
+
+  // One of their other focuses: the same questions, from "outcome" on, saved beside the main one.
+  if (searchParams.other !== undefined && !practice) {
+    const name = searchParams.other;
+    if (!saved?.confirmed_at || !saved.later.includes(name)) redirect(board);
+    const had = saved.later_details?.[name];
+    const answers: FocusAnswers = { ...EMPTY_FOCUS, ...(had ?? {}), topics: [name], focus: name, later: [] };
+    const at = had?.confirmed_at ? "summary" : FOCUS_STEPS[Math.max(FOCUS_STEPS.indexOf("outcome"), Math.min(FOCUS_STEPS.length - 1, had?.step ?? 0))];
+    return (
+      <>
+        <Header me={me} sub={coach ? `${who.name}'s other focus` : "Another focus"} tabs={[]} current="" />
+        <div className="wrap walk-wrap">
+          <FocusWalkthrough key={`other-${name}`} memberId={who.id === me.id ? "" : who.id} firstName={firstName(who.name)} coachName={coachName}
+            initial={answers} startAt={at} doneHref={`${board}#member-${who.id}`} forCoach={coach} other={name} />
+          <p className="walk-leave"><Link href={board}>Leave without changing anything</Link></p>
         </div>
       </>
     );

@@ -658,12 +658,26 @@ tr:last-child td { border-bottom: 0; }
 .later-list ul { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
 .later-list li { background: var(--sun-soft); border-radius: 999px; padding: 4px 11px; font-size: 0.86rem; }
 .later-list h4 { margin: 0; font-size: 0.95rem; }
-.later-list li { display: inline-flex; align-items: center; gap: 4px; }
-.later-list li form { display: contents; }
-.later-remove { border: 0; background: none; color: var(--muted); font-size: 1rem; line-height: 1; padding: 0 2px; cursor: pointer; }
-.later-remove:hover { color: var(--alert); }
+.later-list li { display: inline-flex; align-items: center; gap: 6px; }
+.later-list ul.later-edit { flex-direction: column; align-items: flex-start; }
+.focus-card .later-list li.later-item { padding: 0; background: none; display: block; }
+.later-num { display: inline-grid; place-items: center; min-width: 20px; height: 20px; border-radius: 50%; background: var(--tint, var(--accent)); color: #fff; font-size: 0.72rem; font-weight: 750; font-style: normal; }
+.later-chip > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 4px; background: color-mix(in srgb, var(--tint, var(--accent)) 14%, var(--earth-card, var(--surface))); font-size: 0.86rem; }
+.later-chip > summary::-webkit-details-marker { display: none; }
+.later-chip > summary::after { content: "▾"; color: var(--muted); font-size: 0.75rem; }
+.later-chip[open] > summary { outline: 2px solid color-mix(in srgb, var(--tint, var(--accent)) 50%, transparent); }
+.later-menu { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 2px 6px; }
+.later-menu form { display: contents; }
+.later-menu .hint { flex-basis: 100%; margin: 0; }
 .later-add { display: flex; gap: 8px; margin-top: 10px; }
 .later-add input { flex: 1; min-width: 0; }
+.focus-subtabs { display: flex; gap: 6px; align-items: center; }
+.focus-subtabs::before { content: "Focuses"; font-size: 0.72rem; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
+.focus-subtabs button { font: inherit; font-weight: 750; font-size: 0.86rem; width: 32px; height: 32px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--tint, var(--accent)) 45%, var(--line)); background: var(--earth-card, var(--surface)); color: var(--tint, var(--accent)); cursor: pointer; }
+.focus-subtabs button[aria-selected="true"] { background: var(--tint, var(--accent)); color: #fff; border-color: var(--tint, var(--accent)); }
+.focus-subtabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.other-actions { align-items: center; gap: 12px; }
+.other-actions form { display: contents; }
 .later-list .hint { margin: 8px 0 0; }
 .edit-focus { align-self: flex-start; }
 .walk-remove { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 1.3rem; line-height: 1; cursor: pointer; }

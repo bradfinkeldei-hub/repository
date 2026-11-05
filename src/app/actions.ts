@@ -9,7 +9,7 @@ import { requireCoach, requireEditor, requireProfile, requireRealCoach, MEMBER_V
 import { ABSENT_STEPS, AREAS, ASSUMED, CANT_MAKE_IT, missingDetails, usesFocusCards, TRACK_CHOICES, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
 import { sendEmails } from "@/lib/mail";
 import { rsvpLink } from "@/lib/rsvp";
-import { cleanFocus, focusGaps, type FocusAnswers } from "@/lib/focus";
+import { cleanFocus, focusGaps, OTHER_FIELDS, swapMainFocus, type Focus, type FocusAnswers, type OtherFocus } from "@/lib/focus";
 
 const TZ = process.env.REMINDER_TIMEZONE;
 const str = (v: FormDataEntryValue | null, max: number) => String(v ?? "").trim().slice(0, max);
@@ -839,9 +839,50 @@ export async function addLaterFocus(memberId: string, formData: FormData) {
 export async function removeLaterFocus(memberId: string, item: string) {
   const { supabase, me } = await requireEditor();
   if (memberId !== me.id && me.role !== "coach") return;
-  const { data: card } = await supabase.from("focus_cards").select("later").eq("member_id", memberId).maybeSingle();
+  const { data: card } = await supabase.from("focus_cards").select("*").eq("member_id", memberId).maybeSingle();
   if (!card) return;
-  await supabase.from("focus_cards").update({ later: (card.later ?? []).filter((t: string) => t !== item), updated_at: new Date().toISOString() }).eq("member_id", memberId);
+  const patch: Record<string, unknown> = { later: (card.later ?? []).filter((t: string) => t !== item), updated_at: new Date().toISOString() };
+  // Its answers go with it. Skipped if the column isn't there yet.
+  if (card.later_details && item in card.later_details) {
+    const { [item]: _gone, ...rest } = card.later_details;
+    patch.later_details = rest;
+  }
+  await supabase.from("focus_cards").update(patch).eq("member_id", memberId);
+  revalidatePath("/", "layout");
+}
+
+/** Saves the answers for one of a member's other focuses, as they go through its questions. */
+export async function saveOtherFocus(memberId: string, name: string, answers: Partial<Record<keyof FocusAnswers, unknown>>, finish = false): Promise<{ ok: boolean; error?: string }> {
+  const { supabase, me } = await requireEditor();
+  const id = memberId || me.id;
+  if (id !== me.id && me.role !== "coach") return { ok: false, error: "You can only change your own card." };
+  const { data: card } = await supabase.from("focus_cards").select("later, later_details").eq("member_id", id).maybeSingle();
+  if (!card || !(card.later ?? []).includes(name)) return { ok: false, error: "That focus isn't on the list anymore." };
+  const f = cleanFocus({ ...answers, topics: [name], focus: name });
+  if (finish && focusGaps(f).length) return { ok: false, error: `Still blank: ${focusGaps(f).map(([, l]) => l).join(", ")}.` };
+  const details: Record<string, OtherFocus> = card.later_details ?? {};
+  const was = details[name];
+  // An answered focus only changes when they confirm again.
+  if (!finish && was?.confirmed_at) return { ok: true };
+  const entry = Object.fromEntries(OTHER_FIELDS.map((k) => [k, f[k]])) as Omit<OtherFocus, "confirmed_at">;
+  const { error } = await supabase.from("focus_cards").update({
+    later_details: { ...details, [name]: { ...entry, confirmed_at: finish ? new Date().toISOString() : was?.confirmed_at ?? null } },
+    updated_at: new Date().toISOString(),
+  }).eq("member_id", id);
+  if (error) return { ok: false, error: "That didn't save. Check your connection and try again." };
+  if (finish) revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** Makes one of a member's answered other focuses their main focus. */
+export async function makeMainFocus(memberId: string, name: string) {
+  const { supabase, me } = await requireEditor();
+  if (memberId !== me.id && me.role !== "coach") return;
+  const { data: card } = await supabase.from("focus_cards").select("*").eq("member_id", memberId).maybeSingle();
+  if (!card) return;
+  const patch = swapMainFocus(card as Focus, name);
+  if (!patch) return;
+  await supabase.from("focus_cards").update({ ...patch, updated_at: new Date().toISOString() }).eq("member_id", memberId);
   revalidatePath("/", "layout");
 }
 

@@ -28,9 +28,17 @@ export type Focus = {
   confirmed_at: string | null;
   /** How many weeks they chose to be held accountable and tracked. Null until they choose. */
   track_weeks?: number | null;
+  /** Answers for the other focuses on the Later list, by name. */
+  later_details?: Record<string, OtherFocus> | null;
 };
 
-export type FocusAnswers = Omit<Focus, "member_id" | "confirmed_at" | "track_weeks">;
+/** An other focus answered like the main one. confirmed_at is set once all its questions are answered. */
+export type OtherFocus = Pick<FocusAnswers, "outcome" | "measure_kind" | "measure" | "measure_start" | "measure_goal" | "measure_now" | "meaning" | "start_point" | "held_by" | "step"> & {
+  confirmed_at: string | null;
+};
+export const OTHER_FIELDS = ["outcome", "measure_kind", "measure", "measure_start", "measure_goal", "measure_now", "meaning", "start_point", "held_by", "step"] as const;
+
+export type FocusAnswers = Omit<Focus, "member_id" | "confirmed_at" | "track_weeks" | "later_details">;
 
 /** The walkthrough's screens, in order. "pick" only shows when they named more than one topic. */
 export const FOCUS_STEPS = ["welcome", "topic", "pick", "outcome", "measure", "meaning", "start", "summary", "held"] as const;
@@ -113,4 +121,31 @@ export function progressLabel(f: Pick<FocusAnswers, "measure_kind" | "measure_st
   if (f.measure_kind === "number") return `${f.measure_now ?? 0} of ${f.measure_goal}`;
   if (f.measure_kind === "feeling") return `Now ${f.measure_now ?? f.measure_start ?? "?"} out of 10, aiming for ${f.measure_goal}`;
   return "";
+}
+
+/** The other focuses that have all their answers, in the order of the Later list. */
+export function definedOthers(f: Pick<Focus, "later" | "later_details">): [string, OtherFocus][] {
+  const d = f.later_details ?? {};
+  return f.later.filter((t) => d[t]?.confirmed_at).map((t) => [t, d[t]]);
+}
+
+/**
+ * Makes an answered other focus the main one. The old main focus, with its answers,
+ * goes to the front of the Later list. Null when that focus isn't answered yet.
+ */
+export function swapMainFocus(f: Focus, name: string): Partial<Focus> | null {
+  const d = { ...(f.later_details ?? {}) };
+  const next = d[name];
+  if (!f.later.includes(name) || !next?.confirmed_at || !f.focus) return null;
+  delete d[name];
+  const old = Object.fromEntries(OTHER_FIELDS.map((k) => [k, f[k]])) as Omit<OtherFocus, "confirmed_at">;
+  d[f.focus] = { ...old, confirmed_at: f.confirmed_at ?? new Date().toISOString() };
+  const nextFields = Object.fromEntries(OTHER_FIELDS.map((k) => [k, next[k]])) as Omit<OtherFocus, "confirmed_at">;
+  return {
+    ...nextFields,
+    focus: name,
+    topics: f.topics.includes(name) ? f.topics : [...f.topics, name],
+    later: [f.focus, ...f.later.filter((t) => t !== name)],
+    later_details: d,
+  };
 }

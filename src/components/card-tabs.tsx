@@ -3,15 +3,15 @@
 import { useId, useState } from "react";
 
 /** Tabs across the top of a member card. Every panel is rendered; only the chosen one shows. */
-export function CardTabs({ tabs, children }: { tabs: { key: string; label: string; dot?: boolean }[]; children: React.ReactNode[] }) {
+export function CardTabs({ tabs, children, className = "card-tabs", label }: { tabs: { key: string; label: string; dot?: boolean; title?: string }[]; children: React.ReactNode[]; className?: string; label?: string }) {
   const [on, setOn] = useState(0);
   const id = useId();
   return (
     <>
-      <div className="card-tabs" role="tablist">
+      <div className={className} role="tablist" aria-label={label}>
         {tabs.map((t, i) => (
           <button key={t.key} type="button" role="tab" id={`${id}-t${i}`} aria-controls={`${id}-p${i}`} aria-selected={on === i}
-            tabIndex={on === i ? 0 : -1} onClick={() => setOn(i)}
+            tabIndex={on === i ? 0 : -1} title={t.title} onClick={() => setOn(i)}
             onKeyDown={(e) => {
               const n = e.key === "ArrowRight" ? (i + 1) % tabs.length : e.key === "ArrowLeft" ? (i + tabs.length - 1) % tabs.length : -1;
               if (n < 0) return;

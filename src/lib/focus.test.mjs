@@ -52,3 +52,22 @@ test("every group except Tuesday uses the Focus cards", async () => {
   for (const t of ["Monday", "Wednesday", "Thursday", "Example", "Pilot"]) assert.equal(usesFocusCards(t), true, t);
   assert.equal(usesFocusCards(null), false);
 });
+
+test("other focuses: answered ones show, and one can become the main focus", async () => {
+  const { definedOthers, swapMainFocus } = await import("./focus.ts");
+  const other = { outcome: "Run 5K", measure_kind: "", measure: "Finish one", measure_start: null, measure_goal: null, measure_now: null, meaning: "Energy", start_point: "Walk", held_by: "Group", step: 8, confirmed_at: "2026-11-01T00:00:00Z" };
+  const card = {
+    member_id: "m", topics: ["Clients"], focus: "Clients", later: ["Gym", "Read"], outcome: "10 clients", measure_kind: "number", measure: "10 signed",
+    measure_start: 0, measure_goal: 10, measure_now: 3, meaning: "Freedom", start_point: "Call 5", held_by: "Coach", step: 8, confirmed_at: "2026-10-01T00:00:00Z",
+    later_details: { Gym: other, Read: { ...other, confirmed_at: null } },
+  };
+  assert.deepEqual(definedOthers(card).map(([t]) => t), ["Gym"]);
+  assert.equal(swapMainFocus(card, "Read"), null);
+  const p = swapMainFocus(card, "Gym");
+  assert.equal(p.focus, "Gym");
+  assert.equal(p.outcome, "Run 5K");
+  assert.deepEqual(p.later, ["Clients", "Read"]);
+  assert.equal(p.later_details.Clients.outcome, "10 clients");
+  assert.equal(p.later_details.Clients.measure_now, 3);
+  assert.ok(!("Gym" in p.later_details));
+});

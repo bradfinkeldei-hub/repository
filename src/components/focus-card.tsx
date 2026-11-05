@@ -5,8 +5,8 @@ import { CardTabs } from "@/components/card-tabs";
 import { Thread } from "@/components/thread";
 import { CoachNotes } from "@/components/notes";
 import { dateKey, firstName, meetingDate, shortDate, sprintOf, TRACK_CHOICES, weekKey, type Profile, type Progress, type TeamNames } from "@/lib/coaching";
-import { addLaterFocus, addProudMoment, deleteProudMoment, removeLaterFocus, setTrackWeeks, setWeekDone } from "@/app/actions";
-import { focusProgress, isShared, MEASURE_KINDS, progressLabel, type Focus } from "@/lib/focus";
+import { addLaterFocus, addProudMoment, deleteProudMoment, makeMainFocus, removeLaterFocus, setTrackWeeks, setWeekDone } from "@/app/actions";
+import { definedOthers, focusProgress, isShared, MEASURE_KINDS, progressLabel, type Focus } from "@/lib/focus";
 import type { CoachNote, ProudMoment, Social } from "@/lib/social";
 
 /** The Pilot group's Team tab: everyone's Focus card, your own first. */
@@ -52,9 +52,10 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
   const isMe = m.id === viewer.id;
   const coach = viewer.role === "coach";
   const done = !!f?.confirmed_at;
-  const pct = f && done ? focusProgress(f) : null;
-  const kind = MEASURE_KINDS.find(([k]) => k === f?.measure_kind)?.[1];
   const kudos = social?.kudos[m.id] ?? [];
+  const canEdit = isMe || coach;
+  const others = f && done ? definedOthers(f) : [];
+  const otherHref = (t: string) => `/focus?other=${encodeURIComponent(t)}${isMe ? "" : `&id=${m.id}`}`;
   const focusPanel = (
     <>
       {!done ? (
@@ -65,29 +66,23 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
         </div>
       ) : (
         <>
-          <div className="focus-topic">
-            <span className="label">Focus</span>
-            <p>{isShared(f.focus) ? <Private /> : f.focus}</p>
-          </div>
-          <dl className="focus-rows">
-            <div className="fr creating"><dt>Creating</dt><dd>{isShared(f.outcome) ? <Private /> : f.outcome}</dd></div>
-            <div className="fr know">
-              <dt>I&apos;ll know when</dt>
-              <dd>
-                {isShared(f.measure) ? <Private /> : f.measure}
-                {pct !== null && (
-                  <span className="focus-meter">
-                    <span className="meter" role="img" aria-label={`${pct}% of the way there`}><i style={{ width: `${pct}%` }} /></span>
-                    <span>{progressLabel(f)}{kind ? ` · ${kind}` : ""}</span>
-                  </span>
-                )}
-              </dd>
-            </div>
-            <div className="fr why"><dt>Why it matters</dt><dd>{isShared(f.meaning) ? <Private /> : f.meaning}</dd></div>
-            <div className="fr start"><dt>Starting with</dt><dd>{isShared(f.start_point) ? <Private /> : f.start_point}</dd></div>
-            <div className="fr held"><dt>Accountable by</dt><dd>{isShared(f.held_by) ? <Private /> : f.held_by}</dd></div>
-          </dl>
-          {(f.later.length > 0 || isMe || coach) && <LaterList m={m} later={f.later} canEdit={isMe || coach} isMe={isMe} />}
+          {others.length ? (
+            <CardTabs className="focus-subtabs" label="Focuses" tabs={[{ key: "main", label: "1", title: f.focus }, ...others.map(([t], i) => ({ key: `o-${t}`, label: String(i + 2), title: t }))]}>
+              {[<FocusRows key="main" a={f} label="Main focus" />,
+                ...others.map(([t, o], i) => (
+                  <Fragment key={`o-${t}`}>
+                    <FocusRows a={{ ...o, focus: t }} label={`Focus ${i + 2}`} />
+                    {canEdit && (
+                      <div className="row other-actions">
+                        <form action={makeMainFocus.bind(null, m.id, t)}><button className="btn ghost small" type="submit">Make this my main focus</button></form>
+                        <Link className="edit-focus" href={otherHref(t)}>Edit these answers</Link>
+                      </div>
+                    )}
+                  </Fragment>
+                ))]}
+            </CardTabs>
+          ) : <FocusRows a={f} label="Focus" />}
+          {(f.later.length > 0 || canEdit) && <LaterList m={m} later={f.later} defined={others.map(([t]) => t)} canEdit={canEdit} isMe={isMe} href={otherHref} />}
           {coach && !isMe && <Link className="edit-focus" href={`/focus?id=${m.id}`}>Edit {firstName(m.name)}&apos;s answers</Link>}
         </>
       )}
@@ -118,23 +113,66 @@ function memberTint(id: string) {
   return `var(--e${(h % 8) + 1})`;
 }
 
-/** Other focuses they want to get to: on the walkthrough's Later list, and added any time after. */
-function LaterList({ m, later, canEdit, isMe }: { m: Profile; later: string[]; canEdit: boolean; isMe: boolean }) {
+/** The answers for one focus, as striped rows. */
+function FocusRows({ a, label }: { a: Pick<Focus, "focus" | "outcome" | "measure" | "measure_kind" | "measure_start" | "measure_goal" | "measure_now" | "meaning" | "start_point" | "held_by">; label: string }) {
+  const pct = focusProgress(a);
+  const kind = MEASURE_KINDS.find(([k]) => k === a.measure_kind)?.[1];
+  return (
+    <>
+      <div className="focus-topic">
+        <span className="label">{label}</span>
+        <p>{isShared(a.focus) ? <Private /> : a.focus}</p>
+      </div>
+      <dl className="focus-rows">
+        <div className="fr creating"><dt>Creating</dt><dd>{isShared(a.outcome) ? <Private /> : a.outcome}</dd></div>
+        <div className="fr know">
+          <dt>I&apos;ll know when</dt>
+          <dd>
+            {isShared(a.measure) ? <Private /> : a.measure}
+            {pct !== null && (
+              <span className="focus-meter">
+                <span className="meter" role="img" aria-label={`${pct}% of the way there`}><i style={{ width: `${pct}%` }} /></span>
+                <span>{progressLabel(a)}{kind ? ` · ${kind}` : ""}</span>
+              </span>
+            )}
+          </dd>
+        </div>
+        <div className="fr why"><dt>Why it matters</dt><dd>{isShared(a.meaning) ? <Private /> : a.meaning}</dd></div>
+        <div className="fr start"><dt>Starting with</dt><dd>{isShared(a.start_point) ? <Private /> : a.start_point}</dd></div>
+        <div className="fr held"><dt>Accountable by</dt><dd>{isShared(a.held_by) ? <Private /> : a.held_by}</dd></div>
+      </dl>
+    </>
+  );
+}
+
+/**
+ * Other focuses they want to get to: on the walkthrough's Later list, and added any time after.
+ * On your own card, tapping one lets you answer its questions, make it your main focus, or remove it.
+ */
+function LaterList({ m, later, defined, canEdit, isMe, href }: { m: Profile; later: string[]; defined: string[]; canEdit: boolean; isMe: boolean; href: (t: string) => string }) {
   return (
     <details className="fold later-list">
       <summary><h4>{isMe ? "My other focuses" : "Other focuses"}</h4><span className="pill">{later.length}</span></summary>
       {later.length > 0 ? (
-        <ul>
-          {later.map((t) => (
-            <li key={t}>
-              <span>{t}</span>
-              {canEdit && (
-                <form action={removeLaterFocus.bind(null, m.id, t)}>
-                  <button className="later-remove" type="submit" aria-label={`Remove ${t}`} title="Remove">×</button>
-                </form>
-              )}
-            </li>
-          ))}
+        <ul className={canEdit ? "later-edit" : undefined}>
+          {later.map((t) => {
+            const n = defined.indexOf(t);
+            const num = n >= 0 ? <b className="later-num" title={`Focus ${n + 2}`}>{n + 2}</b> : null;
+            return canEdit ? (
+              <li key={t} className="later-item">
+                <details className="later-chip">
+                  <summary>{num}<span>{t}</span></summary>
+                  <div className="later-menu">
+                    <Link className="btn small" href={href(t)}>{n >= 0 ? "Edit its answers" : "Answer its questions"}</Link>
+                    {n >= 0 ? (
+                      <form action={makeMainFocus.bind(null, m.id, t)}><button className="btn ghost small" type="submit">Make this my main focus</button></form>
+                    ) : <span className="hint">Answer its questions to see it on {isMe ? "your" : "the"} card and to make it {isMe ? "your" : "the"} main focus.</span>}
+                    <form action={removeLaterFocus.bind(null, m.id, t)}><button className="linkbtn" type="submit">Remove</button></form>
+                  </div>
+                </details>
+              </li>
+            ) : <li key={t}>{num}<span>{t}</span></li>;
+          })}
         </ul>
       ) : (
         <p className="hint">{isMe ? "Nothing here yet. Add anything else you want to work on later, so it doesn't get lost." : `${firstName(m.name)} hasn't added any other focuses yet.`}</p>
