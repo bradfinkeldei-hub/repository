@@ -110,11 +110,11 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
   );
 }
 
-/** Each member's own shade, the same on every screen: one of the app's eight colors, picked from their id. */
+/** Each member's own shade, the same on every screen: one of eight earthy colors, picked from their id. */
 function memberTint(id: string) {
   let h = 0;
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return `var(--w${(h % 8) + 1})`;
+  return `var(--e${(h % 8) + 1})`;
 }
 
 function Private() {
