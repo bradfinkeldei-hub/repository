@@ -5,7 +5,7 @@ import { CardTabs } from "@/components/card-tabs";
 import { Thread } from "@/components/thread";
 import { CoachNotes } from "@/components/notes";
 import { dateKey, firstName, meetingDate, shortDate, sprintOf, TRACK_CHOICES, weekKey, type Profile, type Progress, type TeamNames } from "@/lib/coaching";
-import { addProudMoment, deleteProudMoment, setTrackWeeks, setWeekDone } from "@/app/actions";
+import { addLaterFocus, addProudMoment, deleteProudMoment, removeLaterFocus, setTrackWeeks, setWeekDone } from "@/app/actions";
 import { focusProgress, isShared, MEASURE_KINDS, progressLabel, type Focus } from "@/lib/focus";
 import type { CoachNote, ProudMoment, Social } from "@/lib/social";
 
@@ -87,12 +87,7 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
             <div className="fr start"><dt>Starting with</dt><dd>{isShared(f.start_point) ? <Private /> : f.start_point}</dd></div>
             <div className="fr held"><dt>Accountable by</dt><dd>{isShared(f.held_by) ? <Private /> : f.held_by}</dd></div>
           </dl>
-          {f.later.length > 0 && (
-            <details className="fold later-list">
-              <summary><h4>Also on my list</h4><span className="pill">{f.later.length}</span></summary>
-              <ul>{f.later.map((t) => <li key={t}>{t}</li>)}</ul>
-            </details>
-          )}
+          {(f.later.length > 0 || isMe || coach) && <LaterList m={m} later={f.later} canEdit={isMe || coach} isMe={isMe} />}
           {coach && !isMe && <Link className="edit-focus" href={`/focus?id=${m.id}`}>Edit {firstName(m.name)}&apos;s answers</Link>}
         </>
       )}
@@ -121,6 +116,37 @@ function memberTint(id: string) {
   let h = 0;
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return `var(--e${(h % 8) + 1})`;
+}
+
+/** Other focuses they want to get to: on the walkthrough's Later list, and added any time after. */
+function LaterList({ m, later, canEdit, isMe }: { m: Profile; later: string[]; canEdit: boolean; isMe: boolean }) {
+  return (
+    <details className="fold later-list">
+      <summary><h4>{isMe ? "My other focuses" : "Other focuses"}</h4><span className="pill">{later.length}</span></summary>
+      {later.length > 0 ? (
+        <ul>
+          {later.map((t) => (
+            <li key={t}>
+              <span>{t}</span>
+              {canEdit && (
+                <form action={removeLaterFocus.bind(null, m.id, t)}>
+                  <button className="later-remove" type="submit" aria-label={`Remove ${t}`} title="Remove">×</button>
+                </form>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="hint">{isMe ? "Nothing here yet. Add anything else you want to work on later, so it doesn't get lost." : `${firstName(m.name)} hasn't added any other focuses yet.`}</p>
+      )}
+      {canEdit && later.length < 10 && (
+        <form className="later-add" action={addLaterFocus.bind(null, m.id)}>
+          <input type="text" name="focus" maxLength={300} required aria-label="Another focus" placeholder="e.g. Get back to the gym" />
+          <button className="btn small" type="submit">Add</button>
+        </form>
+      )}
+    </details>
+  );
 }
 
 function Private() {

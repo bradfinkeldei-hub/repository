@@ -658,6 +658,13 @@ tr:last-child td { border-bottom: 0; }
 .later-list ul { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
 .later-list li { background: var(--sun-soft); border-radius: 999px; padding: 4px 11px; font-size: 0.86rem; }
 .later-list h4 { margin: 0; font-size: 0.95rem; }
+.later-list li { display: inline-flex; align-items: center; gap: 4px; }
+.later-list li form { display: contents; }
+.later-remove { border: 0; background: none; color: var(--muted); font-size: 1rem; line-height: 1; padding: 0 2px; cursor: pointer; }
+.later-remove:hover { color: var(--alert); }
+.later-add { display: flex; gap: 8px; margin-top: 10px; }
+.later-add input { flex: 1; min-width: 0; }
+.later-list .hint { margin: 8px 0 0; }
 .edit-focus { align-self: flex-start; }
 .walk-remove { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 1.3rem; line-height: 1; cursor: pointer; }
 .walk-remove:hover { color: var(--alert); border-color: var(--alert); }
