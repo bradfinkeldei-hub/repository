@@ -703,3 +703,43 @@ tr:last-child td { border-bottom: 0; }
 .focus-progress > p { margin: 0; font-size: 0.9rem; }
 .focus-weeks { display: flex; flex-direction: column; gap: 6px; }
 .small-note { font-size: 0.85rem; margin: 0; }
+
+/* Earthy look for the Pilot cards: olive, clay, slate, tan, forest, rust, saddle, stone. */
+:root {
+  --e1: #5f6f32; --e2: #a0522d; --e3: #4b5d68; --e4: #9a7b4f;
+  --e5: #3e6346; --e6: #8b3a2b; --e7: #6f4e37; --e8: #5c5a52;
+  --earth-card: #f7f3ea; --earth-line: #d9d0bf; --earth-ink: #2b2620;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --e1: #9aab63; --e2: #d08a5f; --e3: #8fa3ae; --e4: #c9a877;
+    --e5: #7fa784; --e6: #c97a66; --e7: #b08c6f; --e8: #a8a497;
+    --earth-card: #1d1b17; --earth-line: #3a352c; --earth-ink: #ece5d8;
+  }
+}
+.focus-card { background: var(--earth-card); border: 1px solid var(--earth-line); border-top: 4px solid var(--tint); border-radius: 10px; color: var(--earth-ink); box-shadow: 0 1px 2px rgb(43 38 32 / 0.08); }
+.focus-card .focus-topic { border-radius: 6px; background: color-mix(in srgb, var(--tint) 14%, var(--earth-card)); border-left: 4px solid var(--tint); }
+.focus-card .focus-topic p { color: color-mix(in srgb, var(--tint) 80%, var(--earth-ink)); font-weight: 700; }
+.focus-card .focus-rows { border-radius: 6px; border-color: color-mix(in srgb, var(--tint) 30%, var(--earth-line)); }
+.focus-card .focus-rows .fr { background: var(--earth-card); }
+.focus-card .focus-rows .fr:nth-child(odd) { background: color-mix(in srgb, var(--tint) 11%, var(--earth-card)); }
+.focus-card .focus-rows dt { color: color-mix(in srgb, var(--tint) 70%, var(--earth-ink)); }
+.focus-card .focus-meter .meter i { background: var(--tint); }
+.focus-card .card-tabs { border-radius: 8px; background: color-mix(in srgb, var(--tint) 14%, var(--earth-card)); }
+.focus-card .card-tabs button { border-radius: 6px; color: color-mix(in srgb, var(--tint) 60%, var(--earth-ink)); text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.78rem; font-weight: 750; }
+.focus-card .card-tabs button[aria-selected="true"] { background: var(--tint); color: #fff; box-shadow: none; }
+.focus-card .tab-dot { background: var(--e4); }
+.focus-card .card-tabs button[aria-selected="true"] .tab-dot { background: #fff; }
+.focus-card .focus-mission blockquote { border-radius: 0 6px 6px 0; background: color-mix(in srgb, var(--tint) 11%, var(--earth-card)); }
+.focus-card .acct { border-radius: 6px; background: color-mix(in srgb, var(--tint) 11%, var(--earth-card)); }
+.focus-card .acct .label { color: color-mix(in srgb, var(--tint) 70%, var(--earth-ink)); }
+.focus-card .focus-pending { border-radius: 6px; background: color-mix(in srgb, var(--tint) 7%, var(--earth-card)); border-color: var(--earth-line); }
+.focus-card .later-list li { background: color-mix(in srgb, var(--tint) 14%, var(--earth-card)); border-radius: 4px; }
+.focus-card .edit-focus { color: var(--tint); }
+.focus-card .tick { border-radius: 5px; border-color: color-mix(in srgb, var(--tint) 55%, var(--earth-line)); background: var(--earth-card); }
+.focus-card .commits li.on .tick { background: var(--tint); border-color: var(--tint); }
+.focus-card .pill.done { background: color-mix(in srgb, var(--tint) 16%, var(--earth-card)); color: var(--tint); }
+.focus-card .strip li.done::before, .focus-card .stripkey i.done { background: var(--tint); }
+.focus-card .btn.ghost, .focus-card .btn.small:not(.ghost) { border-radius: 6px; }
+.focus-card .btn.ghost { background: var(--earth-card); color: var(--tint); border-color: color-mix(in srgb, var(--tint) 40%, var(--earth-line)); }
+.focus-card .avatar { border-radius: 8px; background: var(--tint); color: #fff; box-shadow: none; }
