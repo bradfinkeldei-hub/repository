@@ -12,7 +12,7 @@ export const MEMBER_TABS = [
   { key: "progress", label: "My progress", href: "/progress" },
 ];
 
-/** The Pilot group's tabs: a Group board instead of Team, and no Missions. */
+/** The Pilot group's tabs. Not shown to members any more: their card has Focus, Mission and Progress tabs instead. */
 export const PILOT_TABS = [
   { key: "team", label: "Group board", href: "/team?tab=team" },
   { key: "accountability", label: "Accountability", href: "/team?tab=accountability" },

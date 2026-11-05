@@ -688,3 +688,18 @@ tr:last-child td { border-bottom: 0; }
 .walk-share small { color: var(--muted); font-size: 0.85rem; }
 .walk-screen textarea[readonly] { color: var(--muted); font-style: italic; background: var(--surface-2); }
 .shared-later { font-style: italic; color: var(--muted); }
+
+/* Focus / Mission / Progress tabs on a Pilot member card */
+.card-tabs { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: color-mix(in srgb, var(--tint, var(--accent)) 12%, var(--surface)); }
+.card-tabs button { flex: 1; font: inherit; font-size: 0.88rem; font-weight: 650; color: var(--muted); background: none; border: 0; border-radius: 9px; padding: 8px 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; }
+.card-tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / 0.12); }
+.card-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tab-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sun, #f5a524); display: inline-block; }
+.card-panel { display: flex; flex-direction: column; gap: 10px; }
+.card-panel[hidden] { display: none; }
+.focus-mission { display: flex; flex-direction: column; gap: 6px; }
+.focus-mission blockquote { margin: 0; padding: 12px 14px; border-left: 4px solid var(--tint, var(--accent)); background: color-mix(in srgb, var(--tint, var(--accent)) 10%, var(--surface)); border-radius: 0 12px 12px 0; font-family: var(--display); font-size: 1.05rem; line-height: 1.4; }
+.focus-progress { display: flex; flex-direction: column; gap: 10px; }
+.focus-progress > p { margin: 0; font-size: 0.9rem; }
+.focus-weeks { display: flex; flex-direction: column; gap: 6px; }
+.small-note { font-size: 0.85rem; margin: 0; }

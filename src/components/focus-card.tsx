@@ -1,14 +1,16 @@
 import Link from "next/link";
-import { Who } from "@/components/cards";
+import { Commitments, Who } from "@/components/cards";
+import { CardTabs } from "@/components/card-tabs";
+import { MiniProgress, StripKey } from "@/components/progress";
 import { Thread } from "@/components/thread";
 import { CoachNotes } from "@/components/notes";
-import { firstName, type Profile, type TeamNames } from "@/lib/coaching";
+import { firstName, type Profile, type Progress, type TeamNames } from "@/lib/coaching";
 import { focusProgress, isShared, MEASURE_KINDS, progressLabel, type Focus } from "@/lib/focus";
 import type { CoachNote, Social } from "@/lib/social";
 
 /** The Pilot group's Team tab: everyone's Focus card, your own first. */
-export function FocusBoard({ members, focus, viewer, names, social, avatars, checked, notes }: {
-  members: Profile[]; focus: Record<string, Focus>; viewer: Profile; names?: TeamNames; social?: Social | null;
+export function FocusBoard({ members, focus, viewer, names, social, avatars, checked, notes, logs }: {
+  members: Profile[]; focus: Record<string, Focus>; viewer: Profile; names?: TeamNames; social?: Social | null; logs?: Record<string, Progress>;
   avatars: Record<string, string>; checked?: Record<string, string[]>; notes?: Record<string, CoachNote[]> | null;
 }) {
   const coach = viewer.role === "coach";
@@ -24,7 +26,7 @@ export function FocusBoard({ members, focus, viewer, names, social, avatars, che
         <div className="grid">
           {members.map((m) => (
             <FocusCard key={m.id} m={m} f={focus[m.id]} viewer={viewer} names={names} social={social} avatars={avatars}
-              checked={checked?.[m.id]} notes={notes ? notes[m.id] ?? [] : undefined} />
+              checked={checked?.[m.id]} notes={notes ? notes[m.id] ?? [] : undefined} p={logs?.[m.id]} />
           ))}
         </div>
       ) : (
@@ -37,9 +39,9 @@ export function FocusBoard({ members, focus, viewer, names, social, avatars, che
   );
 }
 
-export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes, practice }: {
+export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes, practice, p }: {
   m: Profile; f?: Focus; viewer: Profile; names?: TeamNames; social?: Social | null; avatars: Record<string, string>;
-  checked?: string[]; notes?: CoachNote[];
+  checked?: string[]; notes?: CoachNote[]; p?: Progress;
   /** The coach's practice card: no weekly commitments. */
   practice?: boolean;
 }) {
@@ -49,9 +51,8 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
   const pct = f && done ? focusProgress(f) : null;
   const kind = MEASURE_KINDS.find(([k]) => k === f?.measure_kind)?.[1];
   const kudos = social?.kudos[m.id] ?? [];
-  return (
-    <article className="card focus-card" id={`member-${m.id}`} style={{ "--tint": memberTint(m.id) } as React.CSSProperties}>
-      <Who m={m} viewer={viewer} coachTools names={names} />
+  const focusPanel = (
+    <>
       {!done ? (
         <div className="focus-pending">
           <p>{isMe ? "You haven't finished your questions yet." : `${firstName(m.name)} hasn't finished their questions yet.`}</p>
@@ -91,6 +92,18 @@ export function FocusCard({ m, f, viewer, names, social, avatars, checked, notes
           {coach && !isMe && <Link className="edit-focus" href={`/focus?id=${m.id}`}>Edit {firstName(m.name)}&apos;s answers</Link>}
         </>
       )}
+    </>
+  );
+  return (
+    <article className="card focus-card" id={`member-${m.id}`} style={{ "--tint": memberTint(m.id) } as React.CSSProperties}>
+      <Who m={m} viewer={viewer} coachTools names={names} />
+      {practice ? focusPanel : (
+        <CardTabs tabs={[{ key: "focus", label: "Focus", dot: !done && (isMe || coach) }, { key: "mission", label: "Mission", dot: !m.mission && (isMe || coach) }, { key: "progress", label: "Progress" }]}>
+          {focusPanel}
+          <MissionPanel m={m} viewer={viewer} />
+          <ProgressPanel m={m} viewer={viewer} checked={checked} p={p} />
+        </CardTabs>
+      )}
       {social && <Thread m={m} viewer={viewer} comments={social.comments[m.id] ?? []} kudos={kudos} avatars={avatars} fresh={social.fresh?.memberId === m.id ? social.fresh : undefined} />}
       {notes && coach && <CoachNotes m={m} notes={notes} />}
     </article>
@@ -106,4 +119,44 @@ function memberTint(id: string) {
 
 function Private() {
   return <span className="shared-later">Will share in the group</span>;
+}
+
+/** The Mission tab. A blank mission on your own card walks you through writing it. */
+function MissionPanel({ m, viewer }: { m: Profile; viewer: Profile }) {
+  const isMe = m.id === viewer.id;
+  const coach = viewer.role === "coach";
+  if (!m.mission?.trim()) {
+    return (
+      <div className="focus-pending">
+        <p>{isMe ? "You haven't written your mission yet. A few short questions will help you put it into one sentence." : `${firstName(m.name)} hasn't written their mission yet.`}</p>
+        {isMe && <Link className="btn small" href="/mission">Write my mission</Link>}
+        {coach && !isMe && <Link className="btn ghost small" href={`/mission?id=${m.id}`}>Write it with them</Link>}
+      </div>
+    );
+  }
+  return (
+    <div className="focus-mission">
+      <span className="label">My mission</span>
+      <blockquote>{isShared(m.mission) ? <Private /> : m.mission}</blockquote>
+      {(isMe || coach) && <Link className="edit-focus" href={isMe ? "/mission" : `/mission?id=${m.id}`}>{isMe ? "Change my mission" : `Edit ${firstName(m.name)}'s mission`}</Link>}
+    </div>
+  );
+}
+
+/** The Progress tab: tick off this week's commitment, and see the weeks so far. */
+function ProgressPanel({ m, viewer, checked, p }: { m: Profile; viewer: Profile; checked?: string[]; p?: Progress }) {
+  const isMe = m.id === viewer.id;
+  return (
+    <div className="focus-progress">
+      <p className="muted">{isMe ? "Did you do what you said this week? Tap the circle when it's done." : `What ${firstName(m.name)} said they'd do this week.`}</p>
+      <Commitments m={m} viewer={viewer} checked={checked} />
+      {p && p.weeks.length > 0 ? (
+        <div className="focus-weeks">
+          <span className="label">Week by week</span>
+          <MiniProgress p={p} team={m.team} />
+          <StripKey />
+        </div>
+      ) : <p className="muted small-note">Each week you mark it done shows up here as a streak.</p>}
+    </div>
+  );
 }

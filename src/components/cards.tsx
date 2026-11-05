@@ -240,7 +240,7 @@ export function TeamViews({ tab, groups, viewer, ownTeam, logs, names, checkins,
         if (tab === "team" && isPilot(team)) {
           body = (
             <>
-              <FocusBoard members={members} focus={focus ?? {}} viewer={viewer} names={names} social={social} avatars={avatars} checked={checked} notes={notes} />
+              <FocusBoard members={members} focus={focus ?? {}} viewer={viewer} names={names} social={social} avatars={avatars} checked={checked} notes={notes} logs={logs} />
               {team && checkins?.[team] && <MeetingCheckin team={team} label={teamLabel(team, names)} members={members} viewer={viewer} c={checkins[team]} />}
             </>
           );
