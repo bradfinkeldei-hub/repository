@@ -593,3 +593,26 @@ export function teamPulse(
     weeks: weeks.map(({ week, rate }) => ({ week, rate })),
   };
 }
+
+export const SPRINT_WEEKS = 12;
+export type SprintCell = { week: string; date: Date; n: number; status: "done" | "missed" | "open" | "ahead" };
+export type Sprint = { number: number; weekNo: number; cells: SprintCell[]; done: number };
+
+/**
+ * The 12-week sprint a member is in, counted from the week they started (the week
+ * their card was built). Each cell is one meeting week with its date.
+ */
+export function sprintOf(startWeek: string, currentWeek: string, p: Progress | undefined, team: Team | null): Sprint {
+  const start = startWeek > currentWeek ? currentWeek : startWeek;
+  let since = 0;
+  while (addWeeks(start, since + 1) <= currentWeek) since++;
+  const number = Math.floor(since / SPRINT_WEEKS) + 1;
+  const first = addWeeks(start, (number - 1) * SPRINT_WEEKS);
+  const status = new Map((p?.weeks ?? []).map((w) => [w.week, w.status]));
+  const cells: SprintCell[] = Array.from({ length: SPRINT_WEEKS }, (_, i) => {
+    const week = addWeeks(first, i);
+    const s: SprintCell["status"] = week > currentWeek ? "ahead" : status.get(week) === "done" ? "done" : week === currentWeek ? "open" : "missed";
+    return { week, date: meetingDate(week, team), n: i + 1, status: s };
+  });
+  return { number, weekNo: (since % SPRINT_WEEKS) + 1, cells, done: cells.filter((c) => c.status === "done").length };
+}
