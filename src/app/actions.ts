@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireCoach, requireEditor, requireProfile, requireRealCoach, VIEW_AS_COOKIE } from "@/lib/session";
+import { requireCoach, requireEditor, requireProfile, requireRealCoach, MEMBER_VIEW_COOKIE, VIEW_AS_COOKIE } from "@/lib/session";
 import { ABSENT_STEPS, AREAS, ASSUMED, CANT_MAKE_IT, missingDetails, usesFocusCards, TRACK_CHOICES, BOOKING_ENABLED, clockLabel, commitmentList, dateKey, DAYS, firstName, joinCommitments, MAX_COMMITMENTS, isTeam, isTimeZone, meetingWhen, monthKey, nextMeeting, TEAMS, teamLabel, weekKey, zoneLabel, type Profile, type Wheel } from "@/lib/coaching";
 import { sendEmails } from "@/lib/mail";
 import { rsvpLink } from "@/lib/rsvp";
@@ -838,5 +838,14 @@ export async function deleteProudMoment(id: string) {
   const { supabase } = await requireEditor();
   // The database only lets the member or the coach remove it.
   await supabase.from("proud_moments").delete().eq("id", id);
+  revalidatePath("/", "layout");
+}
+
+/** Coach only: turns the "Member view" switch on or off (for sharing the screen in a meeting). */
+export async function setMemberView(on: boolean) {
+  await requireRealCoach();
+  const jar = await cookies();
+  if (on) jar.set(MEMBER_VIEW_COOKIE, "1", { path: "/", httpOnly: true, sameSite: "lax", secure: true, maxAge: 60 * 60 * 24 * 30 });
+  else jar.delete(MEMBER_VIEW_COOKIE);
   revalidatePath("/", "layout");
 }

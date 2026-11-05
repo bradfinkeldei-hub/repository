@@ -228,3 +228,17 @@ export function YourTime({ at, meetingZone }: { at: string; meetingZone: string 
   }, [at, meetingZone]);
   return label ? <> ({label} your time)</> : null;
 }
+
+/** The coach's "Member view" slider: one switch that hides the team column and all coach-only parts. */
+export function MemberViewSwitch({ on, action }: { on: boolean; action: (on: boolean) => Promise<void> }) {
+  const [pending, start] = useTransition();
+  const [value, setValue] = useState(on);
+  return (
+    <button type="button" role="switch" aria-checked={value} className={`member-switch${value ? " on" : ""}`} disabled={pending}
+      title={value ? "Turn off to see your coach tools again" : "Hide the team list and coach tools, so your screen looks like a member's"}
+      onClick={() => { const v = !value; setValue(v); start(() => action(v)); }}>
+      <span className="member-switch-track" aria-hidden="true"><i /></span>
+      <span>Member view</span>
+    </button>
+  );
+}
