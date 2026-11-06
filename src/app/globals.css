@@ -602,7 +602,10 @@ tr:last-child td { border-bottom: 0; }
 .intention details summary { list-style: none; width: fit-content; }
 .intention details summary::-webkit-details-marker { display: none; }
 .intention details[open] summary { display: none; }
-.intention-quote { margin: -4px 0 14px; padding: 0 4px; font-size: 1rem; line-height: 1.4; color: var(--ink); }
+/* Brad's standing question under the intention, styled as a pull quote */
+.intention-quote { position: relative; margin: 0 0 16px; padding: 18px 20px 18px 52px; background: var(--accent-soft, #e3f4f0); border-radius: var(--r-md, 10px); border-left: 4px solid var(--accent); }
+.intention-quote::before { content: "\201C"; position: absolute; left: 12px; top: 2px; font-family: var(--display); font-size: 3.6rem; line-height: 1; color: var(--accent); opacity: 0.85; }
+.intention-quote p { margin: 0; font-family: var(--display); font-style: italic; font-weight: 600; font-size: clamp(1.05rem, 3.6vw, 1.25rem); line-height: 1.4; color: var(--ink); text-wrap: balance; }
 
 /* "Finish your details" on a member's team page, and the coach's "Email all" for missing details. */
 .details-nudge, .remind-all { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
