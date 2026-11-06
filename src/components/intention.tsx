@@ -12,10 +12,14 @@ export function Intention({ team, text, coach }: { team: Team; text: string; coa
     </form>
   );
   return (
+    <>
     <section className="intention" id={`intention-${team}`}>
       <span className="intention-label">The intention of this group is:</span>
       {text ? <p className="intention-text">{text}</p> : !coach && <p className="intention-text muted">Coming soon.</p>}
       {coach && (text ? <details><summary className="linkbtn">Edit</summary>{form}</details> : form)}
     </section>
+    {/* Brad's line for every team, right under the group's intention. */}
+    <p className="intention-quote"><strong>My greatest growth lies where I resist accountability.</strong></p>
+    </>
   );
 }

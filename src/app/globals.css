@@ -602,6 +602,7 @@ tr:last-child td { border-bottom: 0; }
 .intention details summary { list-style: none; width: fit-content; }
 .intention details summary::-webkit-details-marker { display: none; }
 .intention details[open] summary { display: none; }
+.intention-quote { margin: -4px 0 14px; padding: 0 4px; font-size: 1rem; line-height: 1.4; color: var(--ink); }
 
 /* "Finish your details" on a member's team page, and the coach's "Email all" for missing details. */
 .details-nudge, .remind-all { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
