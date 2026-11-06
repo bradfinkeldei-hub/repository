@@ -19,7 +19,9 @@ export function Intention({ team, text, coach }: { team: Team; text: string; coa
       {coach && (text ? <details><summary className="linkbtn">Edit</summary>{form}</details> : form)}
     </section>
     {/* Brad's line for every team, right under the group's intention. */}
-    <p className="intention-quote"><strong>My greatest growth lies where I resist accountability.</strong></p>
+    <blockquote className="intention-quote">
+      <p>What are you avoiding being held accountable for, even though you know it would make a meaningful difference in your life?</p>
+    </blockquote>
     </>
   );
 }
