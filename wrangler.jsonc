@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "coaching-circle",
+  "name": "coaching-stageshow",
   // custom-worker.ts wraps the built app and adds the daily reminder run.
   "main": "custom-worker.ts",
   "compatibility_date": "2026-10-01",
