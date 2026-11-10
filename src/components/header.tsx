@@ -46,7 +46,7 @@ export function Header({ me, sub, tabs, current, right }: {
   return (
     <header className="top">
       <div className="wrap bar">
-        <Link href="/" className="brand"><span className="mark" aria-hidden="true" />The Coaching Circle<small>{sub}</small></Link>
+        <Link href="/" className="brand"><span className="mark" aria-hidden="true" />The Coaching Circle{process.env.APP_BADGE ? <span className="app-badge">{process.env.APP_BADGE}</span> : null}<small>{sub}</small></Link>
         {tabs.length > 0 && (
           <nav className="tabs" aria-label="Sections">
             {tabs.map((t) => (

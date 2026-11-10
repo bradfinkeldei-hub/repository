@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BoardView } from "@/components/board-view";
 import { Fragment } from "react";
 import { Commitments, Who } from "@/components/cards";
 import { CardTabs } from "@/components/card-tabs";
@@ -25,12 +26,12 @@ export function FocusBoard({ members, focus, viewer, names, social, avatars, che
         </div>
       )}
       {members.length ? (
-        <div className="grid">
+        <BoardView>
           {members.map((m) => (
             <FocusCard key={m.id} m={m} f={focus[m.id]} viewer={viewer} names={names} social={social} avatars={avatars}
               checked={checked?.[m.id]} notes={notes ? notes[m.id] ?? [] : undefined} p={logs?.[m.id]} proud={proud ? proud[m.id] ?? [] : undefined} />
           ))}
-        </div>
+        </BoardView>
       ) : (
         <div className="empty">
           <h3>No one in this group yet</h3>
