@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { saveMission } from "@/app/actions";
 import { isShared, SHARE_IN_GROUP } from "@/lib/focus";
+import { composeMission, missionText } from "@/lib/mission";
 
 const STEPS = ["welcome", "matters", "difference", "best", "write"] as const;
 type Step = (typeof STEPS)[number];
@@ -15,7 +16,7 @@ export function MissionWalkthrough({ memberId, firstName, initial, doneHref, for
   const router = useRouter();
   const [step, setStep] = useState<Step>(initial ? "write" : "welcome");
   const [notes, setNotes] = useState({ matters: "", difference: "", best: "" });
-  const [mission, setMission] = useState(initial);
+  const [mission, setMission] = useState(initial || "My mission is ");
   const [error, setError] = useState("");
   /** They said they already have a mission, so the questions were skipped. */
   const [skipped, setSkipped] = useState(false);
@@ -29,8 +30,9 @@ export function MissionWalkthrough({ memberId, firstName, initial, doneHref, for
     if (step !== "welcome" && step !== "write" && !notes[step].trim()) { setError("Write an answer to go on, even a few words."); return; }
     go(i + 1);
   }
+  const example = composeMission(notes.matters, notes.difference, notes.best);
   function finish() {
-    if (!mission.trim()) { setError("Write your mission to save it."); return; }
+    if (!mission.trim() || mission.trim() === "My mission is") { setError("Write your mission to save it."); return; }
     start(async () => {
       const r = await saveMission(memberId, mission);
       if (!r.ok) { setError(r.error ?? "That didn't save."); return; }
@@ -89,15 +91,25 @@ export function MissionWalkthrough({ memberId, firstName, initial, doneHref, for
                 {notes.best && <li><span>At {your} best: <b>{notes.best}</b></span></li>}
               </ul>
             )}
-            <div className="walk-examples">
-              <span>An example to compare with:</span>
-              <ul><li>My mission is to raise kind, brave kids and build a business that gives us freedom.</li></ul>
-            </div>
+            {example.length ? (
+              <div className="mission-example">
+                <span className="label">Example from {forCoach ? "their" : "your"} answers</span>
+                <p>{example.map((p, k) => p.own ? <u key={k}>{p.text}</u> : <Fragment key={k}>{p.text}</Fragment>)}</p>
+                <small>Underlined words are exactly what {forCoach ? "they" : "you"} wrote.</small>
+              </div>
+            ) : (
+              <div className="walk-examples">
+                <span>An example to compare with:</span>
+                <ul><li>My mission is to raise kind, brave kids and build a business that gives us freedom.</li></ul>
+              </div>
+            )}
+            {example.length > 0 && <p className="mission-yours">Now write it {forCoach ? "their" : "your"} way. Keep what fits, change what doesn&apos;t.</p>}
             {skipped && <p className="hint">One or two sentences is plenty. Want help putting it into words? <button type="button" className="linkish" onClick={() => { setSkipped(false); go(1); }}>Answer the three questions</button></p>}
             <textarea className="input" rows={3} maxLength={600} readOnly={isShared(mission)} value={mission} placeholder="My mission is to…"
               onChange={(e) => { setMission(e.target.value); setError(""); }} />
+            {example.length > 0 && !isShared(mission) && <button type="button" className="linkish" onClick={() => { setMission(missionText(example)); setError(""); }}>Start from the example</button>}
             <label className="walk-share">
-              <input type="checkbox" checked={isShared(mission)} onChange={(e) => setMission(e.target.checked ? SHARE_IN_GROUP : "")} />
+              <input type="checkbox" checked={isShared(mission)} onChange={(e) => setMission(e.target.checked ? SHARE_IN_GROUP : "My mission is ")} />
               <span>I&apos;ll share it in the group <small>(it&apos;s kind of private to me)</small></span>
             </label>
           </>
