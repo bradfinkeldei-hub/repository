@@ -82,12 +82,12 @@ export function LoginForm({ error, googleClientId, appBadge }: { error?: string;
     setState(error ? "error" : "sent");
   }
 
-  const title = mode === "forgot" ? "Reset your password" : "Sign in";
-  const button = { password: "Sign in", link: "Email me a sign-in link", forgot: "Email me a reset link" }[mode];
-  const sent = mode === "forgot" ? "If that email has an account, a reset link is on its way." : "Check your email for a sign-in link.";
+  const title = { password: "Sign in", link: "Get a sign-in link", forgot: "Reset your password" }[mode];
+  const button = { password: "Sign in", link: "Send my sign-in link", forgot: "Email me a reset link" }[mode];
+  const sent = mode === "forgot" ? "If that email has an account, a reset link is on its way." : "Sent. Open the email and tap the link to sign in.";
   const failed = {
     password: "That email and password don't match. Try again, or use \"Forgot password?\".",
-    link: "We couldn't send a link to that address. Check it, or ask your coach for an invite.",
+    link: "That email doesn't have an account yet. Your coach needs to invite it first.",
     forgot: "We couldn't send a reset link. Check the address and try again.",
   }[mode];
 
@@ -105,7 +105,7 @@ export function LoginForm({ error, googleClientId, appBadge }: { error?: string;
         <form onSubmit={submit}>
           <h2 style={{ margin: "0 0 4px", fontFamily: "var(--display)", fontWeight: 600, letterSpacing: "-0.02em", fontSize: "1.9rem" }}>{title}</h2>
           <p className="muted" style={{ margin: "0 0 10px" }}>
-            {mode === "forgot" ? "We'll email you a link to choose a new password." : "Use the email your coach invited."}
+            {{ password: "Use the email your coach invited.", link: "Type your email below. We'll send you a link that signs you in, no password needed.", forgot: "Type your email below. We'll send you a link to choose a new password." }[mode]}
           </p>
           {error && state === "idle" && !googleError && <div className="notice">{ERRORS[error] ?? ERRORS.link}</div>}
           {googleError && <div className="notice">{googleError}</div>}
@@ -114,7 +114,7 @@ export function LoginForm({ error, googleClientId, appBadge }: { error?: string;
             <button key={p} type="button" className="sso" onClick={() => oauth(p)}>Continue with {PROVIDERS[p]}</button>
           ))}
           {mode !== "forgot" && enabled.length > 0 && <div className="or">or</div>}
-          <label htmlFor="email" style={{ fontWeight: 600 }}>Email</label>
+          <label htmlFor="email" style={{ fontWeight: 600 }}>Your email</label>
           <input id="email" className="input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
           {mode === "password" && (
             <>
@@ -131,7 +131,7 @@ export function LoginForm({ error, googleClientId, appBadge }: { error?: string;
             {mode === "password" ? (
               <>
                 <button type="button" className="linkbtn" onClick={() => switchTo("forgot")}>Forgot password?</button>
-                <button type="button" className="linkbtn" onClick={() => switchTo("link")}>Email me a link instead</button>
+                <button type="button" className="linkbtn" onClick={() => switchTo("link")}>Sign in without a password</button>
               </>
             ) : (
               <button type="button" className="linkbtn" onClick={() => switchTo("password")}>Sign in with a password</button>
