@@ -22,7 +22,7 @@ type State = "idle" | "busy" | "sent" | "error";
 /** googleClientId switches Google to its own button, so Google's screen names this app instead of the Supabase address. */
 export function LoginForm({ error, googleClientId, appBadge }: { error?: string; googleClientId?: string; appBadge?: string }) {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("password");
+  const [mode, setMode] = useState<Mode>("link");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [state, setState] = useState<State>("idle");
@@ -82,7 +82,7 @@ export function LoginForm({ error, googleClientId, appBadge }: { error?: string;
     setState(error ? "error" : "sent");
   }
 
-  const title = { password: "Sign in", link: "Get a sign-in link", forgot: "Reset your password" }[mode];
+  const title = { password: "Sign in with your password", link: "Sign in", forgot: "Reset your password" }[mode];
   const button = { password: "Sign in", link: "Send my sign-in link", forgot: "Email me a reset link" }[mode];
   const sent = mode === "forgot" ? "If that email has an account, a reset link is on its way." : "Sent. Open the email and tap the link to sign in.";
   const failed = {
@@ -105,7 +105,7 @@ export function LoginForm({ error, googleClientId, appBadge }: { error?: string;
         <form onSubmit={submit}>
           <h2 style={{ margin: "0 0 4px", fontFamily: "var(--display)", fontWeight: 600, letterSpacing: "-0.02em", fontSize: "1.9rem" }}>{title}</h2>
           <p className="muted" style={{ margin: "0 0 10px" }}>
-            {{ password: "Use the email your coach invited.", link: "Type your email below. We'll send you a link that signs you in, no password needed.", forgot: "Type your email below. We'll send you a link to choose a new password." }[mode]}
+            {{ password: "Only if you've already set a password. No password? Go back and get an email link.", link: "No password needed. Type the email your coach invited and we'll send you a link that signs you in.", forgot: "Type your email below. We'll send you a link to choose a new password." }[mode]}
           </p>
           {error && state === "idle" && !googleError && <div className="notice">{ERRORS[error] ?? ERRORS.link}</div>}
           {googleError && <div className="notice">{googleError}</div>}
@@ -130,15 +130,17 @@ export function LoginForm({ error, googleClientId, appBadge }: { error?: string;
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             {mode === "password" ? (
               <>
+                <button type="button" className="linkbtn" onClick={() => switchTo("link")}>&larr; No password? Email me a link</button>
                 <button type="button" className="linkbtn" onClick={() => switchTo("forgot")}>Forgot password?</button>
-                <button type="button" className="linkbtn" onClick={() => switchTo("link")}>Sign in without a password</button>
               </>
+            ) : mode === "link" ? (
+              <button type="button" className="linkbtn" onClick={() => switchTo("password")}>I&apos;ve set a password. Use it instead</button>
             ) : (
-              <button type="button" className="linkbtn" onClick={() => switchTo("password")}>Sign in with a password</button>
+              <button type="button" className="linkbtn" onClick={() => switchTo("link")}>&larr; Back to sign in</button>
             )}
           </div>
           <p className="muted" style={{ margin: "8px 0 0", fontSize: "0.9rem" }}>
-            New here? Joining starts with an invite from your coach. Your invite puts you on your team automatically.
+            First time? Tap the link in your invite email. It signs you in and puts you on your team.
           </p>
           <a className="muted" href="/privacy" style={{ fontSize: "0.85rem" }}>Privacy policy and terms</a>
         </form>
