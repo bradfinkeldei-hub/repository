@@ -20,7 +20,7 @@ type Mode = "password" | "link" | "forgot";
 type State = "idle" | "busy" | "sent" | "error";
 
 /** googleClientId switches Google to its own button, so Google's screen names this app instead of the Supabase address. */
-export function LoginForm({ error, googleClientId }: { error?: string; googleClientId?: string }) {
+export function LoginForm({ error, googleClientId, appBadge }: { error?: string; googleClientId?: string; appBadge?: string }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState("");
@@ -96,7 +96,7 @@ export function LoginForm({ error, googleClientId }: { error?: string; googleCli
       <div className="hero">
         <div className="kicker">Sparkz of Courage</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <h1>The Coaching Circle</h1>
+          <h1>The Coaching Circle{appBadge ? <> <span className="app-badge">{appBadge}</span></> : null}</h1>
           <p>Your team&apos;s life wheels, what each of you is creating, and the commitments you&apos;re holding each other to.</p>
         </div>
         <blockquote style={{ margin: 0, fontFamily: "var(--display)", fontStyle: "italic", fontSize: "1.25rem" }}>&ldquo;Life is a creation you get to make up!&rdquo;</blockquote>
