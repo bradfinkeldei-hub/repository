@@ -69,3 +69,5 @@ npm test          # week, time zone and coach action rules
 npm run test:db   # database access rules
 npm run typecheck
 ```
+
+> Branch `claude/project-thread-yo8br6` is the Stageshow test app (Worker `coaching-stageshow`, its own Supabase project). See docs/stageshow-test-app.md.
