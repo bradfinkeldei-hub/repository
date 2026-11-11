@@ -87,7 +87,7 @@ export function LoginForm({ error, googleClientId, appBadge }: { error?: string;
   const sent = mode === "forgot" ? "If that email has an account, a reset link is on its way." : "Sent. Open the email and tap the link to sign in.";
   const failed = {
     password: "That email and password don't match. Try again, or use \"Forgot password?\".",
-    link: "That email doesn't have an account yet. Your coach needs to invite it first.",
+    link: "We couldn't send a link. If you were just invited, open your invite email and tap its button first. Otherwise ask your coach for an invite.",
     forgot: "We couldn't send a reset link. Check the address and try again.",
   }[mode];
 
