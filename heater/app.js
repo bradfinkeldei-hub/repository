@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.7"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.8"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -16,11 +16,12 @@
   const usLocale = /^en-US/i.test(navigator.language || "en-US");
   const S = Object.assign({
     unit: usLocale ? "F" : "C", targetC: 21, mode: "thermo", cleanMins: 10, coachHours: 4,
-    tank: 6, lead: 30, batt: true, battV: 11.5, native: false, proto: "auto", hUnit: "auto",
+    tankGal: 5, lead: 30, batt: true, battV: 11.5, native: false, proto: "auto", hUnit: "auto",
     showAll: false, pin: "0000", warmOn: false, warmTime: "06:30", room: "heater", goveeId: null,
   }, store.get("settings", {}));
   const stats = Object.assign({ runSec: 0, lowSec: 0, sinceFillL: 0, days: {} }, store.get("stats", {}));
   const saveS = () => store.set("settings", S);
+  const GAL = 3.785; // litres per US gallon (fuel use is tracked in litres, shown in gallons)
   const saveStats = () => store.set("stats", stats);
 
   /* ---------------- Units ---------------- */
@@ -608,11 +609,12 @@
 
     // Fuel
     const today = stats.days[new Date().toISOString().slice(0, 10)] || { sec: 0, L: 0 };
-    const left = Math.max(0, S.tank - stats.sinceFillL);
+    const tankL = S.tankGal * GAL;
+    const left = Math.max(0, tankL - stats.sinceFillL);
     const hrs = left / fuelRate(s && s.level);
-    $("fuelBar").style.width = (left / S.tank) * 100 + "%";
-    $("fuelLeft").textContent = `≈ ${left.toFixed(1)} L · ${hrs.toFixed(0)} h left`;
-    $("fuelText").textContent = `Today ${(today.sec / 3600).toFixed(1)} h · ${today.L.toFixed(2)} L`;
+    $("fuelBar").style.width = (left / tankL) * 100 + "%";
+    $("fuelLeft").textContent = `≈ ${(left / GAL).toFixed(1)} gal · ${hrs.toFixed(0)} h left`;
+    $("fuelText").textContent = `Today ${(today.sec / 3600).toFixed(1)} h · ${(today.L / GAL).toFixed(2)} gal`;
 
     // Schedule
     $("warmOn").checked = S.warmOn; $("warmTime").value = S.warmTime;
@@ -713,7 +715,7 @@
     el.onchange = () => { S[key] = el.type === "checkbox" ? el.checked : num ? +el.value : el.value; saveS(); renderPresets(); render(); };
   };
   bind("setUnit", "unit"); bind("setClean", "cleanMins", 1); bind("setCoach", "coachHours", 1);
-  bind("setTank", "tank", 1); bind("setLead", "lead", 1); bind("setBatt", "batt");
+  bind("setTank", "tankGal", 1); bind("setLead", "lead", 1); bind("setBatt", "batt");
   bind("setBattV", "battV", 1); bind("setNative", "native"); bind("setProto", "proto");
   bind("setHUnit", "hUnit"); bind("setPin", "pin"); bind("setAll", "showAll"); bind("setRoom", "room");
   $("setRoom").addEventListener("change", () => { lastThermo = 0; if (S.room === "govee" && !goveeLive()) (S.goveeId ? restoreGovee() : pairGovee()); });
