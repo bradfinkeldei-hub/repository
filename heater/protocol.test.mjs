@@ -69,3 +69,10 @@ test("Govee H5074 and H5179 little-endian formats", () => {
 test("Govee ignores unrelated data", () => {
   assert.equal(G.decode(0x004c, [1, 2, 3], "iPhone"), null);
 });
+test("Govee H5051 (ihoment name, 9-byte format)", () => {
+  // 0x085C = 2140 -> 21.40°C, 0x0E10 = 3600 -> 36.00 %, battery 95
+  const r = G.decode(0xec88, [0x00, 0x5c, 0x08, 0x10, 0x0e, 95, 0x00, 0x00, 0x00], "ihoment_H5051_C0FE");
+  assert.equal(r.model, "H5051"); assert.equal(r.tempC, 21.4); assert.equal(r.hum, 36); assert.equal(r.batt, 95);
+  // Same packet without a name still decodes (Android sometimes hides it)
+  assert.equal(G.decode(0xec88, [0x00, 0x5c, 0x08, 0x10, 0x0e, 95, 0, 0, 0], "").tempC, 21.4);
+});
