@@ -71,21 +71,20 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 4. Upload the zip again (**Create deployment**) so the setting takes effect.
 
 **At home (old phone or iPad):**
-1. Open Ember, connect the heater, then go to **Settings → Home gateway** and turn it on.
-2. Write down the **home code** it shows, e.g. `JC4J-B78Y-UQMG`.
+1. Open Ember and connect the heater.
+2. Go to **Settings → Home gateway**, turn it on and **choose a PIN** (4–8 digits).
 3. Leave it plugged in, with Ember open, the screen on and Auto-Lock set to Never.
 
-**On your phone:** open Ember → **🏠 Control from away** → enter the home code.
+**On your phone:** open Ember → **🏠 Control from away** → enter your PIN.
 - **Commands take about a minute** to reach the heater.
 - **Starting the heater** needs two taps, so it can't start by accident.
 - **Turn off** runs the clean shutdown first.
 
 **Security:**
-- **Only someone with the home code can see or control the heater.** Keep the code private.
-- **The code isn't stored on Cloudflare in plain text,** only a scrambled (hashed) version of it.
-- **Only a short list of commands with sensible values is accepted.**
-- **The home device ignores commands older than 15 minutes.**
-- **Settings → New code** cuts off anyone holding the old code.
+- **A PIN you choose protects away control.** Only a salted, scrambled (hashed) version of it is stored.
+- **10 wrong PINs lock away control for 24 hours**, which makes guessing impractical.
+- **Settings → Change PIN** cuts off any phone using the old PIN.
+- **Only a short list of commands with sensible values is accepted.** The home device ignores commands older than 15 minutes.
 
 ## Good to know
 
@@ -103,6 +102,7 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 | Didn't reach full power or didn't turn off | Make sure the screen stayed on. Then Settings → **Copy log**. |
 | "Missing the Govee relay" | Re-upload the full zip (it includes `_worker.js`). |
 | "Cloudflare storage isn't switched on yet" | Do the one-time KV setup in step 5, then upload the zip again. |
+| "Too many wrong PINs" | Wait up to 24 hours. The lock clears by itself. |
 | Away screen says "Home offline?" | The home device is asleep, closed or out of Wi-Fi. Wake it up and keep Ember open. |
 | Govee temperature looks wrong | Settings → **Govee reports in** → switch between °F and °C. |
 

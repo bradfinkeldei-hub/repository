@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.21 | Away control uses a simple PIN you choose (4–8 digits). 10 wrong tries lock it for 24 hours. |
 | v1.20 | Control from away: an old phone or iPad at home acts as the gateway; your phone sends start/stop, presets and temperature through your Cloudflare site. |
 | v1.19 | Fuel is five tappable bars, one per gallon: tap a bar to set the tank (last bar = full). |
 | v1.18 | Set the fuel in the tank by hand (slider, ¼ ½ ¾ Full). Just three temperature buttons (Sleep, Comfort, Boost) plus one Custom. |

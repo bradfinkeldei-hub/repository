@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.20"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.21"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1056,29 +1056,25 @@
   /* ---------------- Control from away ----------------
    * Home gateway: this device stays by the heater, posts status and runs commands.
    * Away: your phone reads that status and sends commands. Both go through the
-   * site's _worker.js (Cloudflare KV), keyed by a secret home code. */
-  const ALPHA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const newCode = () => {
-    const a = new Uint8Array(12); crypto.getRandomValues(a);
-    const c = [...a].map((x) => ALPHA[x % ALPHA.length]).join("");
-    return `${c.slice(0, 4)}-${c.slice(4, 8)}-${c.slice(8)}`;
-  };
-  const cleanCode = (c) => String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const fmtCode = (c) => { const x = cleanCode(c); return x.length === 12 ? `${x.slice(0, 4)}-${x.slice(4, 8)}-${x.slice(8)}` : x; };
+   * site's _worker.js (Cloudflare KV), protected by a PIN you choose. */
+  const pinOf = (v) => String(v || "").replace(/\D/g, "");
   const GW_EVERY = FAST > 1 ? 2000 : 10000;
-  const remoteMsg = (e) => e.message === "NOT_SET_UP" ? "Cloudflare storage isn't switched on yet. Follow “Control from away” in the setup guide."
-    : e.message === "NO_RELAY" ? "Your Cloudflare site needs the latest Ember zip (with _worker.js)."
-    : /code/i.test(e.message) ? "That home code isn't valid." : "Can't reach your site: " + e.message;
+  const remoteMsg = (e) => ({
+    NOT_SET_UP: "Cloudflare storage isn't switched on yet. Follow “Control from away” in the setup guide.",
+    NO_RELAY: "Your Cloudflare site needs the latest Ember zip (with _worker.js).",
+    WRONG_PIN: "Wrong PIN." + (e.left != null ? ` ${e.left} tries left before a 24-hour lock.` : ""),
+    LOCKED: "Too many wrong PINs. Away control is locked for up to 24 hours.",
+    NO_HOME: "No home device yet. On the device at home, turn on Settings → Home gateway first.",
+  }[e.message] || "Can't reach your site: " + e.message);
 
-  async function rcall(method, path, body, code) {
+  async function rcall(method, path, body, pin) {
     let r;
     try {
-      r = await fetch("remote/" + path, { method, cache: "no-store", headers: { "X-Ember-Home": cleanCode(code), "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+      r = await fetch("remote/" + path, { method, cache: "no-store", headers: { "X-Ember-Pin": pinOf(pin), "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
     } catch { throw new Error("offline"); }
     if (!(r.headers.get("content-type") || "").includes("json")) throw new Error("NO_RELAY");
     const j = await r.json().catch(() => ({}));
-    if (r.status === 503) throw new Error("NOT_SET_UP");
-    if (!r.ok) throw new Error(j.message || "error " + r.status);
+    if (!r.ok) throw Object.assign(new Error(j.message || "error " + r.status), { left: j.left });
     return j;
   }
 
@@ -1116,10 +1112,10 @@
     saveS(); lastThermo = 0; renderPresets(); render();
   }
   async function gatewayTick() {
-    if (!S.gateway || !S.homeCode || gwBusy || !heater) return;
+    if (!S.gateway || !S.homePin || gwBusy || !heater) return;
     gwBusy = true;
     try {
-      const { cmds = [] } = await rcall("GET", "cmd?after=" + (S.gwLastId || 0), null, S.homeCode);
+      const { cmds = [] } = await rcall("GET", "cmd?after=" + (S.gwLastId || 0), null, S.homePin);
       for (const c of cmds) {
         S.gwLastId = Math.max(S.gwLastId || 0, c.id); saveS();
         if (Date.now() - c.at > 15 * 60000) { log("· skipped an old remote command: " + c.action); continue; }
@@ -1132,38 +1128,52 @@
       const minor = JSON.stringify([st.level, st.roomC == null ? null : Math.round(st.roomC), Math.round(st.leftL / GAL * 4)]);
       const since = Date.now() - gwPushAt;
       if (key !== gwKey || (minor !== gwMinor && since > 180000) || since > 600000) {
-        await rcall("POST", "state", st, S.homeCode);
+        await rcall("POST", "state", st, S.homePin);
         gwKey = key; gwMinor = minor; gwPushAt = Date.now();
       }
       gwInfo = "Online · ready for away control";
-    } catch (e) { gwInfo = remoteMsg(e); }
+    } catch (e) { gwInfo = e.message === "WRONG_PIN" ? "The PIN was changed somewhere else. Tap Change PIN to set it again here." : remoteMsg(e); }
     finally { gwBusy = false; renderGateway(); }
   }
   setInterval(gatewayTick, GW_EVERY);
   function renderGateway() {
     $("setGateway").checked = !!S.gateway;
     $("gwBox").hidden = !S.gateway;
-    $("gwCode").textContent = S.homeCode || "—";
+    $("gwCode").textContent = S.homePin ? "•".repeat(S.homePin.length) : "Not set";
     $("gwStatus").textContent = S.gateway ? gwInfo || "Starting…" : "";
     $("gwBadge").hidden = !S.gateway;
     $("gwBadge").classList.toggle("bad", !!gwInfo && !/^Online/.test(gwInfo));
     $("gwBadgeText").textContent = /^Online/.test(gwInfo) ? "Home gateway on · keep this screen on" : gwInfo || "Home gateway starting…";
   }
+  function startGateway() { S.gateway = true; saveS(); gwKey = ""; gwInfo = ""; renderGateway(); keepAwake(); gatewayTick(); }
   $("setGateway").onchange = (e) => {
-    S.gateway = e.target.checked;
-    if (S.gateway && !S.homeCode) S.homeCode = newCode();
-    saveS(); gwKey = ""; gwInfo = ""; renderGateway(); if (S.gateway) { keepAwake(); gatewayTick(); }
+    if (!e.target.checked) { S.gateway = false; saveS(); return renderGateway(); }
+    if (S.homePin) return startGateway();
+    e.target.checked = false; openPin("set");
   };
-  $("btnGwCopy").onclick = async () => { try { await navigator.clipboard.writeText(S.homeCode); toast("Home code copied"); } catch { toast(S.homeCode, 8000); } };
-  $("btnGwNew").onclick = () => {
-    if (!confirm("Make a new home code? Your phone will need the new code.")) return;
-    S.homeCode = newCode(); S.gwLastId = 0; saveS(); gwKey = ""; renderGateway(); gatewayTick();
-  };
+  $("btnGwNew").onclick = () => openPin(S.homePin ? "change" : "set");
+
+  /* ----- PIN sheet: set it (home), change it (home), or enter it (away) ----- */
+  let pinMode = "away";
+  function openPin(mode) {
+    pinMode = mode;
+    const T = {
+      set: ["Choose a PIN", "Pick 4 to 8 digits. You'll enter it on your phone to control the heater from away.", "New PIN", "Save PIN"],
+      change: ["Change PIN", "Enter the current PIN, then the new one. Phones using the old PIN will be asked for the new one.", "Current PIN", "Change PIN"],
+      away: ["Control from away", "Enter the PIN you set on the device at home (Settings → Home gateway).", "PIN", "Connect"],
+    }[mode];
+    $("pinTitle").textContent = T[0]; $("pinText").textContent = T[1];
+    $("awCode").placeholder = T[2]; $("btnAwsGo").textContent = T[3];
+    $("awCode2").hidden = mode !== "change";
+    $("awCode").value = ""; $("awCode2").value = ""; $("awsMsg").textContent = "";
+    $("settings").hidden = true; $("awaySetup").hidden = false;
+    setTimeout(() => $("awCode").focus(), 50);
+  }
 
   /* ----- Away (your phone) ----- */
   let awTimer = null, awState = null, awNow = 0, awPending = null, awArmed = 0, awTarget = null, awTargetTimer = null;
   function openAway() {
-    if (!S.awayCode) { $("awCode").value = ""; $("awsMsg").textContent = ""; $("awaySetup").hidden = false; return; }
+    if (!S.awayPin) return openPin("away");
     $("connect").hidden = true; $("main").hidden = true; $("away").hidden = false;
     awayPoll(); clearInterval(awTimer); awTimer = setInterval(awayPoll, GW_EVERY);
   }
@@ -1171,27 +1181,40 @@
   $("btnAway").onclick = openAway;
   $("btnAwayExit").onclick = closeAway;
   $("btnAwsClose").onclick = () => ($("awaySetup").hidden = true);
-  $("btnAwayForget").onclick = () => { S.awayCode = null; saveS(); closeAway(); openAway(); };
+  $("btnAwayForget").onclick = () => { S.awayPin = null; saveS(); closeAway(); openAway(); };
   $("btnAwsGo").onclick = async () => {
-    const code = cleanCode($("awCode").value);
-    if (code.length !== 12) return ($("awsMsg").textContent = "The code has 12 letters and numbers, like ABCD-EFGH-JK23.");
+    const pin = pinOf($("awCode").value), pin2 = pinOf($("awCode2").value);
+    const bad = (p) => p.length < 4 || p.length > 8;
+    if (bad(pin) || (pinMode === "change" && bad(pin2))) return ($("awsMsg").textContent = "A PIN is 4 to 8 digits.");
     $("awsMsg").textContent = "Checking…";
     try {
-      const j = await rcall("GET", "state", null, code);
-      if (!j.state) return ($("awsMsg").textContent = "No home device found with that code yet. Make sure Home gateway is on at home, then try again in a minute.");
-      S.awayCode = fmtCode(code); saveS(); $("awaySetup").hidden = true; openAway();
-    } catch (e) { $("awsMsg").textContent = remoteMsg(e); }
+      if (pinMode === "away") {
+        await rcall("GET", "state", null, pin);
+        S.awayPin = pin; saveS(); $("awaySetup").hidden = true; return openAway();
+      }
+      const newPin = pinMode === "change" ? pin2 : pin;
+      await rcall("POST", "register", { pin: newPin }, pinMode === "change" ? pin : pin);
+      S.homePin = newPin; S.gwLastId = 0; saveS();
+      $("awaySetup").hidden = true; toast(pinMode === "change" ? "PIN changed" : "PIN saved. Home gateway is on.");
+      startGateway();
+    } catch (e) {
+      $("awsMsg").textContent = pinMode === "set" && e.message === "WRONG_PIN"
+        ? "This site already has a home PIN. Enter that PIN, or use Change PIN." : remoteMsg(e);
+    }
   };
 
   async function awayPoll() {
     try {
-      const j = await rcall("GET", "state", null, S.awayCode);
+      const j = await rcall("GET", "state", null, S.awayPin);
       awState = j.state; awNow = j.now; renderAway();
-    } catch (e) { $("awFresh").textContent = remoteMsg(e); $("awPill").className = "pill bad"; $("awPillText").textContent = "No connection"; }
+    } catch (e) {
+      if (e.message === "WRONG_PIN") { S.awayPin = null; saveS(); closeAway(); openPin("away"); $("awsMsg").textContent = "The PIN was changed. Enter the new one."; return; }
+      $("awFresh").textContent = remoteMsg(e); $("awPill").className = "pill bad"; $("awPillText").textContent = "No connection";
+    }
   }
   async function awaySend(action, value, note) {
     try {
-      await rcall("POST", "cmd", { action, value }, S.awayCode);
+      await rcall("POST", "cmd", { action, value }, S.awayPin);
       awPending = { action, value, at: Date.now() };
       $("awMsg").textContent = note || "Sent. Your home device picks it up within about a minute.";
     } catch (e) { $("awMsg").textContent = remoteMsg(e); }
