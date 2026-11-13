@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.10"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.11"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -572,6 +572,43 @@
     [...bars.children].forEach((b, i) => b.classList.toggle("on", i < lvl));
   }
 
+  // Plain-English "what's happening" line under the status.
+  function teachText(s) {
+    const t = show(S.targetC), u = "°", lo = S.minLevel || 1, max = maxLevel();
+    const near = show(S.targetC - 3), room = ambientC();
+    if (!s) return "";
+    if (s.power === "error") return "The heater stopped because of a fault. See the message above.";
+    if (s.power === "cooling") return "The fan keeps running a few minutes to cool the heater safely. Don't cut the power.";
+    if (s.power === "fan") return "Fan only: blowing air without burning fuel.";
+    if (s.power === "off") {
+      return S.mode === "manual"
+        ? "Tap Start. It runs at the level you pick until you turn it off."
+        : `Tap Start. It heats at full power until about ${near}${u}, then eases down to level ${lo} at ${t}${u}.`;
+    }
+    if (s.power === "starting") return "Igniting: the glow plug lights the fuel. This takes 1 to 3 minutes.";
+    if (S.mode === "manual") return `Fixed at level ${s.level ?? "—"}. The thermostat is paused until you switch back.`;
+    if (S.native && heater.proto.hasThermostat && S.room !== "govee") return `The heater's own thermostat is holding ${t}${u}. It may turn itself off and on.`;
+    if (room == null) return "Waiting for a room temperature reading…";
+    const r = show(room);
+    if (r >= t) return `At ${t}${u}: holding at level ${lo}. It stays on (it won't shut off by itself) and steps back up if the room cools.`;
+    if (r <= near) return `Heating up at full power. It starts easing down at ${near}${u}.`;
+    return `Getting close (${t - r}${u} to go): easing the power down to save fuel and avoid overshooting.`;
+  }
+
+  function renderHow() {
+    const t = show(S.targetC), u = "°", lo = S.minLevel || 1, max = maxLevel(), near = show(S.targetC - 3);
+    const steps = [
+      ["Heating up", `Below ${near}${u}, it runs at full power (level ${max}) to warm up fast.`],
+      ["Getting close", `From ${near}${u} to ${t}${u}, it lowers the power step by step so it doesn't overshoot.`],
+      ["At temperature", `At ${t}${u}, it holds at level ${lo}. It doesn't turn off. If the room cools, the power goes back up.`],
+      ["Turning off", S.cleanMins
+        ? `When you tap Turn off, it runs ${S.cleanMins} min at full power to burn off carbon, then shuts down. The fan cools it for a few minutes.`
+        : "When you tap Turn off, it shuts down right away. The fan cools it for a few minutes."],
+    ];
+    $("howSteps").innerHTML = steps.map(([h, p], i) => `<li><b><i>${i + 1}</i>${h}</b><span>${p}</span></li>`).join("");
+    $("howFoot").textContent = `It checks the ${useGovee() ? "Govee" : "heater's"} temperature about every 45 seconds. Keep this app open: if it closes, the heater stays at its last level. Running on low for hours builds carbon, so you'll be reminded to do a clean burn.`;
+  }
+
   const POWER_TEXT = { off: "Off", starting: "Igniting", running: "Heating", cooling: "Cooling down", fan: "Fan only", error: "Fault" };
 
   function render() {
@@ -589,6 +626,7 @@
       if (S.mode === "thermo" && room != null) line += show(room) >= show(S.targetC) ? " · at temperature" : "";
     }
     $("statusLine").textContent = line;
+    $("teach").textContent = teachText(s);
 
     // Fault
     const faults = (heater && heater.proto && heater.proto.faults) || P.FAULTS;
@@ -739,6 +777,9 @@
   $("setRoom").addEventListener("change", () => { lastThermo = 0; if (S.room === "govee" && !goveeLive()) (S.goveeId ? restoreGovee() : pairGovee()); });
   $("btnPairGovee").onclick = pairGovee;
   $("btnGovee").onclick = pairGovee; // the picker needs a tap, so this always opens it
+  $("btnHow").onclick = () => { renderHow(); $("how").hidden = false; };
+  $("btnHowClose").onclick = () => ($("how").hidden = true);
+  $("how").addEventListener("click", (e) => { if (e.target.id === "how") $("how").hidden = true; });
   $("btnSettings").onclick = () => { $("settings").hidden = false; log("· settings opened"); };
   $("btnClose").onclick = () => ($("settings").hidden = true);
   $("settings").addEventListener("click", (e) => { if (e.target.id === "settings") $("settings").hidden = true; });

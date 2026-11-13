@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b0b0d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Ember Heater v1.10</title>
+<title>Ember Heater v1.11</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-512.png">
@@ -24,7 +24,7 @@
       <defs><linearGradient id="mg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff5a1f"/><stop offset="1" stop-color="#ffc06a"/></linearGradient></defs>
       <path fill="url(#mg)" d="M32 4c2 10 14 16 14 32a14 14 0 0 1-28 0c0-7 3-11 6-14 0 5 2 8 5 9-1-10 1-19 3-27z"/>
     </svg>
-    <h1>Ember <span class="ver" data-version>v1.10</span></h1>
+    <h1>Ember <span class="ver" data-version>v1.11</span></h1>
     <p class="sub">Smarter control for your Hcalory heater</p>
     <button id="btnConnect" class="btn primary wide">Connect heater</button>
     <button id="btnAll" class="btn ghost wide">Don't see it? Show all devices</button>
@@ -38,7 +38,7 @@
 <!-- Main -->
 <section id="main" class="screen" hidden>
   <header class="top">
-    <div class="brand">Ember <span class="ver" data-version>v1.10</span></div>
+    <div class="brand">Ember <span class="ver" data-version>v1.11</span></div>
     <div class="pill" id="pill"><span class="dot"></span><span id="pillText">Connected</span></div>
     <button class="icon-btn" id="btnSettings" aria-label="Settings">
       <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
@@ -79,16 +79,18 @@
     </div>
     <div class="presets" id="presets"></div>
     <button id="btnGovee" class="chip" hidden>Connect Govee thermometer</button>
+    <button id="btnHow" class="link">How it heats</button>
   </div>
 
   <!-- Manual -->
   <div id="manualView" hidden>
     <div class="level-big"><span id="levelNum">3</span><small>of <span id="levelMax">6</span></small></div>
     <div class="bars" id="bars"></div>
-    <p class="hint">Heat output. Higher burns cleaner.</p>
+    <p class="hint">You pick a fixed heat output. The thermostat is paused.<br>Higher levels burn cleaner. Level 10 is full power.</p>
   </div>
 
   <div class="statusline" id="statusLine">Off</div>
+  <p class="teach" id="teach"></p>
 
   <button id="btnPower" class="btn primary wide big">Start heating</button>
 
@@ -148,13 +150,22 @@
   </div>
 </div>
 
+<!-- How it heats -->
+<div id="how" class="overlay sheet" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2>How it heats</h2><button class="icon-btn" id="btnHowClose" aria-label="Close">✕</button></div>
+    <ol class="how" id="howSteps"></ol>
+    <p class="fine" id="howFoot"></p>
+  </div>
+</div>
+
 <!-- Settings -->
 <div id="settings" class="overlay sheet" hidden>
   <div class="sheet-inner">
     <div class="sheet-head"><h2>Settings</h2><button class="icon-btn" id="btnClose" aria-label="Close">✕</button></div>
 
     <div class="group">
-      <label class="row">Room gauge
+      <label class="row"><span>Room gauge<small>Where the room temperature comes from.</small></span>
         <select id="setRoom"><option value="heater">Heater sensor</option><option value="govee">Govee thermometer</option></select></label>
       <div class="row"><span>Thermometer <span class="muted" id="goveeStatus">Not paired</span></span>
         <button class="btn small" id="btnPairGovee">Pair</button></div>
@@ -163,24 +174,24 @@
     <div class="group">
       <label class="row">Temperature
         <select id="setUnit"><option value="F">°F</option><option value="C">°C</option></select></label>
-      <label class="row">Clean shutdown length
+      <label class="row"><span>Clean shutdown length<small>When you turn off, it first runs at full power to burn off carbon.</small></span>
         <select id="setClean"><option value="0">Off</option><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option></select></label>
-      <label class="row">Thermostat lowest level
+      <label class="row"><span>Thermostat lowest level<small>At your temperature, the heater idles here instead of turning off.</small></span>
         <select id="setMin"><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">Level 3</option><option value="4">Level 4</option></select></label>
-      <label class="row">Remind clean burn after
+      <label class="row"><span>Remind clean burn after<small>Long runs on low build carbon. You'll get a reminder.</small></span>
         <select id="setCoach"><option value="2">2 h on low</option><option value="4">4 h on low</option><option value="6">6 h on low</option></select></label>
-      <label class="row">Tank size
+      <label class="row"><span>Tank size<small>Used for the fuel gauge and hours-left estimates.</small></span>
         <select id="setTank"><option value="1.6">1.6 gal (built-in)</option><option value="2">2 gal</option><option value="3">3 gal</option><option value="5">5 gal</option><option value="10">10 gal</option></select></label>
-      <label class="row">Warm-by head start
+      <label class="row"><span>Warm-by head start<small>How early to start so it's warm by your time.</small></span>
         <select id="setLead"><option value="15">15 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="60">60 min</option></select></label>
     </div>
 
     <div class="group">
-      <label class="row">Battery guard
+      <label class="row"><span>Battery guard<small>Turns the heater off before your battery runs too low.</small></span>
         <label class="switch"><input type="checkbox" id="setBatt"><i></i></label></label>
       <label class="row">Turn off below
         <select id="setBattV"><option value="11.2">11.2 V</option><option value="11.5">11.5 V</option><option value="11.8">11.8 V</option><option value="12.0">12.0 V</option></select></label>
-      <label class="row" id="nativeRow">Use heater's own thermostat
+      <label class="row" id="nativeRow"><span>Use heater's own thermostat<small>The heater controls itself and works with your phone away, but may cycle off and on.</small></span>
         <label class="switch"><input type="checkbox" id="setNative"><i></i></label></label>
       <p class="fine">Battery levels are for 12 V. They double automatically on 24 V.</p>
     </div>
@@ -200,7 +211,7 @@
     </div>
 
     <button class="btn ghost wide" id="btnDisconnect">Disconnect</button>
-    <p class="fine center"><span data-version>v1.10</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
+    <p class="fine center"><span data-version>v1.11</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
   </div>
 </div>
 

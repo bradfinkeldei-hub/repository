@@ -33,6 +33,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.11 | Teaches how it heats: a live explanation under the status, a "How it heats" guide and help text in Settings. |
 | v1.10 | Thermostat never goes below level 2 (adjustable in Settings). |
 | v1.9 | Fuel card shows hours left at every power level, with the current level highlighted. |
 | v1.8 | Fuel shown in gallons; tank size in gallons (default 5 gal). |
