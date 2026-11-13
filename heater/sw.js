@@ -1,5 +1,5 @@
 // Keeps Ember working offline (vans and cabins often have no signal).
-const CACHE = "ember-v1.12";
+const CACHE = "ember-v1.13";
 const FILES = ["./", "index.html", "style.css", "app.js", "protocol.js", "govee.js", "icon.svg", "icon-512.png", "manifest.webmanifest"];
 self.addEventListener("install", (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener("activate", (e) => e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())));

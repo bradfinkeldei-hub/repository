@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.12"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.13"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -199,6 +199,22 @@
     }
     async start() { await this.sendAll(this.proto.start()); return this.poll(); }
     async stop() { await this.sendAll(this.proto.stop()); return this.poll(); }
+    // Turn off, checked: confirm the heater is shutting down, retry (and re-send the PIN) if not.
+    async stopVerified() {
+      this.busy++;
+      try {
+        for (let attempt = 1; attempt <= 5; attempt++) {
+          await this.sendAll(this.proto.stop());
+          await sleep(1500);
+          const s = await this.poll();
+          this.log(`· turn off attempt ${attempt}: ${s ? s.power : "no reply"}`);
+          if (s && (s.power === "off" || s.power === "cooling")) return true;
+          if (attempt >= 2 && this.proto === P.H) { this.log("· re-sending PIN"); this.unlocked = await this.unlock(); }
+        }
+        this.log("✗ heater did not turn off");
+        return false;
+      } finally { this.busy--; }
+    }
     async ensureMode(mode) {
       const p = this.proto;
       if (!p.hasThermostat || !this.status || this.status.mode === mode) return;
@@ -368,7 +384,10 @@
         await sleep(1000 * Math.min(8, 1 + i * 2));
         await link.connect();
         heater.lastSend = 0;
+        // Newer Hcalory heaters forget the unlock when the link drops.
+        if (heater.proto === P.H) heater.unlocked = await heater.unlock();
         await heater.poll();
+        log("· reconnected");
         setPill("ok", "Connected");
         reconnecting = false;
         return;
@@ -434,7 +453,7 @@
     lowVSince = lowVSince || Date.now();
     if ((Date.now() - lowVSince) * FAST > 60000) {
       lowVSince = null; clean = null; store.set("clean", null);
-      heater.stop();
+      heater.stopVerified();
       toast(`Turned off to protect your battery (${s.volts} V)`, 6000);
     }
   }
@@ -477,16 +496,17 @@
 
   async function turnOff() {
     clean = null; store.set("clean", null); $("clean").hidden = true;
-    await heater.stop();
-    toast("Turning off. The fan runs a few minutes to cool down.");
+    toast("Turning off…");
+    const ok = await heater.stopVerified();
+    toast(ok ? "Turning off. The fan runs a few minutes to cool down." : "The heater didn't confirm it turned off. Check it, then Settings → Copy log.", ok ? 3200 : 9000);
   }
 
   async function finishClean() {
     const c = clean; clean = null; store.set("clean", null); $("clean").hidden = true;
     stats.lowSec = 0; saveStats();
     if (c.kind === "shutdown") {
-      await heater.stop();
-      toast("Clean shutdown done. Cooling down now.");
+      const ok = await heater.stopVerified();
+      toast(ok ? "Clean shutdown done. Cooling down now." : "The heater didn't confirm it turned off. Check it, then Settings → Copy log.", ok ? 3200 : 9000);
     } else {
       lastThermo = 0;
       toast("Clean burn done. Back to your setting.");

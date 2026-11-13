@@ -33,6 +33,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.13 | Turning off is confirmed and retried (re-sends the PIN if needed); re-unlocks after a Bluetooth reconnect; warns to keep the screen unlocked during clean shutdown. |
 | v1.12 | Manual tune: save your own heating styles (heat-up level, ease-down point, hold level, clean-burn length) and switch with one tap. |
 | v1.11 | Teaches how it heats: a live explanation under the status, a "How it heats" guide and help text in Settings. |
 | v1.10 | Thermostat never goes below level 2 (adjustable in Settings). |
