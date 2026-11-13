@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.17"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.18"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -25,14 +25,21 @@
   // Heating styles ("tunes"): Standard is built in; custom ones are saved on this phone.
   const STD = () => ({ id: "std", name: "Standard", max: 10, bandC: 3, hold: S.minLevel || 2, clean: S.cleanMins });
   const tune = () => S.tunes.find((t) => t.id === S.tuneId) || STD();
-  // The four starter buttons are ordinary tunes, so every one can be edited.
-  const STARTERS = [["Frost", 5], ["Sleep", 17], ["Comfort", 21], ["Boost", 25]];
+  // Three temperature buttons + one Custom. All are ordinary tunes, so every one can be edited.
+  const STARTERS = [["Sleep", 17], ["Comfort", 21], ["Boost", 25]];
   const starterTunes = () => STARTERS.map(([n, c]) => ({ id: "p-" + n.toLowerCase(), name: n, targetC: c, max: 10, bandC: 3, hold: S.minLevel || 2, clean: S.cleanMins }));
   if (!S.seeded) {
     S.tunes = [...starterTunes(), ...S.tunes];
     S.seeded = true;
     const match = S.tunes.find((t) => Math.abs(t.targetC - S.targetC) < 0.3);
     if (S.tuneId === "std" && match) S.tuneId = match.id;
+    store.set("settings", S);
+  }
+  if (!S.threeButtons) { // v1.18: keep just Sleep, Comfort, Boost and one Custom
+    const customs = S.tunes.filter((t) => !t.id.startsWith("p-"));
+    S.tunes = [...S.tunes.filter((t) => t.id.startsWith("p-") && t.id !== "p-frost"), ...customs.slice(0, 1)];
+    if (!S.tunes.some((t) => t.id === S.tuneId)) S.tuneId = "p-comfort";
+    S.threeButtons = true;
     store.set("settings", S);
   }
   const GAL = 3.785; // litres per US gallon (fuel use is tracked in litres, shown in gallons)
@@ -648,9 +655,12 @@
   // Preset buttons: the built-in four (Standard style) + your saved tunes + "＋ Custom".
   function renderPresets() {
     const esc = (x) => String(x).replace(/[<&"]/g, (m) => ({ "<": "&lt;", "&": "&amp;", '"': "&quot;" }[m]));
-    $("presets").innerHTML =
-      S.tunes.map((t) => `<button class="preset" data-tune="${t.id}"><b>${show(t.targetC ?? S.targetC)}°</b><span>${esc(t.name)}</span></button>`).join("") +
-      `<button class="preset add" data-new="1"><b>＋</b><span>Custom</span></button>`;
+    const order = STARTERS.map(([n]) => "p-" + n.toLowerCase());
+    const starters = order.map((id) => S.tunes.find((t) => t.id === id)).filter(Boolean);
+    const custom = S.tunes.find((t) => !t.id.startsWith("p-"));
+    const btn = (t, cls = "") => `<button class="preset${cls}" data-tune="${t.id}"><b>${show(t.targetC ?? S.targetC)}°</b><span>${esc(t.name)}</span></button>`;
+    $("presets").innerHTML = starters.map((t) => btn(t)).join("") +
+      (custom ? btn(custom, " custom") : `<button class="preset add" data-new="1"><b>＋</b><span>Custom</span></button>`);
     markPresets();
   }
   function markPresets() {
@@ -897,7 +907,7 @@
     const custom = S.tunes.filter((t) => !t.id.startsWith("p-"));
     S.tunes = [...starterTunes(), ...custom];
     if (!S.tunes.some((t) => t.id === S.tuneId)) S.tuneId = "p-comfort";
-    saveS(); renderPresets(); render(); toast("Frost, Sleep, Comfort and Boost reset");
+    saveS(); renderPresets(); render(); toast("Sleep, Comfort and Boost reset");
   };
 
   document.querySelectorAll(".seg-btn[data-mode]").forEach((b) => (b.onclick = () => { S.mode = b.dataset.mode; saveS(); lastThermo = 0; render(); }));
@@ -922,6 +932,30 @@
   $("btnKeep").onclick = () => { clean = null; store.set("clean", null); $("clean").hidden = true; lastThermo = 0; toast("Still heating"); };
   $("btnBurn").onclick = () => beginClean("burn");
   $("btnFilled").onclick = () => { stats.sinceFillL = 0; saveStats(); render(); toast("Tank marked full"); };
+
+  // Set the fuel in the tank by hand (after a partial fill, or to correct the estimate).
+  const fuelNow = () => Math.max(0, S.tankGal - stats.sinceFillL / GAL);
+  function showFuelVal() {
+    const v = +$("fuelRange").value;
+    $("fuelVal").textContent = v.toFixed(1);
+    $("fuelRange").style.setProperty("--p", (v / S.tankGal) * 100 + "%");
+    document.querySelectorAll("#fuelQuick button").forEach((b) => b.classList.toggle("on", Math.abs(+b.dataset.f * S.tankGal - v) < 0.05));
+  }
+  $("btnFuelAdjust").onclick = () => {
+    $("fuelRange").max = S.tankGal;
+    $("fuelRange").value = Math.round(fuelNow() * 10) / 10;
+    $("fuelCap").textContent = S.tankGal;
+    showFuelVal(); $("fuelSheet").hidden = false;
+  };
+  $("fuelRange").oninput = showFuelVal;
+  $("fuelQuick").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; $("fuelRange").value = +b.dataset.f * S.tankGal; showFuelVal(); };
+  $("btnFuelSave").onclick = () => {
+    const v = +$("fuelRange").value;
+    stats.sinceFillL = Math.max(0, (S.tankGal - v) * GAL); saveStats();
+    $("fuelSheet").hidden = true; render(); toast(`Fuel set to ${v.toFixed(1)} gal`);
+  };
+  $("btnFuelClose").onclick = () => ($("fuelSheet").hidden = true);
+  $("fuelSheet").addEventListener("click", (e) => { if (e.target.id === "fuelSheet") $("fuelSheet").hidden = true; });
   $("warmOn").onchange = (e) => { S.warmOn = e.target.checked; saveS(); render(); if (S.warmOn) keepAwake(); };
   $("warmTime").onchange = (e) => { S.warmTime = e.target.value; store.set("warmFired", ""); saveS(); };
 
@@ -951,7 +985,7 @@
     draft = { ...src, band: bandShow(src.bandC), temp: show(src.targetC ?? S.targetC), id: isNew ? "t" + Date.now() : src.id, isNew };
     if (isNew) draft.name = "Custom " + (S.tunes.length + 1);
     $("tuneName").value = draft.name;
-    $("btnTuneDelete").hidden = isNew;
+    $("btnTuneDelete").hidden = isNew || String(draft.id).startsWith("p-"); // the three main buttons stay; edit or reset them
     renderTuner();
     $("tuner").hidden = false;
   }

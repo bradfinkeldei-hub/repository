@@ -36,6 +36,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.18 | Set the fuel in the tank by hand (slider, ¼ ½ ¾ Full). Just three temperature buttons (Sleep, Comfort, Boost) plus one Custom. |
 | v1.17 | Status bar at the top (on/off, level, setting, fuel left at that level) that stays visible while scrolling. Fixes sideways overflow on iPhone. |
 | v1.16 | Govee setup screen: connect over Wi-Fi with a Govee API key (works on iPhone, via the included _worker.js relay) or Bluetooth (Android Chrome). Fixes the "Re-pair" label. |
 | v1.15 | Every preset button (Frost, Sleep, Comfort, Boost and your own) can be edited: temperature, name, levels, clean burn. Reset in Settings. |
