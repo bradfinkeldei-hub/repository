@@ -96,7 +96,7 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 - **Power level:** tap levels 1–10 to set the speed directly.
 - **Shut down:** pick a **1, 5 or 10 min** burn-off at full power, and then it turns off.
 - **Off now:** turns off right away. It also works during a clean shutdown.
-- **Fan only:** runs the blower with no heat and no fuel. Tap again to stop it.
+- **Fan only:** runs the blower with no heat and no fuel. Tap the bars to set the fan speed (1–10). Tap the button again to stop it.
 - **Updates:** while the away screen is open, the status updates every few seconds and the "Updated … ago" line shows how fresh it is. Commands usually arrive within seconds, and can take up to about a minute.
 
 **Security:**

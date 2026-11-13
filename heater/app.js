@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.26"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.27"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -766,18 +766,19 @@
     const running = s && (s.power === "running" || s.power === "starting");
     const lvl = running ? s.level : null;
     $("sbLevel").innerHTML = lvl != null ? `Level <b>${lvl}</b><small> / ${max}</small>`
-      : s && s.power === "fan" ? "No heat · no fuel"
+      : s && s.power === "fan" ? (s.level != null ? `Fan <b>${s.level}</b><small> / ${max}</small>` : "Fan · no fuel")
       : s && s.power === "error" ? "Needs attention"
       : running && s.setpoint != null ? `Heater set <b>${s.setpoint}°</b>`
       : S.mode === "manual" ? `Runs level ${S.level || 5}`
       : `Runs level ${tune().hold}–${Math.min(max, tune().max)}`;
     const segs = $("sbSegs");
     if (segs.children.length !== max) segs.innerHTML = "<i></i>".repeat(max);
-    [...segs.children].forEach((el, i) => el.classList.toggle("on", lvl != null && i < lvl));
+    const segLvl = lvl ?? (s && s.power === "fan" ? s.level : null);
+    [...segs.children].forEach((el, i) => el.classList.toggle("on", segLvl != null && i < segLvl));
 
     const room = ambientC();
     const roomTxt = room != null ? ` · room ${show(room)}°` : "";
-    $("sbSetting").textContent = S.mode === "manual"
+    $("sbSetting").textContent = s && s.power === "fan" ? `Fan only · no fuel used${roomTxt}` : S.mode === "manual"
       ? `Manual · level ${S.level || (lvl ?? "—")}${roomTxt}`
       : `${tune().name} · ${show(S.targetC)}°${roomTxt}`;
 
@@ -830,6 +831,7 @@
     $("btnFan").hidden = !s || !(s.power === "off" || fanOn) || !heater.proto.fan;
     $("btnFan").textContent = fanOn ? "Stop fan" : "Fan only (no heat)";
     $("btnFan").classList.toggle("on", !!fanOn);
+    renderFanBars("fanBox", fanOn ? s.level : null, !!fanOn);
 
     // Carbon coach
     const pct = Math.min(1, stats.lowSec / (S.coachHours * 3600));
@@ -1024,6 +1026,23 @@
   $("btnRetry").onclick = () => recover(true);
   $("btnReset").onclick = () => recover(false);
 
+  // Fan speed bars (fan-only mode), shared by home and away.
+  function renderFanBars(id, lvl, show) {
+    $(id).hidden = !show;
+    if (!show) return;
+    const max = maxLevel(), bars = $(id + "Bars");
+    if (bars.children.length !== max) bars.innerHTML = Array.from({ length: max }, (_, i) => `<button class="bar" data-l="${i + 1}" style="height:${30 + (70 * (i + 1)) / max}%" aria-label="Fan speed ${i + 1}"></button>`).join("");
+    [...bars.children].forEach((b, i) => b.classList.toggle("on", lvl != null && i < lvl));
+  }
+  $("fanBoxBars").addEventListener("click", async (e) => {
+    const b = e.target.closest(".bar"); if (!b || !heater || !heater.status || heater.status.power !== "fan") return;
+    const l = +b.dataset.l;
+    [...$("fanBoxBars").children].forEach((x, i) => x.classList.toggle("on", i < l));
+    const r = await heater.stepTo(l);
+    const s = heater.status;
+    if (s && s.level !== l) toast("The heater didn't confirm the fan speed. If it didn't change, Settings → Copy log and send it over.", 7000);
+  });
+
   // Turn off: pick 1, 5 or 10 min burn-off, or off right away.
   function openOffSheet() {
     const def = tune().clean;
@@ -1208,6 +1227,7 @@
     else if (c.action === "stop" && s && isOn(s) && !clean) { await beginClean("shutdown", [1, 5, 10].includes(c.value) ? c.value : undefined); }
     else if (c.action === "stopnow" && s && (isOn(s) || clean || s.power === "fan")) { await turnOff(); }
     else if (c.action === "fan" && s && s.power === "off") { await heater.fan(); }
+    else if (c.action === "fanlevel" && s && s.power === "fan") { await heater.stepTo(Math.max(1, Math.min(maxLevel(), +c.value))); }
     else if (c.action === "retry") { await recover(true, true); }
     else if (c.action === "reset") { await recover(false, true); }
     else if (c.action === "tune") {
@@ -1361,11 +1381,12 @@
       state = "clean"; label = `Clean shutdown · ${Math.max(1, Math.ceil(left / 60000))} min`;
     }
     $("awBar").dataset.state = state; $("awState").textContent = label;
-    $("awLevel").innerHTML = st.power === "fan" ? "No heat · no fuel" : st.power === "error" ? "Needs attention" : on && st.level != null ? `Level <b>${st.level}</b><small> / ${max}</small>` : on && st.setpoint != null ? `Heater set <b>${st.setpoint}°</b>` : st.mode === "manual" ? `Runs level ${st.manualLevel || "—"}` : `Runs level ${st.hold}–${st.top}`;
+    $("awLevel").innerHTML = st.power === "fan" ? (st.level != null ? `Fan <b>${st.level}</b><small> / ${max}</small>` : "Fan · no fuel") : st.power === "error" ? "Needs attention" : on && st.level != null ? `Level <b>${st.level}</b><small> / ${max}</small>` : on && st.setpoint != null ? `Heater set <b>${st.setpoint}°</b>` : st.mode === "manual" ? `Runs level ${st.manualLevel || "—"}` : `Runs level ${st.hold}–${st.top}`;
     const segs = $("awSegs"); if (segs.children.length !== max) segs.innerHTML = "<i></i>".repeat(max);
-    [...segs.children].forEach((el, i) => el.classList.toggle("on", on && st.level != null && i < st.level));
+    const segL = (on || st.power === "fan") && st.level != null ? st.level : null;
+    [...segs.children].forEach((el, i) => el.classList.toggle("on", segL != null && i < segL));
     const room = st.roomC != null ? ` · room ${show(st.roomC)}°` : "";
-    $("awSetting").textContent = st.mode === "manual" ? `Manual · level ${st.manualLevel || "—"}${room}` : `${st.tuneName} · ${show(st.targetC)}°${room}`;
+    $("awSetting").textContent = st.power === "fan" ? `Fan only · no fuel used${room}` : st.mode === "manual" ? `Manual · level ${st.manualLevel || "—"}${room}` : `${st.tuneName} · ${show(st.targetC)}°${room}`;
     const gal = (st.leftL / GAL).toFixed(1), lvl = on && st.level != null ? st.level : st.mode === "manual" ? st.manualLevel || 5 : st.top;
     const rate = 0.16 + (0.62 - 0.16) * (Math.max(1, Math.min(max, lvl)) - 1) / (max - 1);
     $("awFuel").textContent = `${gal} gal · ≈ ${Math.round(st.leftL / rate)} h at level ${lvl}`;
@@ -1398,6 +1419,7 @@
     $("awFan").hidden = !(st.power === "off" || fanOn) || !live;
     $("awFan").textContent = fanOn ? "Stop fan" : "Fan only (no heat)";
     $("awFan").classList.toggle("on", fanOn);
+    renderFanBars("awFanBox", fanOn ? (awFanLvl ?? st.level) : null, fanOn && st.connected && !stale);
     $("awOff").hidden = !(on || st.clean);
     $("awClean").hidden = !!st.clean; $("awClean").disabled = !live;
     $("awOffNow").disabled = !live;
@@ -1408,10 +1430,11 @@
         (awPending.action === "tune" && st.tuneId === awPending.value) || (awPending.action === "target" && Math.abs(st.targetC - awPending.value) < 0.3) ||
         (awPending.action === "stopnow" && (st.power === "cooling" || st.power === "off")) ||
         (awPending.action === "fan" && st.power === "fan") ||
+        (awPending.action === "fanlevel" && st.power === "fan" && st.level === awPending.value) ||
         ((awPending.action === "retry" || awPending.action === "reset") && st.power !== "error") ||
         (awPending.action === "mode" && st.mode === awPending.value) ||
         (awPending.action === "level" && st.mode === "manual" && (on ? st.level === awPending.value : st.manualLevel === awPending.value));
-      if (done) { $("awMsg").textContent = "Done ✓ The heater has it."; awPending = null; awView = null; awLvl = null; if (!awTargetTimer) awTarget = null; }
+      if (done) { $("awMsg").textContent = "Done ✓ The heater has it."; awPending = null; awView = null; awLvl = null; awFanLvl = null; if (!awTargetTimer) awTarget = null; }
     }
   }
   $("awPower").onclick = () => {
@@ -1431,6 +1454,12 @@
     const m = +b.dataset.min;
     awaySend("stop", m, `Sent. ${m} min burn-off at full power, then it turns off.`);
   };
+  let awFanLvl = null;
+  $("awFanBoxBars").addEventListener("click", (e) => {
+    const b = e.target.closest(".bar"); if (!b || !awState) return;
+    awFanLvl = +b.dataset.l; renderAway();
+    awaySend("fanlevel", awFanLvl, `Sent: fan speed ${awFanLvl}.`);
+  });
   $("awReset").onclick = () => awaySend("reset", null, "Sent. It clears the fault and stays off.");
   $("awFan").onclick = () => {
     if (!awState) return;

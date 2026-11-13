@@ -379,3 +379,7 @@ body { max-width: 100%; }
 .fault-actions .btn { border-color: rgba(255, 93, 93, .35); }
 .fault-code { white-space: nowrap; }
 .aw-fault { margin: -4px 0 14px; padding: 12px 14px; border-radius: 16px; background: rgba(255, 93, 93, .08); border: 1px solid rgba(255, 93, 93, .3); color: var(--text); font-size: 13px; line-height: 1.45; }
+.fan-speed { margin-top: 6px; }
+.fan-bars { height: 80px; }
+.fan-bars .bar.on { background: linear-gradient(180deg, #b9d2ff, #6f9cff); }
+.sbar[data-state="cool"] .sb-segs i.on { background: linear-gradient(90deg, #6f9cff, #b9d2ff); }

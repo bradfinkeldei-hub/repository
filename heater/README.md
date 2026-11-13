@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.27 | Fan speed 1–10 while in fan-only mode, at home and from away. |
 | v1.26 | Start heating works during cool-down (like the remote) and is checked: if the heater doesn't start, it sends Off then On once more. |
 | v1.25 | Fault recovery: Try again and Reset when the heater shows a fault, at home and from away. 3-try safety limit; never restarts after a carbon monoxide fault. |
 | v1.24 | Fan only (no heat): run the blower without burning fuel, at home and from away. |

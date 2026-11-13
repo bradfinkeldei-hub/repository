@@ -208,7 +208,7 @@
       if (state === 0xf) { s.power = "error"; s.fault = value; return s; }
       s.power = state === 0x4 ? "cooling" : state === 0xc ? "fan" : state === 0x8 ? (step === 3 ? "starting" : "running") : "off";
       if (s.power !== "off" && s.power !== "cooling") {
-        if (mode === 1) s.setpoint = value; else if (mode === 2) s.level = value;
+        if (mode === 1) s.setpoint = value; else if (mode === 2 || mode === 3) s.level = value; // mode 3 = fan speed
       }
       return s;
     },
@@ -337,7 +337,7 @@
       const f = new Array(39).fill(0);
       f[1] = 2; f[3] = 1; f[5] = 1; f[7] = 0x0a; f[8] = 0x03; f[11] = 27;
       f[20] = this.fault ? 0xf0 : (this.state << 4) | this.step; f[21] = this.state === 0xc ? 3 : this.state ? this.mode : 0;
-      f[22] = this.fault || (this.mode === 1 ? this.temp : this.level); f[23] = 2;
+      f[22] = this.fault || (this.state === 0xc ? this.level : this.mode === 1 ? this.temp : this.level); f[23] = 2;
       const v = Math.round(this.volts * 10); f[24] = v >> 8; f[25] = v & 0xff;
       const b = Math.round(this.body * 10); f[27] = (b >> 8) & 0xff; f[28] = b & 0xff;
       const r = Math.round(Math.abs(this.room) * 10); f[29] = this.room < 0 ? 1 : 0; f[30] = r >> 8; f[31] = r & 0xff;
