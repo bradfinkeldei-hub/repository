@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.11"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.12"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -16,11 +16,15 @@
   const usLocale = /^en-US/i.test(navigator.language || "en-US");
   const S = Object.assign({
     unit: usLocale ? "F" : "C", targetC: 21, mode: "thermo", cleanMins: 10, coachHours: 4,
-    tankGal: 5, minLevel: 2, lead: 30, batt: true, battV: 11.5, native: false, proto: "auto", hUnit: "auto",
+    tankGal: 5, minLevel: 2, tunes: [], tuneId: "std", lead: 30, batt: true, battV: 11.5, native: false, proto: "auto", hUnit: "auto",
     showAll: false, pin: "0000", warmOn: false, warmTime: "06:30", room: "heater", goveeId: null,
   }, store.get("settings", {}));
   const stats = Object.assign({ runSec: 0, lowSec: 0, sinceFillL: 0, days: {} }, store.get("stats", {}));
+  if (S.mode !== "thermo" && S.mode !== "manual") S.mode = "thermo";
   const saveS = () => store.set("settings", S);
+  // Heating styles ("tunes"): Standard is built in; custom ones are saved on this phone.
+  const STD = () => ({ id: "std", name: "Standard", max: 10, bandC: 3, hold: S.minLevel || 2, clean: S.cleanMins });
+  const tune = () => S.tunes.find((t) => t.id === S.tuneId) || STD();
   const GAL = 3.785; // litres per US gallon (fuel use is tracked in litres, shown in gallons)
   const saveStats = () => store.set("stats", stats);
 
@@ -449,17 +453,18 @@
     if (Date.now() - lastThermo < 45000 / FAST) return;
     const room = ambientC();
     if (room == null) return;
-    const hi = heater.proto.maxLevel;
-    const lo = Math.min(hi, Math.max(heater.proto.minLevel, S.minLevel || 1)); // your floor (default 2)
-    const gap = S.targetC - room;
-    const want = gap >= 3 ? hi : gap <= 0 ? lo : Math.max(lo, Math.min(hi, lo + Math.round((hi - lo) * gap / 3)));
+    const T = tune();
+    const hi = Math.min(heater.proto.maxLevel, T.max);
+    const lo = Math.min(hi, Math.max(heater.proto.minLevel, T.hold));
+    const band = T.bandC, gap = S.targetC - room;
+    const want = gap >= band ? hi : gap <= 0 ? lo : Math.max(lo, Math.min(hi, lo + Math.round((hi - lo) * gap / band)));
     if (s.mode !== "gear") await heater.ensureMode("gear");
     if (heater.status.level !== want) { lastThermo = Date.now(); heater.stepTo(want); }
   }
 
   /* ---------------- Clean burn ---------------- */
   async function beginClean(kind) {
-    const mins = kind === "burn" ? 15 : S.cleanMins;
+    const mins = kind === "burn" ? 15 : tune().clean;
     if (kind === "shutdown" && (!mins || !isOn(heater.status))) return turnOff();
     clean = { kind, endAt: Date.now() + (mins * 60000) / FAST, total: (mins * 60000) / FAST };
     store.set("clean", clean);
@@ -574,8 +579,8 @@
 
   // Plain-English "what's happening" line under the status.
   function teachText(s) {
-    const t = show(S.targetC), u = "°", lo = S.minLevel || 1, max = maxLevel();
-    const near = show(S.targetC - 3), room = ambientC();
+    const T = tune(), t = show(S.targetC), u = "°", lo = T.hold;
+    const near = show(S.targetC - T.bandC), room = ambientC();
     if (!s) return "";
     if (s.power === "error") return "The heater stopped because of a fault. See the message above.";
     if (s.power === "cooling") return "The fan keeps running a few minutes to cool the heater safely. Don't cut the power.";
@@ -583,7 +588,7 @@
     if (s.power === "off") {
       return S.mode === "manual"
         ? "Tap Start. It runs at the level you pick until you turn it off."
-        : `Tap Start. It heats at full power until about ${near}${u}, then eases down to level ${lo} at ${t}${u}.`;
+        : `Tap Start. It heats at level ${Math.min(maxLevel(), T.max)} until about ${near}${u}, then eases down to level ${lo} at ${t}${u}.`;
     }
     if (s.power === "starting") return "Igniting: the glow plug lights the fuel. This takes 1 to 3 minutes.";
     if (S.mode === "manual") return `Fixed at level ${s.level ?? "—"}. The thermostat is paused until you switch back.`;
@@ -591,20 +596,21 @@
     if (room == null) return "Waiting for a room temperature reading…";
     const r = show(room);
     if (r >= t) return `At ${t}${u}: holding at level ${lo}. It stays on (it won't shut off by itself) and steps back up if the room cools.`;
-    if (r <= near) return `Heating up at full power. It starts easing down at ${near}${u}.`;
+    if (r <= near) return `Heating up at level ${Math.min(maxLevel(), T.max)}. It starts easing down at ${near}${u}.`;
     return `Getting close (${t - r}${u} to go): easing the power down to save fuel and avoid overshooting.`;
   }
 
   function renderHow() {
-    const t = show(S.targetC), u = "°", lo = S.minLevel || 1, max = maxLevel(), near = show(S.targetC - 3);
+    const T = tune(), t = show(S.targetC), u = "°", lo = T.hold, max = Math.min(maxLevel(), T.max), near = show(S.targetC - T.bandC);
     const steps = [
-      ["Heating up", `Below ${near}${u}, it runs at full power (level ${max}) to warm up fast.`],
+      ["Heating up", `Below ${near}${u}, it runs at level ${max}${max === maxLevel() ? " (full power)" : ""} to warm up.`],
       ["Getting close", `From ${near}${u} to ${t}${u}, it lowers the power step by step so it doesn't overshoot.`],
       ["At temperature", `At ${t}${u}, it holds at level ${lo}. It doesn't turn off. If the room cools, the power goes back up.`],
-      ["Turning off", S.cleanMins
-        ? `When you tap Turn off, it runs ${S.cleanMins} min at full power to burn off carbon, then shuts down. The fan cools it for a few minutes.`
+      ["Turning off", T.clean
+        ? `When you tap Turn off, it runs ${T.clean} min at full power to burn off carbon, then shuts down. The fan cools it for a few minutes.`
         : "When you tap Turn off, it shuts down right away. The fan cools it for a few minutes."],
     ];
+    $("howFoot").dataset.tune = T.name;
     $("howSteps").innerHTML = steps.map(([h, p], i) => `<li><b><i>${i + 1}</i>${h}</b><span>${p}</span></li>`).join("");
     $("howFoot").textContent = `It checks the ${useGovee() ? "Govee" : "heater's"} temperature about every 45 seconds. Keep this app open: if it closes, the heater stays at its last level. Running on low for hours builds carbon, so you'll be reminded to do a clean burn.`;
   }
@@ -615,7 +621,7 @@
     const s = heater && heater.status;
     $("thermoView").hidden = S.mode !== "thermo";
     $("manualView").hidden = S.mode !== "manual";
-    document.querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("on", b.dataset.mode === S.mode));
+    document.querySelectorAll(".seg-btn[data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === S.mode));
     renderDial(); renderManual();
 
     // Status line
@@ -637,7 +643,7 @@
     // Power button
     const btn = $("btnPower");
     btn.disabled = !s || s.power === "cooling" || s.power === "error";
-    if (isOn(s)) { btn.textContent = S.cleanMins ? "Turn off" : "Turn off now"; btn.classList.add("off"); }
+    if (isOn(s)) { btn.textContent = tune().clean ? "Turn off" : "Turn off now"; btn.classList.add("off"); }
     else { btn.textContent = s && s.power === "cooling" ? "Cooling down…" : "Start heating"; btn.classList.remove("off"); }
 
     // Carbon coach
@@ -739,7 +745,7 @@
   $("minus").onclick = () => setTarget(show(S.targetC) - 1);
   $("presets").addEventListener("click", (e) => { const b = e.target.closest(".preset"); if (b) setTarget(show(+b.dataset.c)); });
 
-  document.querySelectorAll(".seg-btn").forEach((b) => (b.onclick = () => { S.mode = b.dataset.mode; saveS(); lastThermo = 0; render(); }));
+  document.querySelectorAll(".seg-btn[data-mode]").forEach((b) => (b.onclick = () => { S.mode = b.dataset.mode; saveS(); lastThermo = 0; render(); }));
 
   $("bars").addEventListener("click", (e) => {
     const b = e.target.closest(".bar"); if (!b || !heater || !heater.proto) return;
@@ -777,6 +783,78 @@
   $("setRoom").addEventListener("change", () => { lastThermo = 0; if (S.room === "govee" && !goveeLive()) (S.goveeId ? restoreGovee() : pairGovee()); });
   $("btnPairGovee").onclick = pairGovee;
   $("btnGovee").onclick = pairGovee; // the picker needs a tap, so this always opens it
+  /* ---------------- Tunes ---------------- */
+  function renderTunes() {
+    const all = [STD(), ...S.tunes];
+    $("tuneChips").innerHTML = all.map((t) => `<button class="tchip${t.id === tune().id ? " on" : ""}" data-id="${t.id}">${t.name.replace(/</g, "&lt;")}</button>`).join("") +
+      `<button class="tchip add" data-id="new">＋ Custom</button>`;
+  }
+  let draft = null;
+  const bandShow = (c) => Math.round(S.unit === "F" ? c * 9 / 5 : c);
+  const bandFrom = (d) => (S.unit === "F" ? d * 5 / 9 : d);
+  function openTuner(base) {
+    const T = base || tune();
+    const isNew = !base && T.id === "std" || base === "new";
+    const src = base === "new" ? tune() : T;
+    draft = { ...src, band: bandShow(src.bandC), id: isNew ? "t" + Date.now() : src.id, isNew };
+    if (isNew) draft.name = "Custom " + (S.tunes.length + 1);
+    $("tuneName").value = draft.name;
+    $("btnTuneDelete").hidden = isNew;
+    renderTuner();
+    $("tuner").hidden = false;
+  }
+  function renderTuner() {
+    const top = maxLevel();
+    const lim = { max: [3, top], band: S.unit === "F" ? [2, 15] : [1, 8], hold: [1, Math.max(1, draft.max - 1)] };
+    draft.hold = Math.min(draft.hold, lim.hold[1]);
+    document.querySelectorAll("#tuner .stepper").forEach((st) => {
+      const k = st.dataset.k, [lo, hi] = lim[k];
+      st.querySelector("output").textContent = k === "band" ? draft.band + "°" : "Level " + draft[k];
+      st.querySelector('[data-d="-1"]').disabled = draft[k] <= lo;
+      st.querySelector('[data-d="1"]').disabled = draft[k] >= hi;
+    });
+    document.querySelectorAll("#tuneClean .seg-btn").forEach((b) => b.classList.toggle("on", +b.dataset.v === draft.clean));
+    const t = show(S.targetC);
+    $("tunePreview").textContent = `With ${t}°: level ${draft.max} until ${t - draft.band}°, then eases down and holds at level ${draft.hold} at ${t}°. ` +
+      (draft.clean ? `Turning off: ${draft.clean} min clean burn, then off.` : "Turning off: off right away.");
+  }
+  $("tuner").addEventListener("click", (e) => {
+    if (e.target.id === "tuner") return ($("tuner").hidden = true);
+    const b = e.target.closest(".stepper button");
+    if (b) {
+      const k = b.closest(".stepper").dataset.k;
+      draft[k] += +b.dataset.d;
+      if (k === "max" && draft.hold >= draft.max) draft.hold = draft.max - 1;
+      renderTuner();
+    }
+    const c = e.target.closest("#tuneClean .seg-btn");
+    if (c) { draft.clean = +c.dataset.v; renderTuner(); }
+  });
+  $("btnTunerClose").onclick = () => ($("tuner").hidden = true);
+  $("btnTuneSave").onclick = () => {
+    const name = ($("tuneName").value || "").trim() || "Custom";
+    const t = { id: draft.id, name, max: draft.max, bandC: bandFrom(draft.band), hold: draft.hold, clean: draft.clean };
+    const i = S.tunes.findIndex((x) => x.id === t.id);
+    if (i >= 0) S.tunes[i] = t; else S.tunes.push(t);
+    S.tuneId = t.id; saveS(); lastThermo = 0;
+    $("tuner").hidden = true; renderTunes(); render();
+    toast(`Saved “${name}” and switched to it`);
+  };
+  $("btnTuneDelete").onclick = () => {
+    S.tunes = S.tunes.filter((x) => x.id !== draft.id);
+    if (S.tuneId === draft.id) S.tuneId = "std";
+    saveS(); $("tuner").hidden = true; renderTunes(); render(); toast("Tune deleted");
+  };
+  $("tuneChips").addEventListener("click", (e) => {
+    const b = e.target.closest(".tchip"); if (!b) return;
+    const id = b.dataset.id;
+    if (id === "new") return openTuner("new");
+    if (id === S.tuneId && id !== "std") return openTuner(S.tunes.find((t) => t.id === id));
+    S.tuneId = id; saveS(); lastThermo = 0; renderTunes(); render();
+    toast(`Heating style: ${tune().name}`);
+  });
+  $("btnTune").onclick = () => openTuner(tune().id === "std" ? "new" : tune());
+
   $("btnHow").onclick = () => { renderHow(); $("how").hidden = false; };
   $("btnHowClose").onclick = () => ($("how").hidden = true);
   $("how").addEventListener("click", (e) => { if (e.target.id === "how") $("how").hidden = true; });
@@ -810,6 +888,7 @@
   document.title = "Ember Heater v" + VERSION;
   log("· Ember v" + VERSION);
   renderPresets();
+  renderTunes();
   render();
   if (params.has("demo")) connect(true);
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
