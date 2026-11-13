@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Ember Heater</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Connect -->
+<section id="connect" class="screen">
+  <div class="connect-inner">
+    <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+      <defs><linearGradient id="mg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff5a1f"/><stop offset="1" stop-color="#ffc06a"/></linearGradient></defs>
+      <path fill="url(#mg)" d="M32 4c2 10 14 16 14 32a14 14 0 0 1-28 0c0-7 3-11 6-14 0 5 2 8 5 9-1-10 1-19 3-27z"/>
+    </svg>
+    <h1>Ember</h1>
+    <p class="sub">Smarter control for your Hcalory heater</p>
+    <button id="btnConnect" class="btn primary wide">Connect heater</button>
+    <button id="btnDemo" class="btn ghost wide">Try the demo</button>
+    <p id="btNote" class="note" hidden></p>
+    <p id="connectMsg" class="note" role="status"></p>
+  </div>
+</section>
+
+<!-- Main -->
+<section id="main" class="screen" hidden>
+  <header class="top">
+    <div class="brand">Ember</div>
+    <div class="pill" id="pill"><span class="dot"></span><span id="pillText">Connected</span></div>
+    <button class="icon-btn" id="btnSettings" aria-label="Settings">
+      <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+    </button>
+  </header>
+
+  <div id="fault" class="fault" hidden>
+    <div class="fault-code" id="faultCode">E-08</div>
+    <div><div class="fault-title" id="faultTitle"></div><div class="fault-text" id="faultText"></div></div>
+  </div>
+
+  <div class="seg" role="tablist">
+    <button class="seg-btn on" data-mode="thermo">Thermostat</button>
+    <button class="seg-btn" data-mode="manual">Power level</button>
+  </div>
+
+  <!-- Thermostat dial -->
+  <div id="thermoView">
+    <div class="dial-wrap">
+      <button class="step" id="minus" aria-label="Cooler">−</button>
+      <svg id="dial" class="dial" viewBox="0 0 300 300" role="slider" aria-label="Target temperature" tabindex="0">
+        <defs>
+          <linearGradient id="ember" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stop-color="#ff4d1a"/><stop offset=".6" stop-color="#ff8a2a"/><stop offset="1" stop-color="#ffc472"/>
+          </linearGradient>
+          <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="6"/></filter>
+        </defs>
+        <path id="track" class="track" d=""/>
+        <path id="arcGlow" class="arc-glow" d="" filter="url(#glow)"/>
+        <path id="arc" class="arc" d=""/>
+        <circle id="roomDot" class="room-dot" r="4"/>
+        <circle id="knob" class="knob" r="11"/>
+        <text x="150" y="112" class="d-label">SET TO</text>
+        <text x="150" y="172" class="d-temp" id="dTemp">70°</text>
+        <text x="150" y="205" class="d-room" id="dRoom">Room —</text>
+      </svg>
+      <button class="step" id="plus" aria-label="Warmer">+</button>
+    </div>
+    <div class="presets" id="presets"></div>
+  </div>
+
+  <!-- Manual -->
+  <div id="manualView" hidden>
+    <div class="level-big"><span id="levelNum">3</span><small>of <span id="levelMax">6</span></small></div>
+    <div class="bars" id="bars"></div>
+    <p class="hint">Heat output. Higher burns cleaner.</p>
+  </div>
+
+  <div class="statusline" id="statusLine">Off</div>
+
+  <button id="btnPower" class="btn primary wide big">Start heating</button>
+
+  <div class="cards">
+    <div class="card" id="coachCard">
+      <div class="card-head"><span>Carbon health</span><span class="muted" id="coachPct">Good</span></div>
+      <div class="meter"><i id="coachBar"></i></div>
+      <div class="card-row">
+        <span class="muted" id="coachText">Hours on low since last clean burn</span>
+        <button class="btn small" id="btnBurn">Clean burn</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span>Fuel</span><span class="muted" id="fuelLeft">—</span></div>
+      <div class="meter fuel"><i id="fuelBar"></i></div>
+      <div class="card-row">
+        <span class="muted" id="fuelText">Today 0 h · 0.0 L</span>
+        <button class="btn small" id="btnFilled">Filled up</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span>Warm by</span>
+        <label class="switch"><input type="checkbox" id="warmOn"><i></i></label>
+      </div>
+      <div class="card-row">
+        <input type="time" id="warmTime" value="06:30" class="time">
+        <span class="muted" id="warmText">Starts 30 min before. Keep this screen open.</span>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div><b id="sVolts">—</b><span>Battery</span></div>
+      <div><b id="sBody">—</b><span>Heater</span></div>
+      <div><b id="sHours">—</b><span>Total hours</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- Clean burn overlay -->
+<div id="clean" class="overlay" hidden>
+  <div class="clean-inner">
+    <div class="eyebrow" id="cleanEyebrow">CLEAN SHUTDOWN</div>
+    <svg viewBox="0 0 240 240" class="ring">
+      <defs><linearGradient id="ember2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#ff4d1a"/><stop offset=".6" stop-color="#ff8a2a"/><stop offset="1" stop-color="#ffc472"/></linearGradient></defs>
+      <circle cx="120" cy="120" r="104" class="ring-track"/>
+      <circle cx="120" cy="120" r="104" class="ring-fill" id="ringFill" stroke="url(#ember2)"/>
+      <text x="120" y="128" class="ring-time" id="ringTime">10:00</text>
+      <text x="120" y="158" class="ring-sub">full power</text>
+    </svg>
+    <p class="clean-text" id="cleanText">Burning off carbon at full power. The heater turns itself off when the timer ends.</p>
+    <button class="btn ghost wide" id="btnSkip">Turn off now</button>
+    <button class="btn text wide" id="btnKeep">Keep heating</button>
+  </div>
+</div>
+
+<!-- Settings -->
+<div id="settings" class="overlay sheet" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2>Settings</h2><button class="icon-btn" id="btnClose" aria-label="Close">✕</button></div>
+
+    <div class="group">
+      <label class="row">Temperature
+        <select id="setUnit"><option value="F">°F</option><option value="C">°C</option></select></label>
+      <label class="row">Clean shutdown length
+        <select id="setClean"><option value="0">Off</option><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option></select></label>
+      <label class="row">Remind clean burn after
+        <select id="setCoach"><option value="2">2 h on low</option><option value="4">4 h on low</option><option value="6">6 h on low</option></select></label>
+      <label class="row">Tank size
+        <select id="setTank"><option value="5">5 L</option><option value="6">6 L</option><option value="10">10 L</option><option value="20">20 L</option></select></label>
+      <label class="row">Warm-by head start
+        <select id="setLead"><option value="15">15 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="60">60 min</option></select></label>
+    </div>
+
+    <div class="group">
+      <label class="row">Battery guard
+        <label class="switch"><input type="checkbox" id="setBatt"><i></i></label></label>
+      <label class="row">Turn off below
+        <select id="setBattV"><option value="11.2">11.2 V</option><option value="11.5">11.5 V</option><option value="11.8">11.8 V</option><option value="12.0">12.0 V</option></select></label>
+      <label class="row" id="nativeRow">Use heater's own thermostat
+        <label class="switch"><input type="checkbox" id="setNative"><i></i></label></label>
+      <p class="fine">Battery levels are for 12 V. They double automatically on 24 V.</p>
+    </div>
+
+    <div class="group">
+      <label class="row">Protocol
+        <select id="setProto"><option value="auto">Auto-detect</option><option value="B">Hcalory (B)</option><option value="A">AirHeater (A)</option></select></label>
+      <label class="row">Heater reports in
+        <select id="setHUnit"><option value="auto">Auto</option><option value="C">°C</option><option value="F">°F</option></select></label>
+      <label class="row">Show all Bluetooth devices
+        <label class="switch"><input type="checkbox" id="setAll"><i></i></label></label>
+      <div class="row"><span>Detected <span class="muted" id="protoName">—</span></span>
+        <button class="btn small" id="btnCopyLog">Copy log</button></div>
+      <pre class="log" id="log"></pre>
+    </div>
+
+    <button class="btn ghost wide" id="btnDisconnect">Disconnect</button>
+    <p class="fine center">Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script src="protocol.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,205 @@
+/*
+ * Ember – Hcalory heater Bluetooth protocol.
+ *
+ * Hcalory heaters expose BLE service 0xFFF0: commands are written to 0xFFF2,
+ * status frames arrive as notifications on 0xFFF1. Two frame formats are in
+ * the wild (community reverse-engineering, not official documentation):
+ *
+ *   "A" – AirHeater / BA AB frames  (github.com/mSoftMS/AirHeater-BLE)
+ *   "B" – Hcalory app 20-byte header (github.com/evanfoster/hcalory-control)
+ *
+ * The app tries both and locks onto whichever one the heater answers.
+ * Works in the browser (window.EmberProtocol) and in Node for tests.
+ */
+(function (root) {
+  "use strict";
+
+  const SERVICE = 0xfff0;
+  const NOTIFY = 0xfff1;
+  const WRITE = 0xfff2;
+
+  const sum8 = (bytes) => bytes.reduce((a, b) => (a + b) & 0xff, 0);
+  const withSum = (bytes) => Uint8Array.from([...bytes, sum8(bytes)]);
+  const hex = (bytes) =>
+    Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(" ").toUpperCase();
+
+  // Plain-English faults, shared by both formats.
+  const FAULTS = {
+    1: ["General fault", "Turn the heater off, wait a minute and start it again."],
+    2: ["Voltage problem", "Battery is too low or too high. Charge it or check the wiring."],
+    3: ["Glow plug fault", "The igniter isn't working. Check its plug or replace it."],
+    4: ["Fuel pump fault", "Check the pump wiring and that the fuel line isn't kinked."],
+    5: ["Overheating", "Something is blocking airflow. Clear the inlet and outlet."],
+    6: ["Fan fault", "The fan is stuck or unplugged. Check for debris."],
+    7: ["Lost connection", "The control board isn't talking to the heater. Check the cable."],
+    8: ["Flame went out", "Usually low fuel or air in the line. Top up and prime the pump."],
+    9: ["Sensor fault", "A temperature sensor isn't reading. Check its plug."],
+    10: ["Didn't ignite", "Often low fuel, air in the line or carbon. Prime and retry."],
+  };
+
+  /* ---------------- Format A: BA AB ---------------- */
+  const A = {
+    id: "A",
+    maxLevel: 6,
+    minLevel: 1,
+    hasThermostat: false,
+    unit: "C",
+    poll: () => Uint8Array.from([0xba, 0xab, 0x04, 0xcc, 0x00, 0x00, 0x00, 0x35]),
+    bb: (mode) => withSum([0xba, 0xab, 0x04, 0xbb, mode, 0x00, 0x00]),
+    start() { return [A.bb(0xa1)]; },
+    // Same sequence as the official app: ventilate, heat, ventilate (≈500 ms apart).
+    stop() { return [A.bb(0xa4), A.bb(0xa1), A.bb(0xa4)]; },
+    up() { return [A.bb(0xa2)]; },
+    down() { return [A.bb(0xa3)]; },
+    looksLike: (x) => x.length >= 14 && x.length < 32,
+    parse(x) {
+      if (x.length < 14) return null;
+      const status = x[4];
+      const mode = x[5];
+      const gear = x[6];
+      let volts = x[9];
+      if (volts > 40) volts = volts / 10;
+      const offset = x[10] === 0 ? 30 : 22;
+      const s = {
+        proto: "A",
+        raw: hex(x),
+        level: null,
+        mode: "gear",
+        setpoint: null,
+        volts,
+        ambient: x[11] - offset,
+        body: (x[12] << 8) | x[13],
+        fault: null,
+        power: "off",
+      };
+      if (mode === 0xff) {
+        s.power = "error";
+        s.fault = gear;
+        return s;
+      }
+      s.level = gear;
+      s.power = { 0: "off", 1: "running", 2: "cooling", 4: "fan" }[status] || "running";
+      return s;
+    },
+  };
+
+  /* ---------------- Format B: Hcalory 20-byte header ---------------- */
+  const B_HEAD = [0x00, 0x02, 0x00, 0x01, 0x00, 0x01, 0x00, 0x0e, 0x04, 0x00,
+    0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+  const bcmd = (a, b) => Uint8Array.from([...B_HEAD, a, b]);
+  const B_STATE = {
+    0: "off", 65: "cooling", 67: "cooling", 69: "cooling",
+    128: "starting", 129: "starting", 131: "starting", 135: "starting",
+    133: "running", 255: "error",
+  };
+  const B = {
+    id: "B",
+    maxLevel: 6,
+    minLevel: 1,
+    hasThermostat: true,
+    unit: "F",
+    poll: () => bcmd(0x00, 0x0d),
+    start() { return [bcmd(0x02, 0x0f)]; },
+    stop() { return [bcmd(0x01, 0x0e)]; },
+    up() { return [bcmd(0x03, 0x10)]; },
+    down() { return [bcmd(0x04, 0x11)]; },
+    gearMode() { return [bcmd(0x07, 0x14)]; },
+    thermoMode() { return [bcmd(0x06, 0x13)]; },
+    looksLike: (x) => x.length >= 32,
+    parse(x) {
+      if (x.length < 32) return null;
+      const state = x[20];
+      const modeByte = x[21];
+      const setting = x[22];
+      const u16 = (i) => ((x[i] << 8) | x[i + 1]) / 10;
+      const s = {
+        proto: "B",
+        raw: hex(x),
+        power: B_STATE[state] || (state & 0x80 ? "running" : "off"),
+        mode: modeByte === 1 ? "thermostat" : "gear",
+        level: modeByte === 1 ? null : setting,
+        setpoint: modeByte === 1 ? setting : null,
+        volts: Math.round(x[25]) / 10,
+        body: Math.round(u16(27)),
+        ambient: Math.round(u16(30)),
+        fault: null,
+      };
+      if (modeByte === 8) { s.power = "error"; s.fault = 10; }
+      else if (state === 255) { s.fault = 1; }
+      return s;
+    },
+  };
+
+  /* ---------------- Simulated heater (demo + tests) ---------------- */
+  // Speaks format A over a fake transport so the real parser is exercised.
+  class SimHeater {
+    constructor(speed = 1) {
+      this.speed = speed;
+      this.status = 0; this.gear = 2; this.fault = 0;
+      this.room = 9; this.body = 12; this.volts = 12.9;
+      this.coolLeft = 0; this.ignite = 0;
+      this.listener = null; this.connected = false;
+      this.offSeq = [];
+      this._t = null;
+    }
+    async connect() {
+      this.connected = true;
+      this._t = setInterval(() => this.tick(1), 1000);
+    }
+    disconnect() { this.connected = false; clearInterval(this._t); }
+    onNotify(fn) { this.listener = fn; }
+    tick(sec) {
+      const dt = sec * this.speed;
+      const heating = this.status === 1 && this.ignite <= 0;
+      if (this.status === 1 && this.ignite > 0) this.ignite -= dt;
+      const target = heating ? 10 + this.gear * 3.2 : 8;
+      this.room += (target - this.room) * Math.min(1, 0.004 * dt);
+      const bodyTarget = heating ? 60 + this.gear * 22 : this.room;
+      this.body += (bodyTarget - this.body) * Math.min(1, 0.05 * dt);
+      this.volts = heating ? 12.7 - this.gear * 0.05 : 12.9;
+      if (this.status === 2) {
+        this.coolLeft -= dt;
+        if (this.coolLeft <= 0) this.status = 0;
+      }
+    }
+    async write(bytes) {
+      if (!this.connected) throw new Error("not connected");
+      const x = Array.from(bytes);
+      if (x[0] !== 0xba || x[1] !== 0xab) return; // ignores format B
+      if (x[3] === 0xcc) return this.reply();
+      if (x[3] !== 0xbb) return;
+      const m = x[4];
+      if (m === 0xa1) {
+        this.offSeq.push(m);
+        if (this.status === 0) { this.status = 1; this.ignite = 30; }
+      } else if (m === 0xa4) {
+        this.offSeq.push(m);
+        const seq = this.offSeq.slice(-3).join(",");
+        if (seq === "164,161,164" || this.status === 0) {
+          if (this.status !== 0) { this.status = 2; this.coolLeft = 120; }
+          this.offSeq = [];
+        }
+      } else if (m === 0xa2 && this.status === 1) this.gear = Math.min(6, this.gear + 1);
+      else if (m === 0xa3 && this.status === 1) this.gear = Math.max(1, this.gear - 1);
+    }
+    reply() {
+      const f = new Array(18).fill(0);
+      f[0] = 0xab; f[1] = 0xba; f[2] = 0x11;
+      f[4] = this.status;
+      f[5] = this.fault ? 0xff : 0x01;
+      f[6] = this.fault || this.gear;
+      f[9] = Math.round(this.volts * 10);
+      f[10] = 0;
+      f[11] = Math.round(this.room) + 30;
+      const b = Math.round(this.body);
+      f[12] = (b >> 8) & 0xff; f[13] = b & 0xff;
+      f[17] = sum8(f.slice(0, 17));
+      const frame = Uint8Array.from(f);
+      setTimeout(() => this.listener && this.listener(frame), 60);
+    }
+  }
+
+  const api = { SERVICE, NOTIFY, WRITE, A, B, FAULTS, SimHeater, hex, sum8 };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  else root.EmberProtocol = api;
+})(typeof window !== "undefined" ? window : globalThis);
