@@ -331,3 +331,13 @@ body { max-width: 100%; }
 .fuel-quick button { padding: 10px 0; border-radius: 14px; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; font-size: 15px; }
 .fuel-quick button.on { border-color: rgba(255,138,42,.6); background: rgba(255,122,42,.1); color: var(--ember-2); }
 #fuelSheet { z-index: 12; }
+
+/* Fuel: one bar per gallon */
+.gal-bars { display: flex; gap: 8px; margin-top: 14px; }
+.gal { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; background: none; border: 0; padding: 0; cursor: pointer; }
+.gal i { position: relative; display: block; width: 100%; height: 54px; border-radius: 10px; background: var(--surface-2); overflow: hidden; }
+.gal i { background: linear-gradient(0deg, #ff7a2a, #ffc472) bottom / 100% var(--h, 0%) no-repeat, var(--surface-2); }
+.gal span { font-size: 12px; color: var(--muted); }
+.gal:active i { outline: 2px solid rgba(255,196,114,.5); }
+.gal-bars.low .gal i { background: linear-gradient(0deg, #ff4d4d, #ff8a5c) bottom / 100% var(--h, 0%) no-repeat, var(--surface-2); }
+.gal-hint { color: var(--muted); font-size: 12px; margin: 10px 0 0; }

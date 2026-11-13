@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.18"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.19"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -807,7 +807,11 @@
     const tankL = S.tankGal * GAL;
     const left = Math.max(0, tankL - stats.sinceFillL);
     const hrs = left / fuelRate(s && s.level);
-    $("fuelBar").style.width = (left / tankL) * 100 + "%";
+    const nBars = Math.max(1, Math.round(S.tankGal)), per = S.tankGal / nBars, leftGal = left / GAL;
+    const gb = $("galBars");
+    if (gb.children.length !== nBars) gb.innerHTML = Array.from({ length: nBars }, (_, i) => `<button class="gal" data-n="${i + 1}" aria-label="${+((i + 1) * per).toFixed(1)} gallons"><i></i><span>${+((i + 1) * per).toFixed(1)}</span></button>`).join("");
+    gb.classList.toggle("low", leftGal <= per);
+    [...gb.children].forEach((el, i) => { el.querySelector("i").style.setProperty("--h", Math.max(0, Math.min(1, (leftGal - i * per) / per)) * 100 + "%"); });
     $("fuelLeft").textContent = `≈ ${(left / GAL).toFixed(1)} gal · ${hrs.toFixed(0)} h left`;
     $("fuelText").textContent = `Today ${(today.sec / 3600).toFixed(1)} h · ${(today.L / GAL).toFixed(2)} gal`;
 
@@ -931,31 +935,17 @@
   $("btnSkip").onclick = () => (clean && clean.kind === "burn" ? finishClean() : turnOff());
   $("btnKeep").onclick = () => { clean = null; store.set("clean", null); $("clean").hidden = true; lastThermo = 0; toast("Still heating"); };
   $("btnBurn").onclick = () => beginClean("burn");
-  $("btnFilled").onclick = () => { stats.sinceFillL = 0; saveStats(); render(); toast("Tank marked full"); };
-
-  // Set the fuel in the tank by hand (after a partial fill, or to correct the estimate).
-  const fuelNow = () => Math.max(0, S.tankGal - stats.sinceFillL / GAL);
-  function showFuelVal() {
-    const v = +$("fuelRange").value;
-    $("fuelVal").textContent = v.toFixed(1);
-    $("fuelRange").style.setProperty("--p", (v / S.tankGal) * 100 + "%");
-    document.querySelectorAll("#fuelQuick button").forEach((b) => b.classList.toggle("on", Math.abs(+b.dataset.f * S.tankGal - v) < 0.05));
-  }
-  $("btnFuelAdjust").onclick = () => {
-    $("fuelRange").max = S.tankGal;
-    $("fuelRange").value = Math.round(fuelNow() * 10) / 10;
-    $("fuelCap").textContent = S.tankGal;
-    showFuelVal(); $("fuelSheet").hidden = false;
-  };
-  $("fuelRange").oninput = showFuelVal;
-  $("fuelQuick").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; $("fuelRange").value = +b.dataset.f * S.tankGal; showFuelVal(); };
-  $("btnFuelSave").onclick = () => {
-    const v = +$("fuelRange").value;
-    stats.sinceFillL = Math.max(0, (S.tankGal - v) * GAL); saveStats();
-    $("fuelSheet").hidden = true; render(); toast(`Fuel set to ${v.toFixed(1)} gal`);
-  };
-  $("btnFuelClose").onclick = () => ($("fuelSheet").hidden = true);
-  $("fuelSheet").addEventListener("click", (e) => { if (e.target.id === "fuelSheet") $("fuelSheet").hidden = true; });
+  // Fuel: one bar per gallon. Tap a bar to set the tank to that many gallons
+  // (tap the last one after filling up; tap the first one again to set it empty).
+  $("galBars").addEventListener("click", (e) => {
+    const b = e.target.closest(".gal"); if (!b) return;
+    const per = S.tankGal / Math.max(1, Math.round(S.tankGal));
+    let gal = +b.dataset.n * per;
+    const now = Math.max(0, S.tankGal - stats.sinceFillL / GAL);
+    if (+b.dataset.n === 1 && Math.abs(now - gal) < 0.05) gal = 0;
+    stats.sinceFillL = Math.max(0, (S.tankGal - gal) * GAL); saveStats(); render();
+    toast(gal >= S.tankGal - 0.01 ? "Tank set to full" : gal === 0 ? "Tank set to empty" : `Tank set to ${+gal.toFixed(1)} gal`);
+  });
   $("warmOn").onchange = (e) => { S.warmOn = e.target.checked; saveS(); render(); if (S.warmOn) keepAwake(); };
   $("warmTime").onchange = (e) => { S.warmTime = e.target.value; store.set("warmFired", ""); saveS(); };
 
