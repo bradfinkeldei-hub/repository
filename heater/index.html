@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b0b0d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Ember Heater v1.22</title>
+<title>Ember Heater v1.23</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-512.png">
@@ -24,7 +24,7 @@
       <defs><linearGradient id="mg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff5a1f"/><stop offset="1" stop-color="#ffc06a"/></linearGradient></defs>
       <path fill="url(#mg)" d="M32 4c2 10 14 16 14 32a14 14 0 0 1-28 0c0-7 3-11 6-14 0 5 2 8 5 9-1-10 1-19 3-27z"/>
     </svg>
-    <h1>Ember <span class="ver" data-version>v1.22</span></h1>
+    <h1>Ember <span class="ver" data-version>v1.23</span></h1>
     <p class="sub">Smarter control for your Hcalory heater</p>
     <button id="btnConnect" class="btn primary wide">Connect heater</button>
     <button id="btnAll" class="btn ghost wide">Don't see it? Show all devices</button>
@@ -39,7 +39,7 @@
 <!-- Main -->
 <section id="main" class="screen" hidden>
   <header class="top">
-    <div class="brand">Ember <span class="ver" data-version>v1.22</span></div>
+    <div class="brand">Ember <span class="ver" data-version>v1.23</span></div>
     <div class="pill" id="pill"><span class="dot"></span><span id="pillText">Connected</span></div>
     <button class="icon-btn" id="btnSettings" aria-label="Settings">
       <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
@@ -180,9 +180,9 @@
   </div>
   <button id="awPower" class="btn primary wide big" disabled>Start heating</button>
   <div class="aw-off" id="awOff" hidden>
-    <button id="awClean" class="btn primary wide big">Clean shutdown</button>
+    <div id="awClean"><p class="burn-label">Shut down with a burn-off at full power</p><div class="burn-pick" id="awBurn"><button type="button" data-min="1">1 min</button><button type="button" data-min="5">5 min</button><button type="button" data-min="10">10 min</button></div></div>
     <button id="awOffNow" class="btn ghost wide">Off now</button>
-    <p class="fine center">Clean shutdown runs at full power for your clean-burn time, then turns off. Off now skips that.</p>
+    <p class="fine center">Pick a burn-off: it runs at full power for that long, then turns off by itself. Off now skips it.</p>
   </div>
   <p class="aw-msg" id="awMsg"></p>
   <p class="fine center">Commands go to the device at home and usually reach the heater within a minute.</p>
@@ -198,6 +198,16 @@
     <input id="awCode2" class="code-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="New PIN" autocomplete="off" hidden>
     <p class="gs-msg" id="awsMsg"></p>
     <button class="btn primary wide" id="btnAwsGo">Connect</button>
+  </div>
+</div>
+
+<!-- Turn off: choose the burn-off -->
+<div id="offSheet" class="overlay sheet" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2>Turn off</h2><button class="icon-btn" id="btnOffClose" aria-label="Close">✕</button></div>
+    <p class="fine">Burn off carbon at full power first, then it shuts down by itself. Longer is cleaner.</p>
+    <div class="burn-pick big" id="offBurn"><button type="button" data-min="1">1 min</button><button type="button" data-min="5">5 min</button><button type="button" data-min="10">10 min</button></div>
+    <button class="btn ghost wide" id="btnOffNow">Off now (no burn-off)</button>
   </div>
 </div>
 
@@ -239,7 +249,7 @@
       <li><b><i>2</i>Getting close</b><span>Start easing down this many degrees below your temperature</span><div class="stepper" data-k="band"><button type="button" data-d="-1" aria-label="Less">−</button><output></output><button type="button" data-d="1" aria-label="More">+</button></div></li>
       <li><b><i>3</i>At temperature</b><span>Level it holds at once the room is warm (it stays on)</span><div class="stepper" data-k="hold"><button type="button" data-d="-1" aria-label="Less">−</button><output></output><button type="button" data-d="1" aria-label="More">+</button></div></li>
       <li><b><i>4</i>Turning off</b><span>Clean burn at full power before it shuts down</span>
-        <div class="seg mini" id="tuneClean"><button type="button" class="seg-btn" data-v="0">Off</button><button type="button" class="seg-btn" data-v="5">5 min</button><button type="button" class="seg-btn" data-v="10">10 min</button><button type="button" class="seg-btn" data-v="15">15 min</button></div></li>
+        <div class="seg mini" id="tuneClean"><button type="button" class="seg-btn" data-v="0">Off</button><button type="button" class="seg-btn" data-v="1">1 min</button><button type="button" class="seg-btn" data-v="5">5 min</button><button type="button" class="seg-btn" data-v="10">10 min</button></div></li>
     </ol>
     <p class="tune-preview" id="tunePreview"></p>
     <button class="btn primary wide" id="btnTuneSave">Save tune</button>
@@ -293,7 +303,7 @@
       <label class="row">Temperature
         <select id="setUnit"><option value="F">°F</option><option value="C">°C</option></select></label>
       <label class="row"><span>Clean shutdown length<small>When you turn off, it first runs at full power to burn off carbon.</small></span>
-        <select id="setClean"><option value="0">Off</option><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option></select></label>
+        <select id="setClean"><option value="0">Off</option><option value="1">1 min</option><option value="5">5 min</option><option value="10">10 min</option></select></label>
       <label class="row"><span>Thermostat lowest level<small>At your temperature, the heater idles here instead of turning off.</small></span>
         <select id="setMin"><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">Level 3</option><option value="4">Level 4</option></select></label>
       <label class="row"><span>Remind clean burn after<small>Long runs on low build carbon. You'll get a reminder.</small></span>
@@ -342,7 +352,7 @@
     </div>
 
     <button class="btn ghost wide" id="btnDisconnect">Disconnect</button>
-    <p class="fine center"><span data-version>v1.22</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
+    <p class="fine center"><span data-version>v1.23</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
   </div>
 </div>
 

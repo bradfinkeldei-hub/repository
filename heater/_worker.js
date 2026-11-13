@@ -71,7 +71,7 @@ async function remote(request, env, path) {
       if (!ACTIONS.has(c.action)) return json(400, { code: 400, message: "Unknown action" });
       // Only sensible values get through to the heater.
       const v = c.value;
-      const ok = { start: v == null, stop: v == null, stopnow: v == null,
+      const ok = { start: v == null, stop: v == null || v === 1 || v === 5 || v === 10, stopnow: v == null,
         tune: typeof v === "string" && /^[\w-]{1,40}$/.test(v),
         target: typeof v === "number" && v >= 4 && v <= 32,
         mode: v === "thermo" || v === "manual",

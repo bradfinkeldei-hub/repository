@@ -364,3 +364,12 @@ body { max-width: 100%; }
 #away .level-big { margin: 22px 0 14px; }
 .aw-off .btn.primary { background: linear-gradient(135deg, #3a3a40, #2a2a2f); color: var(--text); box-shadow: none; border: 1px solid rgba(255,196,114,.35); }
 .level-big small span { font-size: inherit; letter-spacing: 0; }
+
+/* Burn-off choice */
+.burn-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.burn-pick button { padding: 14px 0; border-radius: 16px; border: 1px solid rgba(255,196,114,.3); background: var(--surface-2); color: var(--text); font-size: 15px; font-weight: 500; cursor: pointer; }
+.burn-pick button.on { background: linear-gradient(135deg, #ff6a24, #ffb25c); color: #1a0c04; border-color: transparent; }
+.burn-pick.big button { padding: 20px 0; font-size: 17px; }
+.burn-label { text-align: center; color: var(--muted); font-size: 13px; margin: 18px 0 0; }
+#offSheet { z-index: 12; }
+#offSheet .btn.ghost { margin-top: 14px; }

@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.22"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.23"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -42,6 +42,8 @@
     S.threeButtons = true;
     store.set("settings", S);
   }
+  if (S.cleanMins === 15) S.cleanMins = 10; // v1.23: burn-off choices are 1, 5 or 10 min
+  S.tunes.forEach((t) => { if (t.clean === 15) t.clean = 10; });
   const GAL = 3.785; // litres per US gallon (fuel use is tracked in litres, shown in gallons)
   const saveStats = () => store.set("stats", stats);
 
@@ -552,8 +554,8 @@
   }
 
   /* ---------------- Clean burn ---------------- */
-  async function beginClean(kind) {
-    const mins = kind === "burn" ? 15 : tune().clean;
+  async function beginClean(kind, chosen) {
+    const mins = kind === "burn" ? 15 : chosen ?? tune().clean;
     if (kind === "shutdown" && (!mins || !isOn(heater.status))) return turnOff();
     clean = { kind, endAt: Date.now() + (mins * 60000) / FAST, total: (mins * 60000) / FAST };
     store.set("clean", clean);
@@ -926,12 +928,25 @@
 
   $("btnPower").onclick = async () => {
     const s = heater && heater.status; if (!s) return;
-    if (isOn(s)) return beginClean("shutdown");
+    if (isOn(s)) return openOffSheet();
     $("btnPower").disabled = true; $("btnPower").textContent = "Starting…";
     lastThermo = 0;
     await heater.start();
     if (S.mode === "manual" && S.level) setTimeout(() => heater.stepTo(S.level), 1500);
   };
+  // Turn off: pick 1, 5 or 10 min burn-off, or off right away.
+  function openOffSheet() {
+    const def = tune().clean;
+    document.querySelectorAll("#offBurn [data-min]").forEach((b) => b.classList.toggle("on", +b.dataset.min === def));
+    $("offSheet").hidden = false;
+  }
+  $("offBurn").onclick = (e) => {
+    const b = e.target.closest("[data-min]"); if (!b) return;
+    $("offSheet").hidden = true; beginClean("shutdown", +b.dataset.min);
+  };
+  $("btnOffNow").onclick = () => { $("offSheet").hidden = true; turnOff(); };
+  $("btnOffClose").onclick = () => ($("offSheet").hidden = true);
+  $("offSheet").addEventListener("click", (e) => { if (e.target.id === "offSheet") $("offSheet").hidden = true; });
   $("btnSkip").onclick = () => (clean && clean.kind === "burn" ? finishClean() : turnOff());
   $("btnKeep").onclick = () => { clean = null; store.set("clean", null); $("clean").hidden = true; lastThermo = 0; toast("Still heating"); };
   $("btnBurn").onclick = () => beginClean("burn");
@@ -1098,7 +1113,7 @@
     if (!heater || !heater.proto) return;
     const s = heater.status;
     if (c.action === "start" && s && (s.power === "off" || s.power === "cooling")) { lastThermo = 0; await heater.start(); toast("Started from away"); }
-    else if (c.action === "stop" && s && isOn(s) && !clean) { await beginClean("shutdown"); }
+    else if (c.action === "stop" && s && isOn(s) && !clean) { await beginClean("shutdown", [1, 5, 10].includes(c.value) ? c.value : undefined); }
     else if (c.action === "stopnow" && s && (isOn(s) || clean)) { await turnOff(); }
     else if (c.action === "tune") {
       const t = S.tunes.find((x) => x.id === c.value);
@@ -1306,7 +1321,11 @@
     awaySend("start", null, "Sent. The heater should start within about a minute.");
     renderAway();
   };
-  $("awClean").onclick = () => awaySend("stop", null, "Sent. It runs the clean shutdown, then turns off.");
+  $("awBurn").onclick = (e) => {
+    const b = e.target.closest("[data-min]"); if (!b) return;
+    const m = +b.dataset.min;
+    awaySend("stop", m, `Sent. ${m} min burn-off at full power, then it turns off.`);
+  };
   $("awOffNow").onclick = () => {
     if (!confirm("Turn the heater off now, without the clean burn?")) return;
     awaySend("stopnow", null, "Sent. The heater turns off and cools down.");

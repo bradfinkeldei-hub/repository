@@ -5,7 +5,7 @@ It isn't made by or affiliated with Hcalory.
 
 ## What it adds
 
-- **Clean shutdown.** When you tap Turn off, it runs at full power for 10 minutes to burn off carbon, then shuts down. The heater still does its own safe cool-down.
+- **Clean shutdown.** When you tap Turn off, you pick a **1, 5 or 10 minute** burn-off at full power (or Off now). It then shuts down, and the heater still does its own safe cool-down.
 - **One-dial thermostat.** It runs at full power while the room is cold, eases down as it gets close, then holds at a low level (2 by default) instead of cycling on and off.
 - **Three temperature buttons plus one Custom** (Sleep, Comfort, Boost). Tap to use, tap again to change. Each button can have its own power levels and clean-burn length.
 - **Status bar** at the top: on/off, current level, the setting it follows, and fuel left.
@@ -79,7 +79,7 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 - **Start:** needs two taps, so it can't start by accident.
 - **Thermostat:** pick a temperature or a preset button.
 - **Power level:** tap levels 1–10 to set the speed directly.
-- **Clean shutdown:** runs at full power for your clean-burn time, then turns off.
+- **Shut down:** pick a **1, 5 or 10 min** burn-off at full power, and then it turns off.
 - **Off now:** turns off right away. It also works during a clean shutdown.
 - **Updates:** while the away screen is open, the status updates every few seconds and the "Updated … ago" line shows how fresh it is. Commands usually arrive within seconds, and can take up to about a minute.
 
