@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b0b0d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Ember Heater v1.13</title>
+<title>Ember Heater v1.14</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-512.png">
@@ -24,7 +24,7 @@
       <defs><linearGradient id="mg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff5a1f"/><stop offset="1" stop-color="#ffc06a"/></linearGradient></defs>
       <path fill="url(#mg)" d="M32 4c2 10 14 16 14 32a14 14 0 0 1-28 0c0-7 3-11 6-14 0 5 2 8 5 9-1-10 1-19 3-27z"/>
     </svg>
-    <h1>Ember <span class="ver" data-version>v1.13</span></h1>
+    <h1>Ember <span class="ver" data-version>v1.14</span></h1>
     <p class="sub">Smarter control for your Hcalory heater</p>
     <button id="btnConnect" class="btn primary wide">Connect heater</button>
     <button id="btnAll" class="btn ghost wide">Don't see it? Show all devices</button>
@@ -38,7 +38,7 @@
 <!-- Main -->
 <section id="main" class="screen" hidden>
   <header class="top">
-    <div class="brand">Ember <span class="ver" data-version>v1.13</span></div>
+    <div class="brand">Ember <span class="ver" data-version>v1.14</span></div>
     <div class="pill" id="pill"><span class="dot"></span><span id="pillText">Connected</span></div>
     <button class="icon-btn" id="btnSettings" aria-label="Settings">
       <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
@@ -79,10 +79,6 @@
     </div>
     <div class="presets" id="presets"></div>
     <button id="btnGovee" class="chip" hidden>Connect Govee thermometer</button>
-    <div class="tunes">
-      <span class="tunes-label">Heating style</span>
-      <div class="tune-chips" id="tuneChips"></div>
-    </div>
     <div class="links"><button id="btnHow" class="link">How it heats</button><button id="btnTune" class="link">Tune it</button></div>
   </div>
 
@@ -170,6 +166,7 @@
     <div class="sheet-head"><h2>Manual tune</h2><button class="icon-btn" id="btnTunerClose" aria-label="Close">✕</button></div>
     <label class="name-row">Name <input id="tuneName" maxlength="16" placeholder="e.g. Night"></label>
     <ol class="how tune-steps">
+      <li class="temp-step"><b><i>°</i>Your temperature</b><span>What this button heats the room to</span><div class="stepper" data-k="temp"><button type="button" data-d="-1" aria-label="Less">−</button><output></output><button type="button" data-d="1" aria-label="More">+</button></div></li>
       <li><b><i>1</i>Heating up</b><span>Power level while the room is cold</span><div class="stepper" data-k="max"><button type="button" data-d="-1" aria-label="Less">−</button><output></output><button type="button" data-d="1" aria-label="More">+</button></div></li>
       <li><b><i>2</i>Getting close</b><span>Start easing down this many degrees below your temperature</span><div class="stepper" data-k="band"><button type="button" data-d="-1" aria-label="Less">−</button><output></output><button type="button" data-d="1" aria-label="More">+</button></div></li>
       <li><b><i>3</i>At temperature</b><span>Level it holds at once the room is warm (it stays on)</span><div class="stepper" data-k="hold"><button type="button" data-d="-1" aria-label="Less">−</button><output></output><button type="button" data-d="1" aria-label="More">+</button></div></li>
@@ -234,7 +231,7 @@
     </div>
 
     <button class="btn ghost wide" id="btnDisconnect">Disconnect</button>
-    <p class="fine center"><span data-version>v1.13</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
+    <p class="fine center"><span data-version>v1.14</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
   </div>
 </div>
 

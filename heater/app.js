@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.13"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.14"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -579,11 +579,24 @@
       const [rx, ry] = pt(A0 + SWEEP * frac(show(room)));
       $("roomDot").style.display = ""; $("roomDot").setAttribute("cx", rx); $("roomDot").setAttribute("cy", ry);
     }
-    document.querySelectorAll(".preset").forEach((b) => b.classList.toggle("on", show(+b.dataset.c) === v));
+    markPresets();
   }
 
+  // Preset buttons: the built-in four (Standard style) + your saved tunes + "＋ Custom".
   function renderPresets() {
-    $("presets").innerHTML = PRESETS.map(([n, c]) => `<button class="preset" data-c="${c}"><b>${show(c)}°</b><span>${n}</span></button>`).join("");
+    const esc = (x) => String(x).replace(/[<&"]/g, (m) => ({ "<": "&lt;", "&": "&amp;", '"': "&quot;" }[m]));
+    $("presets").innerHTML =
+      PRESETS.map(([n, c]) => `<button class="preset" data-c="${c}"><b>${show(c)}°</b><span>${n}</span></button>`).join("") +
+      S.tunes.map((t) => `<button class="preset custom" data-tune="${t.id}"><b>${show(t.targetC ?? S.targetC)}°</b><span>${esc(t.name)}</span></button>`).join("") +
+      `<button class="preset add" data-new="1"><b>＋</b><span>Custom</span></button>`;
+    markPresets();
+  }
+  function markPresets() {
+    const v = show(S.targetC);
+    document.querySelectorAll(".preset").forEach((b) => {
+      const on = b.dataset.tune ? b.dataset.tune === S.tuneId : b.dataset.c ? S.tuneId === "std" && show(+b.dataset.c) === v : false;
+      b.classList.toggle("on", on);
+    });
   }
 
   function renderManual() {
@@ -763,7 +776,18 @@
   });
   $("plus").onclick = () => setTarget(show(S.targetC) + 1);
   $("minus").onclick = () => setTarget(show(S.targetC) - 1);
-  $("presets").addEventListener("click", (e) => { const b = e.target.closest(".preset"); if (b) setTarget(show(+b.dataset.c)); });
+  $("presets").addEventListener("click", (e) => {
+    const b = e.target.closest(".preset"); if (!b) return;
+    if (b.dataset.new) return openTuner("new");
+    if (b.dataset.tune) {
+      const t = S.tunes.find((x) => x.id === b.dataset.tune); if (!t) return;
+      if (S.tuneId === t.id && show(S.targetC) === show(t.targetC ?? S.targetC)) return openTuner(t); // tap again to edit
+      S.tuneId = t.id; if (t.targetC != null) S.targetC = t.targetC;
+      saveS(); lastThermo = 0; render();
+      return toast(`${t.name}: ${show(S.targetC)}° · tap again to edit`);
+    }
+    S.tuneId = "std"; saveS(); setTarget(show(+b.dataset.c)); render();
+  });
 
   document.querySelectorAll(".seg-btn[data-mode]").forEach((b) => (b.onclick = () => { S.mode = b.dataset.mode; saveS(); lastThermo = 0; render(); }));
 
@@ -804,11 +828,6 @@
   $("btnPairGovee").onclick = pairGovee;
   $("btnGovee").onclick = pairGovee; // the picker needs a tap, so this always opens it
   /* ---------------- Tunes ---------------- */
-  function renderTunes() {
-    const all = [STD(), ...S.tunes];
-    $("tuneChips").innerHTML = all.map((t) => `<button class="tchip${t.id === tune().id ? " on" : ""}" data-id="${t.id}">${t.name.replace(/</g, "&lt;")}</button>`).join("") +
-      `<button class="tchip add" data-id="new">＋ Custom</button>`;
-  }
   let draft = null;
   const bandShow = (c) => Math.round(S.unit === "F" ? c * 9 / 5 : c);
   const bandFrom = (d) => (S.unit === "F" ? d * 5 / 9 : d);
@@ -816,7 +835,7 @@
     const T = base || tune();
     const isNew = !base && T.id === "std" || base === "new";
     const src = base === "new" ? tune() : T;
-    draft = { ...src, band: bandShow(src.bandC), id: isNew ? "t" + Date.now() : src.id, isNew };
+    draft = { ...src, band: bandShow(src.bandC), temp: show(src.targetC ?? S.targetC), id: isNew ? "t" + Date.now() : src.id, isNew };
     if (isNew) draft.name = "Custom " + (S.tunes.length + 1);
     $("tuneName").value = draft.name;
     $("btnTuneDelete").hidden = isNew;
@@ -825,16 +844,16 @@
   }
   function renderTuner() {
     const top = maxLevel();
-    const lim = { max: [3, top], band: S.unit === "F" ? [2, 15] : [1, 8], hold: [1, Math.max(1, draft.max - 1)] };
+    const lim = { temp: range(), max: [3, top], band: S.unit === "F" ? [2, 15] : [1, 8], hold: [1, Math.max(1, draft.max - 1)] };
     draft.hold = Math.min(draft.hold, lim.hold[1]);
     document.querySelectorAll("#tuner .stepper").forEach((st) => {
       const k = st.dataset.k, [lo, hi] = lim[k];
-      st.querySelector("output").textContent = k === "band" ? draft.band + "°" : "Level " + draft[k];
+      st.querySelector("output").textContent = k === "band" || k === "temp" ? draft[k] + "°" : "Level " + draft[k];
       st.querySelector('[data-d="-1"]').disabled = draft[k] <= lo;
       st.querySelector('[data-d="1"]').disabled = draft[k] >= hi;
     });
     document.querySelectorAll("#tuneClean .seg-btn").forEach((b) => b.classList.toggle("on", +b.dataset.v === draft.clean));
-    const t = show(S.targetC);
+    const t = draft.temp;
     $("tunePreview").textContent = `With ${t}°: level ${draft.max} until ${t - draft.band}°, then eases down and holds at level ${draft.hold} at ${t}°. ` +
       (draft.clean ? `Turning off: ${draft.clean} min clean burn, then off.` : "Turning off: off right away.");
   }
@@ -853,26 +872,18 @@
   $("btnTunerClose").onclick = () => ($("tuner").hidden = true);
   $("btnTuneSave").onclick = () => {
     const name = ($("tuneName").value || "").trim() || "Custom";
-    const t = { id: draft.id, name, max: draft.max, bandC: bandFrom(draft.band), hold: draft.hold, clean: draft.clean };
+    const t = { id: draft.id, name, targetC: fromShow(draft.temp), max: draft.max, bandC: bandFrom(draft.band), hold: draft.hold, clean: draft.clean };
     const i = S.tunes.findIndex((x) => x.id === t.id);
     if (i >= 0) S.tunes[i] = t; else S.tunes.push(t);
-    S.tuneId = t.id; saveS(); lastThermo = 0;
-    $("tuner").hidden = true; renderTunes(); render();
+    S.tuneId = t.id; S.targetC = t.targetC; saveS(); lastThermo = 0;
+    $("tuner").hidden = true; renderPresets(); render();
     toast(`Saved “${name}” and switched to it`);
   };
   $("btnTuneDelete").onclick = () => {
     S.tunes = S.tunes.filter((x) => x.id !== draft.id);
     if (S.tuneId === draft.id) S.tuneId = "std";
-    saveS(); $("tuner").hidden = true; renderTunes(); render(); toast("Tune deleted");
+    saveS(); $("tuner").hidden = true; renderPresets(); render(); toast("Tune deleted");
   };
-  $("tuneChips").addEventListener("click", (e) => {
-    const b = e.target.closest(".tchip"); if (!b) return;
-    const id = b.dataset.id;
-    if (id === "new") return openTuner("new");
-    if (id === S.tuneId && id !== "std") return openTuner(S.tunes.find((t) => t.id === id));
-    S.tuneId = id; saveS(); lastThermo = 0; renderTunes(); render();
-    toast(`Heating style: ${tune().name}`);
-  });
   $("btnTune").onclick = () => openTuner(tune().id === "std" ? "new" : tune());
 
   $("btnHow").onclick = () => { renderHow(); $("how").hidden = false; };
@@ -908,7 +919,6 @@
   document.title = "Ember Heater v" + VERSION;
   log("· Ember v" + VERSION);
   renderPresets();
-  renderTunes();
   render();
   if (params.has("demo")) connect(true);
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});

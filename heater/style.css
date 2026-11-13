@@ -246,3 +246,11 @@ select { background: var(--surface); border: 1px solid var(--line); border-radiu
 .stepper output { min-width: 62px; text-align: center; font-weight: 500; font-size: 14px; }
 .tune-preview { color: var(--ember-2); font-size: 13px; line-height: 1.5; margin: 6px 4px 4px; }
 .clean-warn { color: var(--ember-2); font-size: 12.5px; line-height: 1.45; margin: -8px 12px 16px; opacity: .9; }
+
+/* Custom tune buttons */
+.preset span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 4px; }
+.preset.custom b { color: var(--ember-2); }
+.preset.add { border-style: dashed; color: var(--muted); }
+.preset.add b { font-weight: 300; }
+.presets { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.temp-step .stepper output { font-size: 18px; }
