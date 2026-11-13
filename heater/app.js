@@ -651,11 +651,12 @@
   };
 
   $("btnConnect").onclick = () => connect(false);
+  $("btnAll").onclick = () => { S.showAll = true; saveS(); $("setAll").checked = true; connect(false); };
   $("btnDemo").onclick = () => connect(true);
 
   if (!navigator.bluetooth) {
     $("btNote").hidden = false;
-    $("btnConnect").disabled = true;
+    $("btnConnect").disabled = true; $("btnAll").disabled = true;
     $("btNote").textContent = /iPhone|iPad|Macintosh/.test(navigator.userAgent)
       ? "On iPhone or iPad, open this page in the free Bluefy browser to connect."
       : "Open this page in Chrome to connect over Bluetooth.";
