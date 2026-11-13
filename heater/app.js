@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.8"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.9"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -397,10 +397,12 @@
     render();
   }
 
+  const maxLevel = () => (heater && heater.proto && heater.proto.maxLevel) || 10;
+  const hrsText = (h) => (h >= 100 ? Math.round(h) : h >= 10 ? Math.round(h) : h.toFixed(1)) + "h";
   const fuelRate = (level) => {
     // TB2S 8 kW: ~0.16 L/h at the lowest level to ~0.62 L/h at the highest.
-    const max = (heater && heater.proto && heater.proto.maxLevel) || 6;
-    const l = level == null ? 3 : Math.max(1, Math.min(max, level));
+    const max = maxLevel();
+    const l = level == null ? Math.ceil(max / 2) : Math.max(1, Math.min(max, level));
     return 0.16 + (0.62 - 0.16) * (l - 1) / (max - 1);
   };
 
@@ -615,6 +617,21 @@
     $("fuelBar").style.width = (left / tankL) * 100 + "%";
     $("fuelLeft").textContent = `≈ ${(left / GAL).toFixed(1)} gal · ${hrs.toFixed(0)} h left`;
     $("fuelText").textContent = `Today ${(today.sec / 3600).toFixed(1)} h · ${(today.L / GAL).toFixed(2)} gal`;
+
+    // Runtime at each level
+    const max = maxLevel(), cur = s && isOn(s) ? s.level : null;
+    const hrsAt = Array.from({ length: max }, (_, i) => left / fuelRate(i + 1));
+    const top = Math.max(...hrsAt) || 1;
+    const rt = $("runtime");
+    if (rt.children.length !== max) {
+      rt.innerHTML = hrsAt.map((_, i) => `<div class="rt-col"><b></b><i><u></u></i><span>${i + 1}</span></div>`).join("");
+    }
+    [...rt.children].forEach((col, i) => {
+      col.classList.toggle("on", cur === i + 1);
+      col.querySelector("b").textContent = hrsText(hrsAt[i]);
+      col.querySelector("u").style.height = Math.max(4, (hrsAt[i] / top) * 100) + "%";
+    });
+    $("rtNow").textContent = cur ? `Now: level ${cur}` : "Level";
 
     // Schedule
     $("warmOn").checked = S.warmOn; $("warmTime").value = S.warmTime;

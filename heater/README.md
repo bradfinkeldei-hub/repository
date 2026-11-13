@@ -33,6 +33,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.9 | Fuel card shows hours left at every power level, with the current level highlighted. |
 | v1.8 | Fuel shown in gallons; tank size in gallons (default 5 gal). |
 | v1.7 | Clean shutdown checks the heater really reaches full power (switches to level mode, confirms, retries, re-sends PIN). Acknowledged Bluetooth writes. |
 | v1.6 | Supports the TB2S (newer Hcalory BD39 controllers): PIN unlock, power levels 1–10, direct temperature. Version shown in the app. |
