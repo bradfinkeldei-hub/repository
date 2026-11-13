@@ -373,3 +373,5 @@ body { max-width: 100%; }
 .burn-label { text-align: center; color: var(--muted); font-size: 13px; margin: 18px 0 0; }
 #offSheet { z-index: 12; }
 #offSheet .btn.ghost { margin-top: 14px; }
+.fan-btn { border-color: rgba(143, 182, 255, .35); color: var(--cool); }
+.fan-btn.on { background: rgba(143, 182, 255, .1); }

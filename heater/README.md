@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.24 | Fan only (no heat): run the blower without burning fuel, at home and from away. |
 | v1.23 | Choose a 1, 5 or 10 min burn-off (or off now) every time you turn off, at home and from away. |
 | v1.22 | Away control adds power levels (1–10), Clean shutdown or Off now, and refreshes every few seconds while you watch. |
 | v1.21 | Away control uses a simple PIN you choose (4–8 digits). 10 wrong tries lock it for 24 hours. |

@@ -107,3 +107,16 @@ test("format H status and auth parse via the TB2S simulator", async () => {
   const bad = Uint8Array.from(P.H.poll()); assert.equal(P.H.parse(bad), null);
   sim.disconnect();
 });
+
+test("fan only: H frame and simulator", async () => {
+  assert.equal(P.hex(P.H.fan()[0]).slice(-5), "08 15");
+  const sim = new P.SimHeaterH(); await sim.connect();
+  const got = []; sim.onNotify((x) => got.push(x));
+  const wait = () => new Promise((r) => setTimeout(r, 100));
+  await sim.write(P.H.auth("0000")); await wait();
+  await sim.write(P.H.fan()[0]); await sim.write(P.H.poll()); await wait();
+  let s = P.H.parse(got.pop()); assert.equal(s.power, "fan"); assert.equal(s.mode, "fan");
+  await sim.write(P.H.stop()[0]); await sim.write(P.H.poll()); await wait();
+  s = P.H.parse(got.pop()); assert.equal(s.power, "off");
+  sim.disconnect();
+});

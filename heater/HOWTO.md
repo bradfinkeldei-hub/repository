@@ -96,6 +96,7 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 - **Power level:** tap levels 1–10 to set the speed directly.
 - **Shut down:** pick a **1, 5 or 10 min** burn-off at full power, and then it turns off.
 - **Off now:** turns off right away. It also works during a clean shutdown.
+- **Fan only:** runs the blower with no heat and no fuel. Tap again to stop it.
 - **Updates:** while the away screen is open, the status updates every few seconds and the "Updated … ago" line shows how fresh it is. Commands usually arrive within seconds, and can take up to about a minute.
 
 **Security:**
@@ -113,6 +114,7 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 | **Buttons** | Sleep, Comfort, Boost and one Custom. Tap to use; tap again to change its temperature, levels and burn-off. |
 | **Power level** | Pick a fixed level 1–10 instead of the thermostat. |
 | **Turn off** | Choose a 1, 5 or 10 min burn-off at full power, or Off now. |
+| **Fan only** | When the heater is off, run just the blower (no heat, no fuel). New in v1.24: if it doesn't work on your heater, send the log. |
 | **Fuel** | One bar per gallon. Tap a bar to set it (the last bar means full). Shows hours left at every level. |
 | **Carbon health** | Counts hours on low and suggests a 15-min clean burn when it's due. |
 | **Settings** | Room gauge (heater or Govee), units, tank size, battery guard, home gateway, heater PIN, and **Copy log** for help. |

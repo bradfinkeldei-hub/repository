@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.23"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.24"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -218,6 +218,7 @@
     }
     async start() { await this.sendAll(this.proto.start()); return this.poll(); }
     async stop() { await this.sendAll(this.proto.stop()); return this.poll(); }
+    async fan() { if (!this.proto.fan) return null; await this.sendAll(this.proto.fan()); await sleep(1200); return this.poll(); }
     // Turn off, checked: confirm the heater is shutting down, retry (and re-send the PIN) if not.
     async stopVerified() {
       this.busy++;
@@ -742,6 +743,7 @@
     const running = s && (s.power === "running" || s.power === "starting");
     const lvl = running ? s.level : null;
     $("sbLevel").innerHTML = lvl != null ? `Level <b>${lvl}</b><small> / ${max}</small>`
+      : s && s.power === "fan" ? "No heat · no fuel"
       : running && s.setpoint != null ? `Heater set <b>${s.setpoint}°</b>`
       : S.mode === "manual" ? `Runs level ${S.level || 5}`
       : `Runs level ${tune().hold}–${Math.min(max, tune().max)}`;
@@ -795,6 +797,11 @@
     btn.disabled = !s || s.power === "cooling" || s.power === "error";
     if (isOn(s)) { btn.textContent = tune().clean ? "Turn off" : "Turn off now"; btn.classList.add("off"); }
     else { btn.textContent = s && s.power === "cooling" ? "Cooling down…" : "Start heating"; btn.classList.remove("off"); }
+    // Fan only: offered when the heater is off; becomes "Stop fan" while the fan runs.
+    const fanOn = s && s.power === "fan";
+    $("btnFan").hidden = !s || !(s.power === "off" || fanOn) || !heater.proto.fan;
+    $("btnFan").textContent = fanOn ? "Stop fan" : "Fan only (no heat)";
+    $("btnFan").classList.toggle("on", !!fanOn);
 
     // Carbon coach
     const pct = Math.min(1, stats.lowSec / (S.coachHours * 3600));
@@ -933,6 +940,17 @@
     lastThermo = 0;
     await heater.start();
     if (S.mode === "manual" && S.level) setTimeout(() => heater.stepTo(S.level), 1500);
+  };
+  $("btnFan").onclick = async () => {
+    const s = heater && heater.status; if (!s) return;
+    $("btnFan").disabled = true;
+    try {
+      if (s.power === "fan") { await heater.stopVerified(); toast("Fan off"); }
+      else {
+        const r = await heater.fan();
+        toast(r && r.power === "fan" ? "Fan only: blowing air, no fuel used" : "The heater didn't confirm fan-only yet. If nothing happens, Settings → Copy log and send it over.", 6000);
+      }
+    } finally { $("btnFan").disabled = false; }
   };
   // Turn off: pick 1, 5 or 10 min burn-off, or off right away.
   function openOffSheet() {
@@ -1114,7 +1132,8 @@
     const s = heater.status;
     if (c.action === "start" && s && (s.power === "off" || s.power === "cooling")) { lastThermo = 0; await heater.start(); toast("Started from away"); }
     else if (c.action === "stop" && s && isOn(s) && !clean) { await beginClean("shutdown", [1, 5, 10].includes(c.value) ? c.value : undefined); }
-    else if (c.action === "stopnow" && s && (isOn(s) || clean)) { await turnOff(); }
+    else if (c.action === "stopnow" && s && (isOn(s) || clean || s.power === "fan")) { await turnOff(); }
+    else if (c.action === "fan" && s && s.power === "off") { await heater.fan(); }
     else if (c.action === "tune") {
       const t = S.tunes.find((x) => x.id === c.value);
       if (t) { S.tuneId = t.id; if (t.targetC != null) S.targetC = t.targetC; S.mode = "thermo"; }
@@ -1266,7 +1285,7 @@
       state = "clean"; label = `Clean shutdown · ${Math.max(1, Math.ceil(left / 60000))} min`;
     }
     $("awBar").dataset.state = state; $("awState").textContent = label;
-    $("awLevel").innerHTML = on && st.level != null ? `Level <b>${st.level}</b><small> / ${max}</small>` : on && st.setpoint != null ? `Heater set <b>${st.setpoint}°</b>` : st.mode === "manual" ? `Runs level ${st.manualLevel || "—"}` : `Runs level ${st.hold}–${st.top}`;
+    $("awLevel").innerHTML = st.power === "fan" ? "No heat · no fuel" : on && st.level != null ? `Level <b>${st.level}</b><small> / ${max}</small>` : on && st.setpoint != null ? `Heater set <b>${st.setpoint}°</b>` : st.mode === "manual" ? `Runs level ${st.manualLevel || "—"}` : `Runs level ${st.hold}–${st.top}`;
     const segs = $("awSegs"); if (segs.children.length !== max) segs.innerHTML = "<i></i>".repeat(max);
     [...segs.children].forEach((el, i) => el.classList.toggle("on", on && st.level != null && i < st.level));
     const room = st.roomC != null ? ` · room ${show(st.roomC)}°` : "";
@@ -1296,6 +1315,10 @@
     btn.hidden = on || !!st.clean;
     btn.disabled = !live || st.power === "cooling";
     if (Date.now() - awArmed > 4000) btn.textContent = st.power === "cooling" ? "Cooling down…" : "Start heating";
+    const fanOn = st.power === "fan";
+    $("awFan").hidden = !(st.power === "off" || fanOn) || !live;
+    $("awFan").textContent = fanOn ? "Stop fan" : "Fan only (no heat)";
+    $("awFan").classList.toggle("on", fanOn);
     $("awOff").hidden = !(on || st.clean);
     $("awClean").hidden = !!st.clean; $("awClean").disabled = !live;
     $("awOffNow").disabled = !live;
@@ -1305,6 +1328,7 @@
       const done = (awPending.action === "start" && on) || (awPending.action === "stop" && (st.clean || st.power === "cooling" || st.power === "off")) ||
         (awPending.action === "tune" && st.tuneId === awPending.value) || (awPending.action === "target" && Math.abs(st.targetC - awPending.value) < 0.3) ||
         (awPending.action === "stopnow" && (st.power === "cooling" || st.power === "off")) ||
+        (awPending.action === "fan" && st.power === "fan") ||
         (awPending.action === "mode" && st.mode === awPending.value) ||
         (awPending.action === "level" && st.mode === "manual" && (on ? st.level === awPending.value : st.manualLevel === awPending.value));
       if (done) { $("awMsg").textContent = "Done ✓ The heater has it."; awPending = null; awView = null; awLvl = null; if (!awTargetTimer) awTarget = null; }
@@ -1325,6 +1349,11 @@
     const b = e.target.closest("[data-min]"); if (!b) return;
     const m = +b.dataset.min;
     awaySend("stop", m, `Sent. ${m} min burn-off at full power, then it turns off.`);
+  };
+  $("awFan").onclick = () => {
+    if (!awState) return;
+    if (awState.power === "fan") awaySend("stopnow", null, "Sent. The fan turns off.");
+    else awaySend("fan", null, "Sent. The fan should start within about a minute (no heat, no fuel).");
   };
   $("awOffNow").onclick = () => {
     if (!confirm("Turn the heater off now, without the clean burn?")) return;

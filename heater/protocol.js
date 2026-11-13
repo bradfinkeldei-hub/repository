@@ -52,6 +52,7 @@
     poll: () => Uint8Array.from([0xba, 0xab, 0x04, 0xcc, 0x00, 0x00, 0x00, 0x35]),
     bb: (mode) => withSum([0xba, 0xab, 0x04, 0xbb, mode, 0x00, 0x00]),
     start() { return [A.bb(0xa1)]; },
+    fan() { return [A.bb(0xa4)]; }, // ventilation
     // Same sequence as the official app: ventilate, heat, ventilate (≈500 ms apart).
     stop() { return [A.bb(0xa4), A.bb(0xa1), A.bb(0xa4)]; },
     up() { return [A.bb(0xa2)]; },
@@ -109,6 +110,7 @@
     up() { return [bcmd(0x03, 0x10)]; },
     down() { return [bcmd(0x04, 0x11)]; },
     gearMode() { return [bcmd(0x07, 0x14)]; },
+    fan() { return [bcmd(0x08, 0x15)]; }, // ventilation (same power family as H; unconfirmed)
     thermoMode() { return [bcmd(0x06, 0x13)]; },
     looksLike: (x) => x.length >= 32,
     parse(x) {
@@ -179,6 +181,7 @@
     start() { return power(2); },
     stop() { return power(1); },
     thermoMode() { return power(6); },
+    fan() { return power(8); }, // fan only / ventilation (decoded, not yet confirmed on a TB2S)
     gearMode() { return power(7); },
     setLevel(l) { return [hcmd(0x0607, [Math.max(1, Math.min(10, l))])]; },
     setTemp(t, fahrenheit) { return [hcmd(0x0706, [Math.round(t), fahrenheit ? 1 : 0])]; },
@@ -322,6 +325,8 @@
         const v = p[8];
         if (v === 2 && (this.state === 0 || this.state === 4)) { this.state = 8; this.step = 3; this.timer = 30; }
         else if (v === 1 && this.state === 8) { this.state = 4; this.step = 0; this.timer = 120; }
+        else if (v === 1 && this.state === 0xc) { this.state = 0; this.step = 0; }
+        else if (v === 8 && this.state === 0) { this.state = 0xc; this.step = 1; }
         else if (v === 6) this.mode = 1;
         else if (v === 7) this.mode = 2;
       } else if (cmd === 0x0607) this.level = Math.max(1, Math.min(10, p[0]));
@@ -330,7 +335,7 @@
     reply() {
       const f = new Array(39).fill(0);
       f[1] = 2; f[3] = 1; f[5] = 1; f[7] = 0x0a; f[8] = 0x03; f[11] = 27;
-      f[20] = (this.state << 4) | this.step; f[21] = this.state ? this.mode : 0;
+      f[20] = (this.state << 4) | this.step; f[21] = this.state === 0xc ? 3 : this.state ? this.mode : 0;
       f[22] = this.mode === 1 ? this.temp : this.level; f[23] = 2;
       const v = Math.round(this.volts * 10); f[24] = v >> 8; f[25] = v & 0xff;
       const b = Math.round(this.body * 10); f[27] = (b >> 8) & 0xff; f[28] = b & 0xff;
