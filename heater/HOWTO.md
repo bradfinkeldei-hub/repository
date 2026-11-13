@@ -3,6 +3,16 @@
 Ember is an unofficial web app that controls Hcalory Bluetooth diesel heaters from your phone. It was built for and tested on a **Hcalory TB2S**, and should work with other Hcalory Bluetooth heaters.
 It isn't made by or affiliated with Hcalory.
 
+**Free · no app store · no developer account · works on Android and iPhone/iPad**
+
+<p>
+<img src="docs/02-heating.png" width="240" alt="Heating at level 10 toward 70 degrees, with the status bar on top">
+<img src="docs/03-turn-off.png" width="240" alt="Turn off: choose a 1, 5 or 10 minute burn-off, or off now">
+<img src="docs/06-away.png" width="240" alt="Controlling the heater from away">
+</p>
+
+**[⬇ Download the latest version](ember-heater-latest.zip?raw=true)** · [What's new](README.md#versions)
+
 ## What it adds
 
 - **Clean shutdown.** When you tap Turn off, you pick a **1, 5 or 10 minute** burn-off at full power (or Off now). It then shuts down, and the heater still does its own safe cool-down.
@@ -26,7 +36,8 @@ It isn't made by or affiliated with Hcalory.
 
 ### 1. Download
 
-Download the latest `ember-heater-vX.Y.zip` from this folder. Don't unzip it.
+Download **[ember-heater-latest.zip](ember-heater-latest.zip?raw=true)**. Don't unzip it.
+The version number shows next to the name in the app (e.g. **EMBER v1.23**).
 
 ### 2. Put it online (Cloudflare, free)
 
@@ -49,6 +60,8 @@ Download the latest `ember-heater-vX.Y.zip` from this folder. Don't unzip it.
 
 **Tip:** tap **Try the demo** first to explore the app without a heater.
 
+<img src="docs/01-connect.png" width="240" alt="Connect screen">
+
 ### 4. Optional: Govee thermometer as the room gauge
 
 **iPhone (Wi-Fi):**
@@ -70,6 +83,8 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 3. Set **Variable name** to `EMBER` (all caps) and choose the `ember` namespace. Save it for **Production**.
 4. Upload the zip again (**Create deployment**) so the setting takes effect.
 
+<img src="docs/07-gateway.png" width="380" alt="Home gateway settings with a PIN">
+
 **At home (old phone or iPad):**
 1. Open Ember and connect the heater.
 2. Go to **Settings → Home gateway**, turn it on and **choose a PIN** (4–8 digits).
@@ -88,6 +103,24 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 - **10 wrong PINs lock away control for 24 hours**, which makes guessing impractical.
 - **Settings → Change PIN** cuts off any phone using the old PIN.
 - **Only a short list of commands with sensible values is accepted.** The home device ignores commands older than 15 minutes.
+
+## Quick tour
+
+| | |
+| --- | --- |
+| **Status bar** (top) | On/off, current level 1–10, the setting it follows, room temperature, fuel left and hours at that level. It stays visible while you scroll. |
+| **Thermostat** | Drag the dial or use −/+. It runs at full power until it's close, eases down, then holds at a low level. Tap **How it heats** for the details. |
+| **Buttons** | Sleep, Comfort, Boost and one Custom. Tap to use; tap again to change its temperature, levels and burn-off. |
+| **Power level** | Pick a fixed level 1–10 instead of the thermostat. |
+| **Turn off** | Choose a 1, 5 or 10 min burn-off at full power, or Off now. |
+| **Fuel** | One bar per gallon. Tap a bar to set it (the last bar means full). Shows hours left at every level. |
+| **Carbon health** | Counts hours on low and suggests a 15-min clean burn when it's due. |
+| **Settings** | Room gauge (heater or Govee), units, tank size, battery guard, home gateway, heater PIN, and **Copy log** for help. |
+
+<p>
+<img src="docs/04-tuner.png" width="240" alt="Manual tune: temperature, heat-up level, ease-down point, hold level and burn-off">
+<img src="docs/05-fuel.png" width="300" alt="Fuel bars, one per gallon, and hours left at each level">
+</p>
 
 ## Good to know
 
@@ -108,6 +141,23 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 | "Too many wrong PINs" | Wait up to 24 hours. The lock clears by itself. |
 | Away screen says "Home offline?" | The home device is asleep, closed or out of Wi-Fi. Wake it up and keep Ember open. |
 | Govee temperature looks wrong | Settings → **Govee reports in** → switch between °F and °C. |
+
+## Questions
+
+**Will it work with my heater?**
+It's built for Hcalory heaters controlled by the Hcalory Bluetooth app. It's tested on a TB2S. It also includes the protocols for older Hcalory and AirHeater-type controllers, but those haven't been tested on a real heater yet. Try the demo, then Connect. If it connects but doesn't respond, send the log from Settings → Copy log.
+
+**Does it change the heater?**
+No. It only sends the same kinds of commands the official app sends. The heater's own safety and cool-down still run.
+
+**Does it cost anything?**
+No. Cloudflare's free plan covers hosting, the Govee relay and away control for one home.
+
+**Can I still use the remote or the Hcalory app?**
+Yes, the remote works alongside Ember. The Hcalory app can't connect while Ember is connected, because the heater talks to one app at a time.
+
+**Is my data private?**
+The app runs on your phone and talks to the heater directly over Bluetooth. Your Cloudflare site only relays Govee readings (if you use them) and, for away control, the heater's status and your commands, protected by your PIN.
 
 ## Credits
 
