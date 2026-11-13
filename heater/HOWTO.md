@@ -124,6 +124,7 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 <p>
 <img src="docs/04-tuner.png" width="240" alt="Manual tune: temperature, heat-up level, ease-down point, hold level and burn-off">
 <img src="docs/05-fuel.png" width="300" alt="Fuel bars, one per gallon, and hours left at each level">
+<img src="docs/08-schedule.png" width="260" alt="Schedule with Morning, Midday and Evening windows">
 </p>
 
 ## Good to know
