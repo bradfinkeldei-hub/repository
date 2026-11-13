@@ -1,5 +1,7 @@
 # Ember – Hcalory heater app
 
+> **New here? Start with the [step-by-step setup guide](HOWTO.md).**
+
 A web app that controls Hcalory diesel heaters (built for the TB2S) over Bluetooth.
 It has no app store listing and needs no developer account. Open the link in Chrome on Android.
 
