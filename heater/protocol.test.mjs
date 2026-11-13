@@ -76,3 +76,34 @@ test("Govee H5051 (ihoment name, 9-byte format)", () => {
   // Same packet without a name still decodes (Android sometimes hides it)
   assert.equal(G.decode(0xec88, [0x00, 0x5c, 0x08, 0x10, 0x0e, 95, 0, 0, 0], "").tempC, 21.4);
 });
+
+test("format H (TB2S / BD39) frames match diesel-heater-ble", () => {
+  assert.equal(P.hex(P.H.auth("0000")), "00 02 00 01 00 01 00 0A 0C 00 00 05 01 00 00 00 00 12");
+  assert.equal(P.hex(P.H.setTemp(20, false)[0]), "00 02 00 01 00 01 00 07 06 00 00 02 14 00 1C");
+  assert.equal(P.hex(P.H.start()[0]).slice(-5), "02 0F");
+  assert.equal(P.hex(P.H.stop()[0]).slice(-5), "01 0E");
+  const q = P.H.poll(new Date(2026, 10, 13, 13, 5, 9)); // Friday
+  assert.equal(P.hex(q), "00 02 00 01 00 01 00 0A 0A 00 00 05 0D 05 09 05 00 " + P.hex([(0x0a + 5 + 13 + 5 + 9 + 5) & 255]));
+  assert.equal(P.hex(P.H.setLevel(10)[0]), "00 02 00 01 00 01 00 06 07 00 00 01 0A 12");
+});
+
+test("format H status and auth parse via the TB2S simulator", async () => {
+  const sim = new P.SimHeaterH(); await sim.connect();
+  const got = []; sim.onNotify((x) => got.push(x));
+  const wait = () => new Promise((r) => setTimeout(r, 100));
+  await sim.write(P.H.poll()); await wait();
+  assert.equal(got.length, 0, "ignores commands before unlock");
+  await sim.write(P.H.auth("1234")); await wait();
+  assert.equal(P.H.authResult(got.pop()), false);
+  await sim.write(P.H.auth("0000")); await wait();
+  assert.equal(P.H.authResult(got.pop()), true);
+  await sim.write(P.H.start()[0]); await sim.write(P.H.poll()); await wait();
+  let s = P.H.parse(got.pop());
+  assert.equal(s.power, "starting"); assert.equal(s.volts, 12.9); assert.equal(s.unit, "C"); assert.equal(s.ambient, 9);
+  sim.step = 5; await sim.write(P.H.setLevel(7)[0]); await sim.write(P.H.poll()); await wait();
+  s = P.H.parse(got.pop());
+  assert.equal(s.power, "running"); assert.equal(s.level, 7);
+  // corrupted checksum is rejected
+  const bad = Uint8Array.from(P.H.poll()); assert.equal(P.H.parse(bad), null);
+  sim.disconnect();
+});

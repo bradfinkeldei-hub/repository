@@ -200,3 +200,4 @@ select { background: var(--surface); border: 1px solid var(--line); border-radiu
   display: block; margin: 12px auto 0; padding: 9px 16px; border-radius: 999px; cursor: pointer;
   background: rgba(143, 182, 255, .08); border: 1px solid rgba(143, 182, 255, .35); color: var(--cool); font-size: 13px;
 }
+.pin { width: 84px; text-align: center; letter-spacing: .2em; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; }

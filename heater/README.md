@@ -32,4 +32,6 @@ If the readings stop for 3 minutes, the app falls back to the heater's own senso
 - iPhone/iPad: Safari has no Bluetooth for web pages. Use the free **Bluefy** browser.
 - Testing: add `?demo` to the URL to start the demo heater, or `?demo&fast` to run time 30× faster.
 - Protocol tests: `node --test protocol.test.mjs`
-- Protocol credits: mSoftMS/AirHeater-BLE, evanfoster/hcalory-control and govee-ble. Unofficial. Not affiliated with Hcalory.
+- Heater formats: **H** = newer Hcalory controllers such as the TB2S (service BD39, unlocked with PIN 0000; change it in Settings).
+  **B** and **A** = older FFF0 controllers. The app picks the right one automatically.
+- Protocol credits: Spettacolo83/homeassistant-diesel-heater (diesel-heater-ble), mSoftMS/AirHeater-BLE, evanfoster/hcalory-control and govee-ble. Unofficial. Not affiliated with Hcalory.

@@ -18,6 +18,10 @@
   const SERVICE = "0000fff0-0000-1000-8000-00805f9b34fb";
   const NOTIFY = "0000fff1-0000-1000-8000-00805f9b34fb";
   const WRITE = "0000fff2-0000-1000-8000-00805f9b34fb";
+  // Newer Hcalory controllers (TB2S, HBU1S…) advertise service BD39.
+  const BD39 = "0000bd39-0000-1000-8000-00805f9b34fb";
+  const BD39_WRITE = "0000bdf7-0000-1000-8000-00805f9b34fb";
+  const BD39_NOTIFY = "0000bdf8-0000-1000-8000-00805f9b34fb";
 
   const sum8 = (bytes) => bytes.reduce((a, b) => (a + b) & 0xff, 0);
   const withSum = (bytes) => Uint8Array.from([...bytes, sum8(bytes)]);
@@ -131,6 +135,82 @@
     },
   };
 
+  /* ---------------- Format H: Hcalory MVP2 (BD39 service) ----------------
+   * Source: Spettacolo83/homeassistant-diesel-heater (diesel-heater-ble),
+   * reverse-engineered from the Hcalory Android app.
+   * Frame: 00 02 00 01 00 01 00 CMD_HI | CMD_LO 00 00 LEN PAYLOAD | SUM
+   * (SUM = sum of everything after CMD_HI, mod 256)
+   */
+  const hcmd = (cmd, payload) => {
+    const body = [cmd & 0xff, 0, 0, payload.length, ...payload];
+    return Uint8Array.from([0x00, 0x02, 0x00, 0x01, 0x00, 0x01, 0x00, (cmd >> 8) & 0xff, ...body, sum8(body)]);
+  };
+  const power = (v) => [hcmd(0x0e04, [0, 0, 0, 0, 0, 0, 0, 0, v])];
+  const H_FAULTS = {
+    1: ["Didn't ignite", "Often low fuel, air in the line or carbon. Prime and retry."],
+    2: ["Flame went out", "Usually low fuel or air in the line. Top up and prime the pump."],
+    3: ["Overheating", "Something is blocking airflow. Clear the inlet and outlet."],
+    4: ["Fan fault", "The fan is stuck or unplugged. Check for debris."],
+    5: ["Fuel pump fault", "Check the pump wiring and that the fuel line isn't kinked."],
+    6: ["Sensor fault", "A temperature sensor isn't reading. Check its plug."],
+    7: ["Battery too low", "Charge the battery or check the wiring."],
+    8: ["Voltage too high", "Check your charger or alternator output."],
+    9: ["Lost connection", "The control board isn't talking to the heater. Check the cable."],
+    10: ["Carbon monoxide high", "Ventilate now and check the exhaust for leaks."],
+    11: ["Carbon monoxide critical", "Get fresh air immediately. Check the exhaust before using again."],
+  };
+  const H = {
+    id: "H",
+    maxLevel: 10,
+    minLevel: 1,
+    hasThermostat: true,
+    direct: true, // sets level/temperature directly, no up/down stepping
+    unit: "C",
+    faults: H_FAULTS,
+    // Status request carries the phone's clock (raw hour, minute, second, ISO weekday).
+    poll(now = new Date()) {
+      return hcmd(0x0a0a, [now.getHours(), now.getMinutes(), now.getSeconds(), now.getDay() || 7, 0]);
+    },
+    auth(pin = "0000") { return hcmd(0x0a0c, [1, ...String(pin).padStart(4, "0").slice(-4).split("").map(Number)]); },
+    authResult(x) {
+      if (x.length < 18 || x[0] !== 0 || x[1] !== 3 || x[7] !== 0x0b || x[8] !== 0x0c) return null;
+      return x[17] === 1;
+    },
+    start() { return power(2); },
+    stop() { return power(1); },
+    thermoMode() { return power(6); },
+    gearMode() { return power(7); },
+    setLevel(l) { return [hcmd(0x0607, [Math.max(1, Math.min(10, l))])]; },
+    setTemp(t, fahrenheit) { return [hcmd(0x0706, [Math.round(t), fahrenheit ? 1 : 0])]; },
+    looksLike: (x) => x.length >= 38 && x[8] === 0x03,
+    parse(x) {
+      if (x.length < 38 || x[8] !== 0x03) return null;
+      if (sum8(Array.from(x.slice(8, -1))) !== x[x.length - 1]) return null;
+      const state = x[20] >> 4, step = x[20] & 0x0f, mode = x[21], value = x[22];
+      const signed = (i) => (x[i] === 1 ? -1 : 1) * ((x[i + 1] << 8) | x[i + 2]) / 10;
+      const s = {
+        proto: "H",
+        raw: hex(x),
+        power: "off",
+        mode: mode === 1 ? "thermostat" : mode === 3 ? "fan" : "gear",
+        level: null,
+        setpoint: null,
+        volts: ((x[24] << 8) | x[25]) / 10,
+        body: Math.round(signed(26)),
+        ambient: Math.round(signed(29) * 10) / 10,
+        unit: x.length > 38 && x[37] === 1 ? "F" : "C",
+        fault: null,
+        auto: x[23] === 1,
+      };
+      if (state === 0xf) { s.power = "error"; s.fault = value; return s; }
+      s.power = state === 0x4 ? "cooling" : state === 0xc ? "fan" : state === 0x8 ? (step === 3 ? "starting" : "running") : "off";
+      if (s.power !== "off" && s.power !== "cooling") {
+        if (mode === 1) s.setpoint = value; else if (mode === 2) s.level = value;
+      }
+      return s;
+    },
+  };
+
   /* ---------------- Simulated heater (demo + tests) ---------------- */
   // Speaks format A over a fake transport so the real parser is exercised.
   class SimHeater {
@@ -200,7 +280,68 @@
     }
   }
 
-  const api = { SERVICE, NOTIFY, WRITE, A, B, FAULTS, SimHeater, hex, sum8 };
+  // Demo heater that speaks format H, like a real TB2S.
+  class SimHeaterH {
+    constructor(speed = 1) {
+      this.speed = speed; this.transport = "bd39";
+      this.state = 0; this.step = 0; this.mode = 2; this.level = 4; this.temp = 21;
+      this.room = 9; this.body = 12; this.volts = 12.9; this.timer = 0; this.authed = false;
+      this.listener = null; this.connected = false; this._t = null;
+    }
+    async connect() { this.connected = true; this._t = setInterval(() => this.tick(1), 1000); }
+    disconnect() { this.connected = false; clearInterval(this._t); }
+    onNotify(fn) { this.listener = fn; }
+    get output() {
+      if (this.state !== 8 || this.step !== 5) return 0;
+      if (this.mode === 2) return this.level;
+      return Math.max(1, Math.min(10, Math.round((this.temp - this.room) * 2 + 1)));
+    }
+    tick(sec) {
+      const dt = sec * this.speed;
+      if (this.state === 8 && this.step === 3 && (this.timer -= dt) <= 0) this.step = 5;
+      if (this.state === 4 && (this.timer -= dt) <= 0) { this.state = 0; this.step = 0; }
+      const out = this.output;
+      this.room += ((out ? 10 + out * 2 : 8) - this.room) * Math.min(1, 0.004 * dt);
+      this.body += ((out ? 60 + out * 13 : this.room) - this.body) * Math.min(1, 0.05 * dt);
+      this.volts = out ? 12.7 - out * 0.03 : 12.9;
+    }
+    send(frame) { setTimeout(() => this.listener && this.listener(frame), 60); }
+    async write(bytes) {
+      if (!this.connected) throw new Error("not connected");
+      const x = Array.from(bytes);
+      if (x[0] !== 0 || x[1] !== 2) return;
+      const cmd = (x[7] << 8) | x[8], p = x.slice(12, -1);
+      if (cmd === 0x0a0c) {
+        this.authed = p.slice(1).join("") === "0000";
+        const r = [0, 3, 0, 1, 0, 1, 0, 0x0b, 0x0c, 0, 0, 6, 1, ...p.slice(1), this.authed ? 1 : 0];
+        return this.send(Uint8Array.from([...r, sum8(r.slice(8))]));
+      }
+      if (!this.authed) return;
+      if (cmd === 0x0a0a) return this.reply();
+      if (cmd === 0x0e04) {
+        const v = p[8];
+        if (v === 2 && (this.state === 0 || this.state === 4)) { this.state = 8; this.step = 3; this.timer = 30; }
+        else if (v === 1 && this.state === 8) { this.state = 4; this.step = 0; this.timer = 120; }
+        else if (v === 6) this.mode = 1;
+        else if (v === 7) this.mode = 2;
+      } else if (cmd === 0x0607) this.level = Math.max(1, Math.min(10, p[0]));
+      else if (cmd === 0x0706) this.temp = p[0];
+    }
+    reply() {
+      const f = new Array(39).fill(0);
+      f[1] = 2; f[3] = 1; f[5] = 1; f[7] = 0x0a; f[8] = 0x03; f[11] = 27;
+      f[20] = (this.state << 4) | this.step; f[21] = this.state ? this.mode : 0;
+      f[22] = this.mode === 1 ? this.temp : this.level; f[23] = 2;
+      const v = Math.round(this.volts * 10); f[24] = v >> 8; f[25] = v & 0xff;
+      const b = Math.round(this.body * 10); f[27] = (b >> 8) & 0xff; f[28] = b & 0xff;
+      const r = Math.round(Math.abs(this.room) * 10); f[29] = this.room < 0 ? 1 : 0; f[30] = r >> 8; f[31] = r & 0xff;
+      f[37] = 0;
+      f[38] = sum8(f.slice(8, 38));
+      this.send(Uint8Array.from(f));
+    }
+  }
+
+  const api = { SERVICE, NOTIFY, WRITE, BD39, BD39_WRITE, BD39_NOTIFY, A, B, H, FAULTS, H_FAULTS, SimHeater, SimHeaterH, hex, sum8 };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.EmberProtocol = api;
 })(typeof window !== "undefined" ? window : globalThis);

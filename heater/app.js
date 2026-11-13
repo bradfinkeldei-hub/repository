@@ -16,7 +16,7 @@
   const S = Object.assign({
     unit: usLocale ? "F" : "C", targetC: 21, mode: "thermo", cleanMins: 10, coachHours: 4,
     tank: 6, lead: 30, batt: true, battV: 11.5, native: false, proto: "auto", hUnit: "auto",
-    showAll: false, warmOn: false, warmTime: "06:30", room: "heater", goveeId: null,
+    showAll: false, pin: "0000", warmOn: false, warmTime: "06:30", room: "heater", goveeId: null,
   }, store.get("settings", {}));
   const stats = Object.assign({ runSec: 0, lowSec: 0, sinceFillL: 0, days: {} }, store.get("stats", {}));
   const saveS = () => store.set("settings", S);
@@ -44,10 +44,10 @@
     constructor() { this.listener = null; this.onDrop = null; }
     get name() { return (this.device && this.device.name) || "Heater"; }
     async pick(showAll, log) {
-      const all = { acceptAllDevices: true, optionalServices: [P.SERVICE] };
+      const all = { acceptAllDevices: true, optionalServices: [P.BD39, P.SERVICE] };
       const filtered = {
-        filters: [{ services: [P.SERVICE] }, ...["hcalory", "Hcalory", "HCALORY", "hc", "HC", "Hc", "TY", "Air", "BT", "Heater"].map((n) => ({ namePrefix: n }))],
-        optionalServices: [P.SERVICE],
+        filters: [{ services: [P.BD39] }, { services: [P.SERVICE] }, ...["hcalory", "Hcalory", "HCALORY", "hc", "HC", "Hc", "TY", "Air", "BT", "Heater"].map((n) => ({ namePrefix: n }))],
+        optionalServices: [P.BD39, P.SERVICE],
       };
       if (showAll) this.device = await navigator.bluetooth.requestDevice(all);
       else {
@@ -64,9 +64,19 @@
     async connect() {
       const step = async (name, fn) => { try { return await fn(); } catch (e) { throw new Error(name + " failed (" + errText(e) + ")"); } };
       const server = await step("Bluetooth connect", () => this.device.gatt.connect());
-      const svc = await step("Finding heater service", () => server.getPrimaryService(P.SERVICE));
-      this.rx = await step("Finding status channel", () => svc.getCharacteristic(P.NOTIFY));
-      this.tx = await step("Finding command channel", () => svc.getCharacteristic(P.WRITE));
+      // Newer Hcalory controllers (TB2S) use service BD39; older ones FFF0.
+      let svc = null;
+      try { svc = await server.getPrimaryService(P.BD39); } catch {}
+      if (svc) {
+        this.transport = "bd39";
+        this.rx = await step("Finding status channel", () => svc.getCharacteristic(P.BD39_NOTIFY));
+        this.tx = await step("Finding command channel", () => svc.getCharacteristic(P.BD39_WRITE));
+      } else {
+        this.transport = "fff0";
+        svc = await step("Finding heater service", () => server.getPrimaryService(P.SERVICE));
+        this.rx = await step("Finding status channel", () => svc.getCharacteristic(P.NOTIFY));
+        this.tx = await step("Finding command channel", () => svc.getCharacteristic(P.WRITE));
+      }
       this.rx.addEventListener("characteristicvaluechanged", (e) => {
         const v = e.target.value;
         this.listener && this.listener(new Uint8Array(v.buffer, v.byteOffset, v.byteLength).slice());
@@ -84,7 +94,7 @@
     disconnect() { try { this.device && this.device.gatt.disconnect(); } catch {} }
   }
 
-  class SimLink extends P.SimHeater {
+  class SimLink extends P.SimHeaterH {
     get name() { return "Demo heater"; }
   }
 
@@ -93,11 +103,16 @@
     constructor(link, onStatus, onLog) {
       this.link = link; this.onStatus = onStatus; this.log = onLog;
       this.proto = null; this.status = null; this.lastPoll = null;
-      this.chain = Promise.resolve(); this.lastSend = 0; this.waiters = []; this.busy = 0;
+      this.chain = Promise.resolve(); this.lastSend = 0; this.waiters = []; this.authWaiters = []; this.busy = 0;
+      this.pins = ["0000", "1234"];
       link.onNotify((x) => this.receive(x));
     }
     receive(x) {
       this.log("◀ " + P.hex(x));
+      if (this.proto === P.H) {
+        const ok = P.H.authResult(x);
+        if (ok !== null) { this.authWaiters.splice(0).forEach((w) => w(ok)); return; }
+      }
       let p = this.proto;
       if (!p) {
         p = this.lastPoll && this.lastPoll.looksLike(x) ? this.lastPoll : P.B.looksLike(x) ? P.B : P.A.looksLike(x) ? P.A : null;
@@ -130,7 +145,29 @@
         this.waiters.push(done);
       });
     }
+    // Newer Hcalory controllers must be unlocked with a 4-digit PIN (factory 0000).
+    async unlock() {
+      for (const pin of [...new Set(this.pins)]) {
+        const got = new Promise((resolve) => {
+          const t = setTimeout(() => resolve(null), 1500);
+          this.authWaiters.push((ok) => { clearTimeout(t); resolve(ok); });
+        });
+        await this.send(P.H.auth(pin));
+        const ok = await got;
+        this.authWaiters = [];
+        if (ok) { this.log("✓ Unlocked with PIN " + pin); this.pin = pin; return true; }
+        this.log(ok === false ? "✗ PIN " + pin + " rejected" : "✗ No reply to PIN " + pin);
+      }
+      return false;
+    }
     async detect(pref) {
+      if (this.link.transport === "bd39") {
+        this.proto = P.H;
+        this.log("✓ Hcalory BD39 controller (format H)");
+        if (!(await this.unlock())) this.log("· continuing without unlock");
+        for (let i = 0; i < 3; i++) if (await this.poll()) return true;
+        return false;
+      }
       const order = pref === "A" ? [P.A] : pref === "B" ? [P.B] : [P.B, P.A];
       for (let round = 0; round < 3 && !this.proto; round++) {
         for (const p of order) {
@@ -160,6 +197,12 @@
     async stepTo(target, key = "level") {
       this.busy++;
       try {
+        if (this.proto.direct) {
+          const unitF = this.status && this.status.unit === "F";
+          await this.sendAll(key === "level" ? this.proto.setLevel(target) : this.proto.setTemp(target, unitF));
+          await sleep(600); await this.poll();
+          return;
+        }
         let stuck = 0, prev = null;
         for (let i = 0; i < 40; i++) {
           const s = await this.poll();
@@ -229,7 +272,10 @@
     try { await gsensor.restore(S.goveeId); } catch (e) { log("✗ govee " + errText(e)); }
   }
 
-  const heaterUnit = () => (S.hUnit !== "auto" ? S.hUnit : heater && heater.proto ? heater.proto.unit : "C");
+  const heaterUnit = () =>
+    S.hUnit !== "auto" ? S.hUnit
+      : heater && heater.status && heater.status.unit ? heater.status.unit
+      : heater && heater.proto ? heater.proto.unit : "C";
   const ambientC = () => {
     if (useGovee()) return govee.tempC;
     const s = heater && heater.status;
@@ -259,6 +305,7 @@
         link.onDrop = onDrop;
       }
       heater = new Heater(link, onStatus, log);
+      heater.pins = [S.pin || "0000", "0000", "1234"];
       $("connectMsg").textContent = "Talking to heater…";
       const ok = await heater.detect(S.proto);
       if (!ok) {
@@ -505,7 +552,8 @@
     $("statusLine").textContent = line;
 
     // Fault
-    const f = s && s.power === "error" ? P.FAULTS[s.fault] || ["Heater fault", "Check the heater's display for details."] : null;
+    const faults = (heater && heater.proto && heater.proto.faults) || P.FAULTS;
+    const f = s && s.power === "error" ? faults[s.fault] || ["Heater fault", "Check the heater's display for details."] : null;
     $("fault").hidden = !f;
     if (f) { $("faultCode").textContent = "E-" + String(s.fault || 0).padStart(2, "0"); $("faultTitle").textContent = f[0]; $("faultText").textContent = f[1]; }
 
@@ -540,7 +588,7 @@
     const b = bodyC();
     $("sBody").textContent = b != null && s && s.power !== "off" ? show(b) + "°" : "—";
     $("sHours").textContent = (stats.runSec / 3600).toFixed(1);
-    $("protoName").textContent = heater && heater.proto ? (heater.proto.id === "B" ? "Hcalory (B)" : "AirHeater (A)") : "—";
+    $("protoName").textContent = heater && heater.proto ? ({ H: "Hcalory BD39 (H)", B: "Hcalory (B)", A: "AirHeater (A)" }[heater.proto.id]) : "—";
     $("btnGovee").hidden = !(S.room === "govee" && !goveeLive() && heater);
     $("goveeStatus").textContent = goveeLive()
       ? `${govee.model} · ${show(govee.tempC)}° · ${Math.round(govee.hum)}% · battery ${govee.batt}%`
@@ -632,7 +680,7 @@
   bind("setUnit", "unit"); bind("setClean", "cleanMins", 1); bind("setCoach", "coachHours", 1);
   bind("setTank", "tank", 1); bind("setLead", "lead", 1); bind("setBatt", "batt");
   bind("setBattV", "battV", 1); bind("setNative", "native"); bind("setProto", "proto");
-  bind("setHUnit", "hUnit"); bind("setAll", "showAll"); bind("setRoom", "room");
+  bind("setHUnit", "hUnit"); bind("setPin", "pin"); bind("setAll", "showAll"); bind("setRoom", "room");
   $("setRoom").addEventListener("change", () => { lastThermo = 0; if (S.room === "govee" && !goveeLive()) (S.goveeId ? restoreGovee() : pairGovee()); });
   $("btnPairGovee").onclick = pairGovee;
   $("btnGovee").onclick = pairGovee; // the picker needs a tap, so this always opens it
