@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.6"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.7"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -86,8 +86,13 @@
     }
     onNotify(fn) { this.listener = fn; }
     async write(bytes) {
-      const t = this.tx;
-      if (t.properties.writeWithoutResponse && t.writeValueWithoutResponse) return t.writeValueWithoutResponse(bytes);
+      const t = this.tx, pr = t.properties || {};
+      // Prefer acknowledged writes so a command can't be silently dropped.
+      if (pr.write && t.writeValueWithResponse) {
+        try { return await t.writeValueWithResponse(bytes); }
+        catch (e) { if (!pr.writeWithoutResponse) throw e; }
+      }
+      if (pr.writeWithoutResponse && t.writeValueWithoutResponse) return t.writeValueWithoutResponse(bytes);
       if (t.writeValueWithResponse) return t.writeValueWithResponse(bytes);
       return t.writeValue(bytes);
     }
@@ -165,7 +170,8 @@
       if (this.link.transport === "bd39") {
         this.proto = P.H;
         this.log("✓ Hcalory BD39 controller (format H)");
-        if (!(await this.unlock())) this.log("· continuing without unlock");
+        this.unlocked = await this.unlock();
+        if (!this.unlocked) this.log("· continuing without unlock (heater may ignore commands)");
         for (let i = 0; i < 3; i++) if (await this.poll()) return true;
         return false;
       }
@@ -217,9 +223,29 @@
         }
       } finally { this.busy--; }
     }
+    // Full power, checked: switch to level mode, ask for max, confirm, retry.
     async toMax() {
-      await this.ensureMode("gear");
-      await this.stepTo(this.proto.maxLevel);
+      const max = this.proto.maxLevel;
+      if (!this.proto.direct) { await this.ensureMode("gear"); return this.stepTo(max); }
+      this.busy++;
+      try {
+        for (let attempt = 1; attempt <= 4; attempt++) {
+          const before = this.status || {};
+          if (before.mode !== "gear") {
+            this.log(`· full power: switching to level mode (was ${before.mode || "?"})`);
+            await this.sendAll(this.proto.gearMode());
+            await sleep(900);
+          }
+          await this.sendAll(this.proto.setLevel(max));
+          await sleep(1200);
+          const s = await this.poll();
+          this.log(`· full power attempt ${attempt}: mode ${s ? s.mode : "?"}, level ${s ? s.level : "?"} (want ${max})`);
+          if (s && s.mode === "gear" && s.level === max) return true;
+          if (attempt === 2 && this.proto === P.H) { this.log("· re-sending PIN"); this.unlocked = await this.unlock(); }
+        }
+        this.log("✗ heater did not go to full power");
+        return false;
+      } finally { this.busy--; }
     }
   }
 
@@ -480,6 +506,14 @@
     if (clean) {
       renderClean();
       if (Date.now() >= clean.endAt) await finishClean();
+      else {
+        const s = heater.status, max = heater.proto.maxLevel;
+        // If the heater isn't at full power yet, keep asking (every 15 s).
+        if (s && isOn(s) && (s.mode !== "gear" || s.level !== max) && !heater.busy && Date.now() - (tick.lastMax || 0) > 15000) {
+          tick.lastMax = Date.now();
+          heater.toMax().then((ok) => { if (!ok) toast("Heater didn't go to full power. Settings → Copy log and send it over.", 6000); });
+        }
+      }
     }
     schedule();
     thermostat();
