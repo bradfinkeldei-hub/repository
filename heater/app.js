@@ -1,6 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
+  const VERSION = "1.6"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -710,6 +711,9 @@
       : "Open this page in Chrome to connect over Bluetooth.";
   }
 
+  document.querySelectorAll("[data-version]").forEach((el) => (el.textContent = "v" + VERSION));
+  document.title = "Ember Heater v" + VERSION;
+  log("· Ember v" + VERSION);
   renderPresets();
   render();
   if (params.has("demo")) connect(true);

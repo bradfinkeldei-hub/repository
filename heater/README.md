@@ -10,7 +10,7 @@ battery guard, plain-English faults, a Govee thermometer as the room gauge and a
 ## Put it online (free, about 2 minutes)
 Web Bluetooth only works over https, so the folder has to be hosted:
 1. Cloudflare dashboard → **Workers & Pages → Create → Pages → Upload assets**.
-2. Name it `ember`, drag in this `heater` folder (or `ember-heater.zip`), then **Deploy**.
+2. Name it `ember`, drag in this `heater` folder (or `ember-heater-vX.Y.zip`), then **Deploy**.
 3. Open `https://ember-xxxx.pages.dev` in **Chrome on Android**. Tap ⋮ → **Add to Home screen**.
 
 ## First connect
@@ -26,6 +26,19 @@ The dial then shows the Govee temperature and humidity, and the thermostat aims 
 If the readings stop for 3 minutes, the app falls back to the heater's own sensor.
 - Supported: H5072, H5074, H5075, H5100–H5110, H5174, H5177, H5179, H5051/52/71, H5178.
 - If Chrome says it needs a setting: open `chrome://flags`, turn on **Experimental Web Platform features** and restart Chrome.
+
+## Versions
+The version shows next to the name in the app (and in the browser tab). To release: bump `VERSION` in `app.js`
+and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`.
+
+| Version | Changes |
+| --- | --- |
+| v1.6 | Supports the TB2S (newer Hcalory BD39 controllers): PIN unlock, power levels 1–10, direct temperature. Version shown in the app. |
+| v1.5 | Finds heaters named "hcalory…" |
+| v1.4 | "Show all devices" on the first screen |
+| v1.3 | Clear error messages, Bluefy fixes |
+| v1.2 | Govee thermometer as the room gauge |
+| v1.1 | Clean shutdown, thermostat, carbon health, fuel, warm-by, battery guard |
 
 ## Notes
 - Keep the screen open during a clean shutdown or warm-by start. The app keeps the screen awake.
