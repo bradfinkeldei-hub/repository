@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.19"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.20"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1051,6 +1051,232 @@
       ? "On iPhone or iPad, open this page in the free Bluefy browser to connect."
       : "Open this page in Chrome to connect over Bluetooth.";
   }
+
+
+  /* ---------------- Control from away ----------------
+   * Home gateway: this device stays by the heater, posts status and runs commands.
+   * Away: your phone reads that status and sends commands. Both go through the
+   * site's _worker.js (Cloudflare KV), keyed by a secret home code. */
+  const ALPHA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const newCode = () => {
+    const a = new Uint8Array(12); crypto.getRandomValues(a);
+    const c = [...a].map((x) => ALPHA[x % ALPHA.length]).join("");
+    return `${c.slice(0, 4)}-${c.slice(4, 8)}-${c.slice(8)}`;
+  };
+  const cleanCode = (c) => String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const fmtCode = (c) => { const x = cleanCode(c); return x.length === 12 ? `${x.slice(0, 4)}-${x.slice(4, 8)}-${x.slice(8)}` : x; };
+  const GW_EVERY = FAST > 1 ? 2000 : 10000;
+  const remoteMsg = (e) => e.message === "NOT_SET_UP" ? "Cloudflare storage isn't switched on yet. Follow “Control from away” in the setup guide."
+    : e.message === "NO_RELAY" ? "Your Cloudflare site needs the latest Ember zip (with _worker.js)."
+    : /code/i.test(e.message) ? "That home code isn't valid." : "Can't reach your site: " + e.message;
+
+  async function rcall(method, path, body, code) {
+    let r;
+    try {
+      r = await fetch("remote/" + path, { method, cache: "no-store", headers: { "X-Ember-Home": cleanCode(code), "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+    } catch { throw new Error("offline"); }
+    if (!(r.headers.get("content-type") || "").includes("json")) throw new Error("NO_RELAY");
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 503) throw new Error("NOT_SET_UP");
+    if (!r.ok) throw new Error(j.message || "error " + r.status);
+    return j;
+  }
+
+  /* ----- Home gateway (this device sits by the heater) ----- */
+  function snapshot() {
+    const s = heater && heater.status;
+    const left = Math.max(0, S.tankGal * GAL - stats.sinceFillL);
+    return {
+      v: 1, at: Date.now(), connected: !!(heater && heater.proto && !reconnecting), name: link ? link.name : null,
+      power: s ? s.power : null, level: s ? s.level : null, setpoint: s ? s.setpoint : null, max: maxLevel(),
+      fault: s ? s.fault : null, volts: s ? s.volts : null,
+      mode: S.mode, targetC: S.targetC, roomC: ambientC(), roomSrc: useGovee() ? "Govee" : "heater",
+      tuneId: tune().id, tuneName: tune().name, hold: tune().hold, top: Math.min(maxLevel(), tune().max),
+      tunes: S.tunes.map((t) => ({ id: t.id, name: t.name, targetC: t.targetC })),
+      manualLevel: S.level || null, leftL: left, clean: clean ? { kind: clean.kind, endAt: clean.endAt } : null,
+    };
+  }
+  let gwKey = "", gwMinor = "", gwPushAt = 0, gwBusy = false, gwInfo = "";
+  async function runRemote(c) {
+    log(`· remote: ${c.action}${c.value != null ? " " + c.value : ""}`);
+    if (!heater || !heater.proto) return;
+    const s = heater.status;
+    if (c.action === "start" && s && (s.power === "off" || s.power === "cooling")) { lastThermo = 0; await heater.start(); toast("Started from away"); }
+    else if (c.action === "stop" && s && isOn(s) && !clean) { await beginClean("shutdown"); }
+    else if (c.action === "tune") {
+      const t = S.tunes.find((x) => x.id === c.value);
+      if (t) { S.tuneId = t.id; if (t.targetC != null) S.targetC = t.targetC; S.mode = "thermo"; }
+    } else if (c.action === "target" && +c.value >= 4 && +c.value <= 32) { S.targetC = +c.value; S.mode = "thermo"; }
+    else if (c.action === "mode" && (c.value === "thermo" || c.value === "manual")) S.mode = c.value;
+    else if (c.action === "level") {
+      const l = Math.max(1, Math.min(maxLevel(), Math.round(+c.value) || 1));
+      S.mode = "manual"; S.level = l;
+      if (isOn(s)) { await heater.ensureMode("gear"); await heater.stepTo(l); }
+    }
+    saveS(); lastThermo = 0; renderPresets(); render();
+  }
+  async function gatewayTick() {
+    if (!S.gateway || !S.homeCode || gwBusy || !heater) return;
+    gwBusy = true;
+    try {
+      const { cmds = [] } = await rcall("GET", "cmd?after=" + (S.gwLastId || 0), null, S.homeCode);
+      for (const c of cmds) {
+        S.gwLastId = Math.max(S.gwLastId || 0, c.id); saveS();
+        if (Date.now() - c.at > 15 * 60000) { log("· skipped an old remote command: " + c.action); continue; }
+        await runRemote(c);
+      }
+      // Publish status: right away for important changes, otherwise at most every 3 min
+      // (and every 10 min regardless) to stay inside Cloudflare's free KV limits.
+      const st = snapshot();
+      const key = JSON.stringify([st.connected, st.power, st.fault, !!st.clean, st.mode, st.tuneId, Math.round(st.targetC * 2), st.tunes.map((t) => t.id + t.name + t.targetC).join()]);
+      const minor = JSON.stringify([st.level, st.roomC == null ? null : Math.round(st.roomC), Math.round(st.leftL / GAL * 4)]);
+      const since = Date.now() - gwPushAt;
+      if (key !== gwKey || (minor !== gwMinor && since > 180000) || since > 600000) {
+        await rcall("POST", "state", st, S.homeCode);
+        gwKey = key; gwMinor = minor; gwPushAt = Date.now();
+      }
+      gwInfo = "Online · ready for away control";
+    } catch (e) { gwInfo = remoteMsg(e); }
+    finally { gwBusy = false; renderGateway(); }
+  }
+  setInterval(gatewayTick, GW_EVERY);
+  function renderGateway() {
+    $("setGateway").checked = !!S.gateway;
+    $("gwBox").hidden = !S.gateway;
+    $("gwCode").textContent = S.homeCode || "—";
+    $("gwStatus").textContent = S.gateway ? gwInfo || "Starting…" : "";
+    $("gwBadge").hidden = !S.gateway;
+    $("gwBadge").classList.toggle("bad", !!gwInfo && !/^Online/.test(gwInfo));
+    $("gwBadgeText").textContent = /^Online/.test(gwInfo) ? "Home gateway on · keep this screen on" : gwInfo || "Home gateway starting…";
+  }
+  $("setGateway").onchange = (e) => {
+    S.gateway = e.target.checked;
+    if (S.gateway && !S.homeCode) S.homeCode = newCode();
+    saveS(); gwKey = ""; gwInfo = ""; renderGateway(); if (S.gateway) { keepAwake(); gatewayTick(); }
+  };
+  $("btnGwCopy").onclick = async () => { try { await navigator.clipboard.writeText(S.homeCode); toast("Home code copied"); } catch { toast(S.homeCode, 8000); } };
+  $("btnGwNew").onclick = () => {
+    if (!confirm("Make a new home code? Your phone will need the new code.")) return;
+    S.homeCode = newCode(); S.gwLastId = 0; saveS(); gwKey = ""; renderGateway(); gatewayTick();
+  };
+
+  /* ----- Away (your phone) ----- */
+  let awTimer = null, awState = null, awNow = 0, awPending = null, awArmed = 0, awTarget = null, awTargetTimer = null;
+  function openAway() {
+    if (!S.awayCode) { $("awCode").value = ""; $("awsMsg").textContent = ""; $("awaySetup").hidden = false; return; }
+    $("connect").hidden = true; $("main").hidden = true; $("away").hidden = false;
+    awayPoll(); clearInterval(awTimer); awTimer = setInterval(awayPoll, GW_EVERY);
+  }
+  function closeAway() { clearInterval(awTimer); $("away").hidden = true; $("connect").hidden = false; }
+  $("btnAway").onclick = openAway;
+  $("btnAwayExit").onclick = closeAway;
+  $("btnAwsClose").onclick = () => ($("awaySetup").hidden = true);
+  $("btnAwayForget").onclick = () => { S.awayCode = null; saveS(); closeAway(); openAway(); };
+  $("btnAwsGo").onclick = async () => {
+    const code = cleanCode($("awCode").value);
+    if (code.length !== 12) return ($("awsMsg").textContent = "The code has 12 letters and numbers, like ABCD-EFGH-JK23.");
+    $("awsMsg").textContent = "Checking…";
+    try {
+      const j = await rcall("GET", "state", null, code);
+      if (!j.state) return ($("awsMsg").textContent = "No home device found with that code yet. Make sure Home gateway is on at home, then try again in a minute.");
+      S.awayCode = fmtCode(code); saveS(); $("awaySetup").hidden = true; openAway();
+    } catch (e) { $("awsMsg").textContent = remoteMsg(e); }
+  };
+
+  async function awayPoll() {
+    try {
+      const j = await rcall("GET", "state", null, S.awayCode);
+      awState = j.state; awNow = j.now; renderAway();
+    } catch (e) { $("awFresh").textContent = remoteMsg(e); $("awPill").className = "pill bad"; $("awPillText").textContent = "No connection"; }
+  }
+  async function awaySend(action, value, note) {
+    try {
+      await rcall("POST", "cmd", { action, value }, S.awayCode);
+      awPending = { action, value, at: Date.now() };
+      $("awMsg").textContent = note || "Sent. Your home device picks it up within about a minute.";
+    } catch (e) { $("awMsg").textContent = remoteMsg(e); }
+  }
+  function renderAway() {
+    const st = awState;
+    if (!st) { $("awState").textContent = "Home device hasn't reported yet"; return; }
+    const age = Math.max(0, (awNow || Date.now()) - (st.serverAt || st.at));
+    const mins = Math.round(age / 60000);
+    const stale = age > 15 * 60000;
+    $("awPill").className = "pill" + (stale || !st.connected ? " warn" : "");
+    $("awPillText").textContent = stale ? "Home offline?" : st.connected ? "Home online" : "Heater not connected";
+    $("awFresh").textContent = `Home device updated ${mins < 1 ? "just now" : mins + " min ago"}${st.name ? " · " + st.name : ""}`;
+
+    // Status bar (same look as at home)
+    const max = st.max || 10, on = st.power === "running" || st.power === "starting";
+    let state = { running: "on", starting: "on", cooling: "cool", fan: "cool", error: "bad" }[st.power] || "off";
+    let label = { off: "Off", starting: "Igniting", running: "Heating", cooling: "Cooling down", fan: "Fan only", error: "Fault" + (st.fault ? " E-" + String(st.fault).padStart(2, "0") : "") }[st.power] || "Unknown";
+    if (!st.connected) { state = "warn"; label = "Heater not connected at home"; }
+    if (st.clean) {
+      const left = Math.max(0, st.clean.endAt - st.at - age);
+      state = "clean"; label = `Clean shutdown · about ${Math.max(1, Math.ceil(left / 60000))} min left`;
+    }
+    $("awBar").dataset.state = state; $("awState").textContent = label;
+    $("awLevel").innerHTML = on && st.level != null ? `Level <b>${st.level}</b><small> / ${max}</small>` : on && st.setpoint != null ? `Heater set <b>${st.setpoint}°</b>` : st.mode === "manual" ? `Runs level ${st.manualLevel || "—"}` : `Runs level ${st.hold}–${st.top}`;
+    const segs = $("awSegs"); if (segs.children.length !== max) segs.innerHTML = "<i></i>".repeat(max);
+    [...segs.children].forEach((el, i) => el.classList.toggle("on", on && st.level != null && i < st.level));
+    const room = st.roomC != null ? ` · room ${show(st.roomC)}°` : "";
+    $("awSetting").textContent = st.mode === "manual" ? `Manual · level ${st.manualLevel || "—"}${room}` : `${st.tuneName} · ${show(st.targetC)}°${room}`;
+    const gal = (st.leftL / GAL).toFixed(1), lvl = on && st.level != null ? st.level : st.mode === "manual" ? st.manualLevel || 5 : st.top;
+    const rate = 0.16 + (0.62 - 0.16) * (Math.max(1, Math.min(max, lvl)) - 1) / (max - 1);
+    $("awFuel").textContent = `${gal} gal · ≈ ${Math.round(st.leftL / rate)} h at level ${lvl}`;
+
+    // Controls
+    if (awTarget == null) $("awTarget").textContent = show(st.targetC) + "°";
+    $("awRoom").textContent = st.roomC != null ? `Room ${show(st.roomC)}° (${st.roomSrc})` : "Room —";
+    const esc = (x) => String(x).replace(/[<&"]/g, (m) => ({ "<": "&lt;", "&": "&amp;", '"': "&quot;" }[m]));
+    $("awPresets").innerHTML = st.tunes.map((t) => `<button class="preset${t.id === st.tuneId && st.mode !== "manual" ? " on" : ""}" data-tune="${t.id}"><b>${show(t.targetC ?? st.targetC)}°</b><span>${esc(t.name)}</span></button>`).join("");
+    const btn = $("awPower");
+    btn.disabled = !st.connected || stale || st.power === "error" || !!st.clean;
+    if (Date.now() - awArmed > 4000) {
+      btn.textContent = on ? "Turn off" : st.power === "cooling" ? "Cooling down…" : "Start heating";
+      btn.classList.toggle("off", on);
+    }
+    // Clear the "sent" note once the home device has caught up.
+    if (awPending && (st.serverAt || 0) > awPending.at) {
+      const done = (awPending.action === "start" && on) || (awPending.action === "stop" && (st.clean || st.power === "cooling" || st.power === "off")) ||
+        (awPending.action === "tune" && st.tuneId === awPending.value) || (awPending.action === "target" && Math.abs(st.targetC - awPending.value) < 0.3);
+      if (done) { $("awMsg").textContent = "Done ✓ The heater has it."; awPending = null; if (!awTargetTimer) awTarget = null; }
+    }
+  }
+  $("awPower").onclick = () => {
+    const st = awState; if (!st) return;
+    const on = st.power === "running" || st.power === "starting";
+    if (Date.now() - awArmed > 4000) {
+      awArmed = Date.now();
+      $("awPower").textContent = on ? "Tap again to turn off" : "Tap again to start heating";
+      return setTimeout(renderAway, 4100);
+    }
+    awArmed = 0;
+    if (on) awaySend("stop", null, "Sent. It will do the clean shutdown, then turn off.");
+    else awaySend("start", null, "Sent. The heater should start within about a minute.");
+    renderAway();
+  };
+  const bumpAway = (d) => {
+    if (!awState) return;
+    const cur = awTarget ?? show(awState.targetC);
+    const [lo, hi] = range();
+    awTarget = Math.max(lo, Math.min(hi, cur + d));
+    $("awTarget").textContent = awTarget + "°";
+    clearTimeout(awTargetTimer);
+    const want = awTarget; // capture now, so a status update can't change what gets sent
+    awTargetTimer = setTimeout(() => { awTargetTimer = null; awaySend("target", Math.round(fromShow(want) * 10) / 10, `Sent: heat to ${want}°.`); }, 1500);
+  };
+  $("awMinus").onclick = () => bumpAway(-1);
+  $("awPlus").onclick = () => bumpAway(1);
+  $("awPresets").addEventListener("click", (e) => {
+    const b = e.target.closest(".preset"); if (!b || !awState) return;
+    const t = awState.tunes.find((x) => x.id === b.dataset.tune);
+    clearTimeout(awTargetTimer);
+    if (t && t.targetC != null) { awTarget = show(t.targetC); $("awTarget").textContent = awTarget + "°"; } // so −/+ starts from the new preset
+    awaySend("tune", b.dataset.tune, `Sent: ${t ? t.name : "preset"}.`);
+    document.querySelectorAll("#awPresets .preset").forEach((x) => x.classList.toggle("on", x === b));
+  });
+  renderGateway();
 
   document.querySelectorAll("[data-version]").forEach((el) => (el.textContent = "v" + VERSION));
   document.title = "Ember Heater v" + VERSION;

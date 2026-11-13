@@ -60,6 +60,33 @@ Download the latest `ember-heater-vX.Y.zip` from this folder. Don't unzip it.
 
 The Wi-Fi option works through the small `_worker.js` file included in the zip. It relays only Govee's two reading requests and stores nothing; your key stays on your phone.
 
+### 5. Optional: control it when you're away
+
+Leave an old phone or iPad next to the heater as the **home gateway**. You can then start it, turn it off, pick a preset or change the temperature from your own phone, anywhere.
+
+**One-time Cloudflare setup (free storage):**
+1. In Cloudflare, go to **Storage & Databases → KV → Create**. Name it `ember`.
+2. Go to **Workers & Pages → your Ember project → Settings → Bindings → Add → KV namespace**.
+3. Set **Variable name** to `EMBER` (all caps) and choose the `ember` namespace. Save it for **Production**.
+4. Upload the zip again (**Create deployment**) so the setting takes effect.
+
+**At home (old phone or iPad):**
+1. Open Ember, connect the heater, then go to **Settings → Home gateway** and turn it on.
+2. Write down the **home code** it shows, e.g. `JC4J-B78Y-UQMG`.
+3. Leave it plugged in, with Ember open, the screen on and Auto-Lock set to Never.
+
+**On your phone:** open Ember → **🏠 Control from away** → enter the home code.
+- **Commands take about a minute** to reach the heater.
+- **Starting the heater** needs two taps, so it can't start by accident.
+- **Turn off** runs the clean shutdown first.
+
+**Security:**
+- **Only someone with the home code can see or control the heater.** Keep the code private.
+- **The code isn't stored on Cloudflare in plain text,** only a scrambled (hashed) version of it.
+- **Only a short list of commands with sensible values is accepted.**
+- **The home device ignores commands older than 15 minutes.**
+- **Settings → New code** cuts off anyone holding the old code.
+
 ## Good to know
 
 - **Keep the app open and your screen unlocked** during a clean shutdown or warm-by start. On iPhone, set **Settings → Display & Brightness → Auto-Lock → Never** while you're using the heater.
@@ -75,6 +102,8 @@ The Wi-Fi option works through the small `_worker.js` file included in the zip. 
 | Connected, but no reply | Settings → **Copy log**, and include it when you ask for help. |
 | Didn't reach full power or didn't turn off | Make sure the screen stayed on. Then Settings → **Copy log**. |
 | "Missing the Govee relay" | Re-upload the full zip (it includes `_worker.js`). |
+| "Cloudflare storage isn't switched on yet" | Do the one-time KV setup in step 5, then upload the zip again. |
+| Away screen says "Home offline?" | The home device is asleep, closed or out of Wi-Fi. Wake it up and keep Ember open. |
 | Govee temperature looks wrong | Settings → **Govee reports in** → switch between °F and °C. |
 
 ## Credits

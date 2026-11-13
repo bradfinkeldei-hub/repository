@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b0b0d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Ember Heater v1.19</title>
+<title>Ember Heater v1.20</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-512.png">
@@ -24,11 +24,12 @@
       <defs><linearGradient id="mg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff5a1f"/><stop offset="1" stop-color="#ffc06a"/></linearGradient></defs>
       <path fill="url(#mg)" d="M32 4c2 10 14 16 14 32a14 14 0 0 1-28 0c0-7 3-11 6-14 0 5 2 8 5 9-1-10 1-19 3-27z"/>
     </svg>
-    <h1>Ember <span class="ver" data-version>v1.19</span></h1>
+    <h1>Ember <span class="ver" data-version>v1.20</span></h1>
     <p class="sub">Smarter control for your Hcalory heater</p>
     <button id="btnConnect" class="btn primary wide">Connect heater</button>
     <button id="btnAll" class="btn ghost wide">Don't see it? Show all devices</button>
     <button id="btnDemo" class="btn ghost wide">Try the demo</button>
+    <button id="btnAway" class="btn ghost wide away-btn">🏠 Control from away</button>
     <p id="btNote" class="note" hidden></p>
     <p id="connectMsg" class="note" role="status"></p>
     <button id="btnCopyLog2" class="btn small" hidden>Copy details for Claude</button>
@@ -38,12 +39,14 @@
 <!-- Main -->
 <section id="main" class="screen" hidden>
   <header class="top">
-    <div class="brand">Ember <span class="ver" data-version>v1.19</span></div>
+    <div class="brand">Ember <span class="ver" data-version>v1.20</span></div>
     <div class="pill" id="pill"><span class="dot"></span><span id="pillText">Connected</span></div>
     <button class="icon-btn" id="btnSettings" aria-label="Settings">
       <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
     </button>
   </header>
+
+  <div class="gw-badge" id="gwBadge" hidden><i></i><span id="gwBadgeText">Home gateway on</span></div>
 
   <!-- At-a-glance status: stays at the top while you scroll -->
   <section class="sbar" id="sbar" data-state="off" aria-live="polite">
@@ -144,6 +147,42 @@
     </div>
   </div>
 </section>
+
+<!-- Away: control the heater through the home device -->
+<section id="away" class="screen" hidden>
+  <header class="top">
+    <div class="brand">Ember <span class="ver" data-version>v</span></div>
+    <div class="pill" id="awPill"><span class="dot"></span><span id="awPillText">Away</span></div>
+    <button class="icon-btn" id="btnAwayExit" aria-label="Back">✕</button>
+  </header>
+  <section class="sbar" id="awBar" data-state="off">
+    <div class="sb-top"><span class="sb-state"><i class="sb-dot"></i><b id="awState">Checking home…</b></span><span class="sb-level" id="awLevel"></span></div>
+    <div class="sb-segs" id="awSegs" aria-hidden="true"></div>
+    <div class="sb-row"><span class="sb-setting" id="awSetting"></span><span class="sb-fuel" id="awFuel"></span></div>
+  </section>
+  <p class="aw-fresh" id="awFresh"></p>
+  <div class="aw-temp">
+    <button class="step" id="awMinus" aria-label="Cooler">−</button>
+    <div class="aw-target"><span>SET TO</span><b id="awTarget">—</b><small id="awRoom">Room —</small></div>
+    <button class="step" id="awPlus" aria-label="Warmer">+</button>
+  </div>
+  <div class="presets" id="awPresets"></div>
+  <button id="awPower" class="btn primary wide big" disabled>Start heating</button>
+  <p class="aw-msg" id="awMsg"></p>
+  <p class="fine center">Commands go to the device at home and usually reach the heater within a minute.</p>
+  <button class="btn text wide" id="btnAwayForget">Use a different home code</button>
+</section>
+
+<!-- Away: enter the home code -->
+<div id="awaySetup" class="overlay sheet" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2>Control from away</h2><button class="icon-btn" id="btnAwsClose" aria-label="Close">✕</button></div>
+    <p class="fine">On the old phone or iPad at home, open Ember, connect the heater, then turn on <b>Settings → Home gateway</b>. Type the home code it shows here.</p>
+    <input id="awCode" class="code-input" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
+    <p class="gs-msg" id="awsMsg"></p>
+    <button class="btn primary wide" id="btnAwsGo">Connect</button>
+  </div>
+</div>
 
 <!-- Clean burn overlay -->
 <div id="clean" class="overlay" hidden>
@@ -259,6 +298,17 @@
     </div>
 
     <div class="group">
+      <label class="row"><span>Home gateway<small>Leave this device next to the heater with Ember open, so you can control it from your phone when you're away.</small></span>
+        <label class="switch"><input type="checkbox" id="setGateway"><i></i></label></label>
+      <div id="gwBox" hidden>
+        <div class="gw-code"><span>Home code</span><b id="gwCode">—</b>
+          <span class="btn-pair"><button class="btn small" id="btnGwCopy">Copy</button><button class="btn small" id="btnGwNew">New code</button></span></div>
+        <p class="gs-msg" id="gwStatus"></p>
+        <p class="fine">On your phone, open Ember → <b>Control from away</b> and enter this code. Keep it private: anyone with it can turn your heater on. Plug this device in and keep the screen on.</p>
+      </div>
+    </div>
+
+    <div class="group">
       <label class="row">Protocol
         <select id="setProto"><option value="auto">Auto-detect</option><option value="B">Hcalory (B)</option><option value="A">AirHeater (A)</option></select></label>
       <label class="row">Heater PIN
@@ -275,7 +325,7 @@
     </div>
 
     <button class="btn ghost wide" id="btnDisconnect">Disconnect</button>
-    <p class="fine center"><span data-version>v1.19</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
+    <p class="fine center"><span data-version>v1.20</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
   </div>
 </div>
 

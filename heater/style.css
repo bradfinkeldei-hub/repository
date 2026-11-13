@@ -341,3 +341,22 @@ body { max-width: 100%; }
 .gal:active i { outline: 2px solid rgba(255,196,114,.5); }
 .gal-bars.low .gal i { background: linear-gradient(0deg, #ff4d4d, #ff8a5c) bottom / 100% var(--h, 0%) no-repeat, var(--surface-2); }
 .gal-hint { color: var(--muted); font-size: 12px; margin: 10px 0 0; }
+
+/* ---------- Control from away ---------- */
+.away-btn { border-color: rgba(143, 182, 255, .35); color: var(--cool); }
+.gw-badge { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 12px; color: #4bd585; margin: -4px 0 10px; }
+.gw-badge i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+.gw-badge.bad { color: #ffb547; }
+.gw-code { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 0 4px; }
+.gw-code > span:first-child { color: var(--muted); font-size: 13px; }
+.gw-code b { font: 600 18px ui-monospace, Menlo, monospace; letter-spacing: .08em; color: var(--ember-2); }
+.code-input { width: 100%; margin-top: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 14px; color: var(--text);
+  font: 600 20px ui-monospace, Menlo, monospace; letter-spacing: .12em; text-align: center; text-transform: uppercase; }
+.aw-fresh { text-align: center; color: var(--muted); font-size: 12px; margin: -6px 0 14px; }
+.aw-temp { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0 18px; }
+.aw-target { text-align: center; }
+.aw-target span { display: block; font-size: 11px; letter-spacing: .22em; color: var(--muted); }
+.aw-target b { display: block; font-size: 64px; font-weight: 300; letter-spacing: -.03em; line-height: 1.1; }
+.aw-target small { color: var(--muted); font-size: 13px; }
+.aw-msg { text-align: center; color: var(--ember-2); font-size: 13px; margin: 12px 0 0; min-height: 18px; }
+#awaySetup { z-index: 12; }
