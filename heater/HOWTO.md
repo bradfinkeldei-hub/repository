@@ -21,7 +21,8 @@ It isn't made by or affiliated with Hcalory.
 - **Status bar** at the top: on/off, current level, the setting it follows, and fuel left.
 - **Fuel gauge.** One bar per gallon. Tap a bar to set it, and it shows the hours left at every power level.
 - **Govee thermometer as the room gauge** (optional), so it heats to the temperature where you sit.
-- **Extras:** a carbon-health reminder, warm-by-a-time start, battery guard and plain-English fault codes.
+- **Schedule:** Morning, Midday and Evening windows, each with a start and stop time and which button to use.
+- **Extras:** a carbon-health reminder, battery guard and plain-English fault codes.
 
 ## What you need
 
@@ -116,6 +117,7 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 | **Turn off** | Choose a 1, 5 or 10 min burn-off at full power, or Off now. |
 | **Fan only** | When the heater is off, run just the blower (no heat, no fuel). New in v1.24: if it doesn't work on your heater, send the log. |
 | **Fuel** | One bar per gallon. Tap a bar to set it (the last bar means full). Shows hours left at every level. |
+| **Schedule** | Turn on Morning, Midday or Evening and set start, stop and which button to use. It turns on at the start time and off (with your burn-off) at the stop time. Overnight windows work too. Keep Ember open on the device by the heater. |
 | **Carbon health** | Counts hours on low and suggests a 15-min clean burn when it's due. |
 | **Settings** | Room gauge (heater or Govee), units, tank size, battery guard, home gateway, heater PIN, and **Copy log** for help. |
 
@@ -126,7 +128,7 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 
 ## Good to know
 
-- **Keep the app open and your screen unlocked** during a clean shutdown or warm-by start. On iPhone, set **Settings → Display & Brightness → Auto-Lock → Never** while you're using the heater.
+- **Keep the app open and your screen unlocked** during a clean shutdown or a scheduled start. On iPhone, set **Settings → Display & Brightness → Auto-Lock → Never** while you're using the heater.
 - **Changing the level on the heater or remote:** Ember sees the change within about 3 seconds. In **Thermostat** mode Ember takes back control within about 45 seconds, so switch to the **Power level** tab if you want to adjust by hand.
 - **Govee over Wi-Fi updates every few minutes**, because the thermometer only reports to Govee every few minutes. Bluetooth updates every few seconds.
 - **Fuel is an estimate.** The heater doesn't report fuel, so Ember calculates it from the power level. Tap the gallon bars when you refill.

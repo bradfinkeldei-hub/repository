@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.28 | Schedule: Morning, Midday and Evening windows, each with start and stop times and a setting. Replaces Warm by. |
 | v1.27 | Fan speed 1–10 while in fan-only mode, at home and from away. |
 | v1.26 | Start heating works during cool-down (like the remote) and is checked: if the heater doesn't start, it sends Off then On once more. |
 | v1.25 | Fault recovery: Try again and Reset when the heater shows a fault, at home and from away. 3-try safety limit; never restarts after a carbon monoxide fault. |

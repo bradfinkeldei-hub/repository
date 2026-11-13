@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.27"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.28"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -17,7 +17,7 @@
   const S = Object.assign({
     unit: usLocale ? "F" : "C", targetC: 21, mode: "thermo", cleanMins: 10, coachHours: 4,
     tankGal: 5, minLevel: 2, tunes: [], tuneId: "std", lead: 30, batt: true, battV: 11.5, native: false, proto: "auto", hUnit: "auto",
-    showAll: false, pin: "0000", warmOn: false, warmTime: "06:30", room: "heater", goveeId: null, gwifi: null, gUnit: "F",
+    showAll: false, pin: "0000", room: "heater", goveeId: null, gwifi: null, gUnit: "F",
   }, store.get("settings", {}));
   const stats = Object.assign({ runSec: 0, lowSec: 0, sinceFillL: 0, days: {} }, store.get("stats", {}));
   if (S.mode !== "thermo" && S.mode !== "manual") S.mode = "thermo";
@@ -44,6 +44,17 @@
   }
   if (S.cleanMins === 15) S.cleanMins = 10; // v1.23: burn-off choices are 1, 5 or 10 min
   S.tunes.forEach((t) => { if (t.clean === 15) t.clean = 10; });
+  // Schedule: three daily windows. Each turns the heater on at its start time and off at its stop time.
+  const SLOT_DEFAULTS = [
+    { id: "morning", name: "Morning", on: false, start: "06:00", stop: "09:00", tune: "p-comfort" },
+    { id: "midday", name: "Midday", on: false, start: "11:30", stop: "13:30", tune: "p-comfort" },
+    { id: "evening", name: "Evening", on: false, start: "17:00", stop: "22:00", tune: "p-comfort" },
+  ];
+  if (!Array.isArray(S.sched)) {
+    S.sched = SLOT_DEFAULTS.map((d) => ({ ...d }));
+    if (S.warmOn && S.warmTime) { S.sched[0].on = true; S.sched[0].start = S.warmTime; } // carry over the old Warm-by time
+  }
+  S.schedFired = S.schedFired || {}; S.schedOwn = S.schedOwn || {};
   const GAL = 3.785; // litres per US gallon (fuel use is tracked in litres, shown in gallons)
   const saveStats = () => store.set("stats", stats);
 
@@ -606,20 +617,81 @@
     }
   }
 
-  /* ---------------- Warm-by schedule ---------------- */
-  function schedule() {
-    if (!S.warmOn || !heater || !heater.status) return;
-    const [h, m] = S.warmTime.split(":").map(Number);
-    const now = new Date();
-    const start = new Date(now); start.setHours(h, m - S.lead, 0, 0);
-    const today = now.toISOString().slice(0, 10);
-    const fired = store.get("warmFired", "");
-    if (fired !== today && now >= start && now - start < 15 * 60000 && heater.status.power === "off") {
-      store.set("warmFired", today);
-      heater.start();
-      toast("Warming up for " + S.warmTime);
+  /* ---------------- Schedule ---------------- */
+  const toMin = (t) => { const [h, m] = String(t || "0:0").split(":").map(Number); return h * 60 + m; };
+  const dayKey = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  const fmtTime = (t) => { const d = new Date(); d.setHours(...t.split(":").map(Number), 0, 0); return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); };
+  // Is "now" inside the slot's window, and which day did that window start on?
+  function slotWindow(slot, now = new Date()) {
+    const m = now.getHours() * 60 + now.getMinutes(), a = toMin(slot.start), b = toMin(slot.stop);
+    const overnight = b <= a;
+    const inside = overnight ? m >= a || m < b : m >= a && m < b;
+    const startDay = new Date(now); if (overnight && m < b) startDay.setDate(startDay.getDate() - 1);
+    return { inside, key: dayKey(startDay) };
+  }
+  async function schedule() {
+    if (!heater || !heater.status || recovering) return;
+    const s = heater.status;
+    for (const slot of S.sched) {
+      const w = slotWindow(slot);
+      // Start once per window (not again if you turned it off yourself).
+      if (slot.on && w.inside && S.schedFired[slot.id] !== w.key) {
+        S.schedFired[slot.id] = w.key; saveS();
+        if (s.power === "off" || s.power === "cooling") {
+          const t = S.tunes.find((x) => x.id === slot.tune);
+          if (t) { S.tuneId = t.id; if (t.targetC != null) S.targetC = t.targetC; S.mode = "thermo"; saveS(); renderPresets(); }
+          S.schedOwn[slot.id] = w.key; saveS();
+          log(`· schedule: ${slot.name} start`); toast(`${slot.name} schedule: heating to ${show(S.targetC)}°`, 5000);
+          lastThermo = 0; await heater.startVerified();
+        }
+      }
+      // Stop at the end of a window this schedule started.
+      if (!w.inside && S.schedOwn[slot.id]) {
+        delete S.schedOwn[slot.id]; saveS();
+        if (isOn(heater.status) && !clean) { log(`· schedule: ${slot.name} stop`); toast(`${slot.name} schedule ended: turning off`, 5000); await beginClean("shutdown"); }
+      }
     }
   }
+  // Next scheduled event, for the card and the away screen.
+  function schedNext() {
+    const on = S.sched.filter((x) => x.on);
+    if (!on.length) return null;
+    const now = new Date(), m = now.getHours() * 60 + now.getMinutes();
+    let best = null;
+    for (const slot of on) {
+      if (S.schedOwn[slot.id]) { const d = (toMin(slot.stop) - m + 1440) % 1440; if (!best || d < best.d) best = { d, text: `${slot.name} ends ${fmtTime(slot.stop)}` }; }
+      const d = (toMin(slot.start) - m + 1440) % 1440 || 1440;
+      if (!best || d < best.d) best = { d, text: `${slot.name} starts ${fmtTime(slot.start)}` };
+    }
+    return best && best.text;
+  }
+  function renderSchedule() {
+    const opts = S.tunes.map((t) => `<option value="${t.id}">${t.name.replace(/</g, "&lt;")} ${show(t.targetC ?? S.targetC)}°</option>`).join("");
+    document.querySelectorAll(".slot").forEach((el) => {
+      const slot = S.sched.find((x) => x.id === el.dataset.slot);
+      el.querySelector(".slot-on").checked = slot.on;
+      if (document.activeElement !== el.querySelector(".slot-start")) el.querySelector(".slot-start").value = slot.start;
+      if (document.activeElement !== el.querySelector(".slot-stop")) el.querySelector(".slot-stop").value = slot.stop;
+      const sel = el.querySelector(".slot-tune");
+      if (sel.dataset.opts !== opts) { sel.innerHTML = opts; sel.dataset.opts = opts; }
+      sel.value = S.tunes.some((t) => t.id === slot.tune) ? slot.tune : "p-comfort";
+      el.classList.toggle("off", !slot.on);
+      el.querySelector(".slot-sum").textContent = slot.on ? (S.schedOwn[slot.id] ? "running" : "") : "off";
+    });
+    $("schedNext").textContent = schedNext() || "Off";
+  }
+  $("schedCard").addEventListener("change", (e) => {
+    const el = e.target.closest(".slot"); if (!el) return;
+    const slot = S.sched.find((x) => x.id === el.dataset.slot);
+    if (e.target.classList.contains("slot-on")) { slot.on = e.target.checked; if (slot.on) keepAwake(); }
+    if (e.target.classList.contains("slot-start")) { slot.start = e.target.value || slot.start; delete S.schedFired[slot.id]; }
+    if (e.target.classList.contains("slot-stop")) slot.stop = e.target.value || slot.stop;
+    if (e.target.classList.contains("slot-tune")) slot.tune = e.target.value;
+    // Turning a slot on in the middle of its window should start it now.
+    if (e.target.classList.contains("slot-on") && slot.on) delete S.schedFired[slot.id];
+    saveS(); renderSchedule();
+    if (slot.on) toast(`${slot.name}: ${fmtTime(slot.start)} → ${fmtTime(slot.stop)}`);
+  });
 
   /* ---------------- Loop ---------------- */
   async function tick() {
@@ -870,8 +942,7 @@
     $("rtNow").textContent = cur ? `Now: level ${cur}` : "Level";
 
     // Schedule
-    $("warmOn").checked = S.warmOn; $("warmTime").value = S.warmTime;
-    $("warmText").textContent = S.warmOn ? `Starts ${S.lead} min early. Keep this screen open.` : "Off";
+    renderSchedule();
 
     // Stats
     $("sVolts").textContent = s && s.volts ? s.volts.toFixed(1) + " V" : "—";
@@ -1070,8 +1141,6 @@
     stats.sinceFillL = Math.max(0, (S.tankGal - gal) * GAL); saveStats(); render();
     toast(gal >= S.tankGal - 0.01 ? "Tank set to full" : gal === 0 ? "Tank set to empty" : `Tank set to ${+gal.toFixed(1)} gal`);
   });
-  $("warmOn").onchange = (e) => { S.warmOn = e.target.checked; saveS(); render(); if (S.warmOn) keepAwake(); };
-  $("warmTime").onchange = (e) => { S.warmTime = e.target.value; store.set("warmFired", ""); saveS(); };
 
   // Settings
   const bind = (id, key, num) => {
@@ -1080,7 +1149,7 @@
     el.onchange = () => { S[key] = el.type === "checkbox" ? el.checked : num ? +el.value : el.value; saveS(); renderPresets(); render(); };
   };
   bind("setUnit", "unit"); bind("setClean", "cleanMins", 1); bind("setCoach", "coachHours", 1);
-  bind("setTank", "tankGal", 1); bind("setMin", "minLevel", 1); bind("setLead", "lead", 1); bind("setBatt", "batt");
+  bind("setTank", "tankGal", 1); bind("setMin", "minLevel", 1); bind("setBatt", "batt");
   bind("setBattV", "battV", 1); bind("setNative", "native"); bind("setProto", "proto");
   bind("setHUnit", "hUnit"); bind("setPin", "pin"); bind("setAll", "showAll"); bind("setRoom", "room");
   bind("setGUnit", "gUnit");
@@ -1215,7 +1284,7 @@
       mode: S.mode, targetC: S.targetC, roomC: ambientC(), roomSrc: useGovee() ? "Govee" : "heater",
       tuneId: tune().id, tuneName: tune().name, hold: tune().hold, top: Math.min(maxLevel(), tune().max),
       tunes: S.tunes.map((t) => ({ id: t.id, name: t.name, targetC: t.targetC })),
-      manualLevel: S.level || null, leftL: left, clean: clean ? { kind: clean.kind, endAt: clean.endAt } : null,
+      manualLevel: S.level || null, leftL: left, schedNext: schedNext(), clean: clean ? { kind: clean.kind, endAt: clean.endAt } : null,
     };
   }
   let gwKey = "", gwMinor = "", gwPushAt = 0, gwBusy = false, gwInfo = "";
@@ -1369,7 +1438,7 @@
     $("awPill").className = "pill" + (stale || !st.connected ? " warn" : "");
     $("awPillText").textContent = stale ? "Home offline?" : st.connected ? "Home online" : "Heater not connected";
     const secs = Math.round(age / 1000);
-    $("awFresh").textContent = `Updated ${secs < 10 ? "just now" : secs < 90 ? secs + " s ago" : mins + " min ago"}${st.name ? " · " + st.name : ""}`;
+    $("awFresh").textContent = `Updated ${secs < 10 ? "just now" : secs < 90 ? secs + " s ago" : mins + " min ago"}${st.name ? " · " + st.name : ""}${st.schedNext ? " · ⏱ " + st.schedNext : ""}`;
 
     // Status bar (same look as at home)
     const max = st.max || 10, on = st.power === "running" || st.power === "starting";

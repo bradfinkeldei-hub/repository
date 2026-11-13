@@ -383,3 +383,17 @@ body { max-width: 100%; }
 .fan-bars { height: 80px; }
 .fan-bars .bar.on { background: linear-gradient(180deg, #b9d2ff, #6f9cff); }
 .sbar[data-state="cool"] .sb-segs i.on { background: linear-gradient(90deg, #6f9cff, #b9d2ff); }
+
+/* Schedule */
+.slot { border-top: 1px solid var(--line); padding: 12px 0 2px; margin-top: 10px; }
+.slot-top { display: flex; align-items: center; gap: 10px; }
+.slot-top b { font-weight: 500; }
+.slot-sum { flex: 1; font-size: 12px; color: var(--ember-2); }
+.slot.off .slot-sum { color: var(--muted); }
+.slot-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.slot-row .time { padding: 7px 8px; font-size: 14px; min-width: 0; width: 7.4em; }
+.slot-row .arrow { color: var(--muted); }
+.slot-tune { flex: 1; min-width: 7em; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; color-scheme: dark; }
+.slot.off .slot-row { opacity: .5; }
+.slot-row .time { width: auto; flex: 1 1 8.6em; max-width: 11em; }
+.slot-row .slot-tune { flex: 1 1 100%; }
