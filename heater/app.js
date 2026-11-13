@@ -30,23 +30,43 @@
   const range = () => (S.unit === "F" ? [41, 86] : [5, 30]);
   const PRESETS = [["Frost", 5], ["Sleep", 17], ["Comfort", 21], ["Boost", 25]];
 
+  // Turn any error (including ones with no message) into readable text.
+  const errText = (e) => {
+    if (!e) return "no details";
+    if (typeof e === "string") return e;
+    const t = [e.name, e.message].filter((x) => x && x !== "Error").join(": ");
+    try { return t || JSON.stringify(e) || String(e); } catch { return String(e); }
+  };
+  const cancelled = (e) => /cancel|NotFoundError|User/i.test(errText(e));
+
   /* ---------------- Bluetooth link ---------------- */
   class BleLink {
     constructor() { this.listener = null; this.onDrop = null; }
     get name() { return (this.device && this.device.name) || "Heater"; }
-    async pick(showAll) {
-      const prefixes = ["HC", "Hc", "hc", "TY", "Air", "AIR", "BT", "Heater", "HEATER", "ZS"];
-      const opts = showAll
-        ? { acceptAllDevices: true, optionalServices: [P.SERVICE] }
-        : { filters: [{ services: [P.SERVICE] }, ...prefixes.map((n) => ({ namePrefix: n }))], optionalServices: [P.SERVICE] };
-      this.device = await navigator.bluetooth.requestDevice(opts);
+    async pick(showAll, log) {
+      const all = { acceptAllDevices: true, optionalServices: [P.SERVICE] };
+      const filtered = {
+        filters: [{ services: [P.SERVICE] }, ...["HC", "Hc", "TY", "Air", "BT", "Heater"].map((n) => ({ namePrefix: n }))],
+        optionalServices: [P.SERVICE],
+      };
+      if (showAll) this.device = await navigator.bluetooth.requestDevice(all);
+      else {
+        try { this.device = await navigator.bluetooth.requestDevice(filtered); }
+        catch (e) {
+          if (cancelled(e)) throw e;
+          log("✗ filtered picker: " + errText(e) + " → showing all devices");
+          this.device = await navigator.bluetooth.requestDevice(all);
+        }
+      }
+      log("· picked " + (this.device.name || "(no name)"));
       this.device.addEventListener("gattserverdisconnected", () => this.onDrop && this.onDrop());
     }
     async connect() {
-      const server = await this.device.gatt.connect();
-      const svc = await server.getPrimaryService(P.SERVICE);
-      this.rx = await svc.getCharacteristic(P.NOTIFY);
-      this.tx = await svc.getCharacteristic(P.WRITE);
+      const step = async (name, fn) => { try { return await fn(); } catch (e) { throw new Error(name + " failed (" + errText(e) + ")"); } };
+      const server = await step("Bluetooth connect", () => this.device.gatt.connect());
+      const svc = await step("Finding heater service", () => server.getPrimaryService(P.SERVICE));
+      this.rx = await step("Finding status channel", () => svc.getCharacteristic(P.NOTIFY));
+      this.tx = await step("Finding command channel", () => svc.getCharacteristic(P.WRITE));
       this.rx.addEventListener("characteristicvaluechanged", (e) => {
         const v = e.target.value;
         this.listener && this.listener(new Uint8Array(v.buffer, v.byteOffset, v.byteLength).slice());
@@ -97,7 +117,7 @@
         const wait = this.lastSend + 550 - Date.now();
         if (wait > 0) await sleep(wait);
         this.log("▶ " + P.hex(bytes));
-        try { await this.link.write(bytes); } catch (e) { this.log("✗ " + e.message); }
+        try { await this.link.write(bytes); } catch (e) { this.log("✗ " + errText(e)); }
         this.lastSend = Date.now();
       });
       return this.chain;
@@ -199,14 +219,14 @@
       if (e.message === "NO_WATCH") toast(/iPhone|iPad/.test(navigator.userAgent)
         ? "This browser can't read the thermometer yet. Using the heater's sensor for now."
         : "Chrome needs one setting: open chrome://flags, turn on “Experimental Web Platform features”, restart Chrome.", 9000);
-      else if (!/cancel/i.test(e.message)) toast("Couldn't pair: " + e.message, 5000);
+      else if (!cancelled(e)) toast("Couldn't pair: " + errText(e), 6000);
     }
   }
 
   async function restoreGovee() {
     if (S.room !== "govee" || !S.goveeId || goveeLive()) return;
     if (demo) return gsensor.startSim(() => (link && link.room != null ? link.room : null));
-    try { await gsensor.restore(S.goveeId); } catch (e) { log("✗ govee " + e.message); }
+    try { await gsensor.restore(S.goveeId); } catch (e) { log("✗ govee " + errText(e)); }
   }
 
   const heaterUnit = () => (S.hUnit !== "auto" ? S.hUnit : heater && heater.proto ? heater.proto.unit : "C");
@@ -233,7 +253,7 @@
         await link.connect();
       } else {
         link = new BleLink();
-        await link.pick(S.showAll);
+        await link.pick(S.showAll, log);
         $("connectMsg").textContent = "Connecting…";
         await link.connect();
         link.onDrop = onDrop;
@@ -253,8 +273,10 @@
       if (clean && heater.status && isOn(heater.status)) resumeClean();
       else if (clean) { clean = null; store.set("clean", null); }
     } catch (e) {
-      log("✗ " + e.message);
-      $("connectMsg").textContent = /cancel/i.test(e.message) ? "" : "Couldn't connect: " + e.message;
+      const why = errText(e);
+      log("✗ " + why);
+      $("connectMsg").textContent = cancelled(e) ? "" : "Couldn't connect: " + why;
+      $("btnCopyLog2").hidden = cancelled(e);
     }
   }
 
@@ -271,7 +293,7 @@
         setPill("ok", "Connected");
         reconnecting = false;
         return;
-      } catch (e) { log("✗ reconnect " + e.message); }
+      } catch (e) { log("✗ reconnect " + errText(e)); }
     }
     reconnecting = false;
     setPill("bad", "Disconnected");
@@ -617,6 +639,7 @@
   $("btnSettings").onclick = () => { $("settings").hidden = false; log("· settings opened"); };
   $("btnClose").onclick = () => ($("settings").hidden = true);
   $("settings").addEventListener("click", (e) => { if (e.target.id === "settings") $("settings").hidden = true; });
+  $("btnCopyLog2").onclick = () => $("btnCopyLog").onclick();
   $("btnCopyLog").onclick = async () => {
     const text = `Ember log · ${navigator.userAgent}\nDevice: ${link ? link.name : "-"} · format ${heater && heater.proto ? heater.proto.id : "?"}\n` + logLines.join("\n");
     try { await navigator.clipboard.writeText(text); toast("Log copied"); } catch { toast("Couldn't copy"); }

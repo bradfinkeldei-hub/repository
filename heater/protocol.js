@@ -14,9 +14,10 @@
 (function (root) {
   "use strict";
 
-  const SERVICE = 0xfff0;
-  const NOTIFY = 0xfff1;
-  const WRITE = 0xfff2;
+  // Full 128-bit IDs: some browsers (e.g. Bluefy on iPhone) reject the short form.
+  const SERVICE = "0000fff0-0000-1000-8000-00805f9b34fb";
+  const NOTIFY = "0000fff1-0000-1000-8000-00805f9b34fb";
+  const WRITE = "0000fff2-0000-1000-8000-00805f9b34fb";
 
   const sum8 = (bytes) => bytes.reduce((a, b) => (a + b) & 0xff, 0);
   const withSum = (bytes) => Uint8Array.from([...bytes, sum8(bytes)]);
