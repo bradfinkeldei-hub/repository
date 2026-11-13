@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.16"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.17"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -596,7 +596,7 @@
   async function tick() {
     if (!heater || !heater.proto) return;
     if (clean) {
-      renderClean();
+      renderClean(); renderStatusBar(heater.status);
       if (Date.now() >= clean.endAt) await finishClean();
       else {
         const s = heater.status, max = heater.proto.maxLevel;
@@ -712,6 +712,48 @@
 
   const POWER_TEXT = { off: "Off", starting: "Igniting", running: "Heating", cooling: "Cooling down", fan: "Fan only", error: "Fault" };
 
+  // Top status bar: on/off, current level, the setting it's following, fuel left.
+  function renderStatusBar(s) {
+    const max = maxLevel();
+    let state = "off", label = "Connecting…";
+    if (reconnecting) { state = "warn"; label = "Reconnecting…"; }
+    else if (clean) {
+      const sec = Math.ceil((Math.max(0, clean.endAt - Date.now()) * FAST) / 1000);
+      state = "clean"; label = `${clean.kind === "burn" ? "Clean burn" : "Clean shutdown"} · ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+    } else if (s) {
+      state = { running: "on", starting: "on", cooling: "cool", fan: "cool", error: "bad" }[s.power] || "off";
+      label = { off: "Off", starting: "Igniting", running: "Heating", cooling: "Cooling down", fan: "Fan only", error: "Fault" + (s.fault ? " E-" + String(s.fault).padStart(2, "0") : "") }[s.power] || "On";
+    }
+    $("sbar").dataset.state = state;
+    $("sbState").textContent = label;
+
+    const running = s && (s.power === "running" || s.power === "starting");
+    const lvl = running ? s.level : null;
+    $("sbLevel").innerHTML = lvl != null ? `Level <b>${lvl}</b><small> / ${max}</small>`
+      : running && s.setpoint != null ? `Heater set <b>${s.setpoint}°</b>`
+      : S.mode === "manual" ? `Runs level ${S.level || 5}`
+      : `Runs level ${tune().hold}–${Math.min(max, tune().max)}`;
+    const segs = $("sbSegs");
+    if (segs.children.length !== max) segs.innerHTML = "<i></i>".repeat(max);
+    [...segs.children].forEach((el, i) => el.classList.toggle("on", lvl != null && i < lvl));
+
+    const room = ambientC();
+    const roomTxt = room != null ? ` · room ${show(room)}°` : "";
+    $("sbSetting").textContent = S.mode === "manual"
+      ? `Manual · level ${S.level || (lvl ?? "—")}${roomTxt}`
+      : `${tune().name} · ${show(S.targetC)}°${roomTxt}`;
+
+    // Fuel left, and how long it lasts at the level it's running (or will run) at.
+    const left = Math.max(0, S.tankGal * GAL - stats.sinceFillL), gal = (left / GAL).toFixed(1);
+    const hrs = (l) => left / fuelRate(l);
+    const h = (x) => (x >= 10 ? Math.round(x) : x.toFixed(1));
+    let fuel;
+    if (lvl != null) fuel = `${gal} gal · ≈ ${h(hrs(lvl))} h at level ${lvl}`;
+    else if (S.mode === "manual") fuel = `${gal} gal · ≈ ${h(hrs(S.level || 5))} h at level ${S.level || 5}`;
+    else { const T = tune(); fuel = `${gal} gal · ≈ ${h(hrs(Math.min(max, T.max)))}–${h(hrs(T.hold))} h`; }
+    $("sbFuel").textContent = fuel;
+  }
+
   function render() {
     const s = heater && heater.status;
     $("thermoView").hidden = S.mode !== "thermo";
@@ -727,6 +769,7 @@
       if (S.mode === "thermo" && room != null) line += show(room) >= show(S.targetC) ? " · at temperature" : "";
     }
     $("statusLine").textContent = line;
+    renderStatusBar(s);
     $("teach").textContent = teachText(s);
 
     // Fault

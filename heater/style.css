@@ -271,3 +271,49 @@ select { background: var(--surface); border: 1px solid var(--line); border-radiu
 .gs-msg { color: var(--ember-2); font-size: 13px; margin: 10px 0 0; min-height: 0; }
 .gs-msg:empty { display: none; }
 #gsetup, #tuner, #how { z-index: 12; }
+
+/* ---------- Status bar ---------- */
+.sbar {
+  position: sticky; top: max(8px, env(safe-area-inset-top)); z-index: 6;
+  margin: 0 0 14px; padding: 12px 14px 12px; border-radius: 20px;
+  background: rgba(21, 21, 24, .86); border: 1px solid var(--line);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 30px -18px rgba(0,0,0,.8);
+  --tone: #6f6b66;
+}
+.sbar[data-state="on"] { --tone: #ff8a2a; border-color: rgba(255, 138, 42, .35); }
+.sbar[data-state="clean"] { --tone: #ffc472; border-color: rgba(255, 196, 114, .4); }
+.sbar[data-state="cool"] { --tone: var(--cool); }
+.sbar[data-state="warn"] { --tone: #ffb547; }
+.sbar[data-state="bad"] { --tone: var(--bad); border-color: rgba(255, 93, 93, .4); }
+.sb-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.sb-state { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.sb-state b { font-weight: 600; font-size: 17px; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--tone); flex: none; box-shadow: 0 0 0 4px color-mix(in srgb, var(--tone) 18%, transparent); }
+.sbar[data-state="on"] .sb-dot, .sbar[data-state="clean"] .sb-dot { box-shadow: 0 0 12px var(--tone), 0 0 0 4px color-mix(in srgb, var(--tone) 20%, transparent); animation: sbpulse 2s ease-in-out infinite; }
+@keyframes sbpulse { 50% { opacity: .55; } }
+.sb-level { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.sb-level b { color: var(--text); font-size: 20px; font-weight: 600; margin-left: 2px; }
+.sb-segs { display: flex; gap: 3px; margin: 10px 0 9px; }
+.sb-segs i { flex: 1; height: 5px; border-radius: 3px; background: var(--surface-2); transition: background .3s ease; }
+.sb-segs i.on { background: linear-gradient(90deg, #ff6a24, #ffb25c); }
+.sb-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--muted); }
+.sb-setting { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-fuel { white-space: nowrap; color: var(--text); opacity: .85; }
+@media (max-width: 359px) { .sb-row { flex-direction: column; gap: 2px; } }
+
+/* ---------- Fit narrow phones (no sideways scroll) ---------- */
+html { overflow-x: hidden; } /* on html only: keeps the status bar able to stick */
+body { max-width: 100%; }
+.screen { width: 100%; }
+.dial-wrap { gap: 4px; margin: 8px 0 0; }
+.dial { flex: 1 1 auto; min-width: 0; width: 100%; max-width: 300px; }
+.step { width: 44px; height: 44px; }
+.overlay > * { min-width: 0; max-width: 100%; }
+.sheet-inner { min-width: 0; }
+.row { min-width: 0; }
+.row > span { min-width: 0; }
+.row select, .row input { max-width: 52%; min-width: 0; }
+.cards, .card, .stats, .presets, .runtime { min-width: 0; }
+.stats div { min-width: 0; padding: 12px 6px; }
+.stats b { font-size: 16px; }
