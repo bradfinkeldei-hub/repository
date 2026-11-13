@@ -50,6 +50,6 @@ Tap **Try the demo** first if you want to see it without a heater.
 - Tested on my **TB2S**. It includes the protocols for older Hcalory and AirHeater-type controllers, but I haven't been able to test those. If you try it on another model, I'd love to hear how it goes.
 - The app has to stay open on the phone or tablet connected to the heater for schedules, clean shutdowns and away control. An old phone plugged in next to the heater works great.
 - Fan-only and fan speed use the decoded commands but aren't confirmed on every model yet. If something doesn't work, Settings → **Copy log** and post it here.
-- Diesel heaters burn fuel indoors-adjacent. **Keep a CO alarm nearby** and follow your heater's manual. It will never auto-restart after a carbon monoxide fault.
+- Diesel heaters burn fuel, so **keep a CO alarm nearby** and follow your heater's manual. It will never auto-restart after a carbon monoxide fault.
 
 Huge thanks to the folks who reverse-engineered these heaters' Bluetooth protocols (credits in the guide). Happy to answer questions or take feature requests!
