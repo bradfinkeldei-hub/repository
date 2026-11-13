@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.25"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.26"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -217,6 +217,25 @@
       return got;
     }
     async start() { await this.sendAll(this.proto.start()); return this.poll(); }
+    // Start, checked: confirm the heater is igniting/heating; if not, send Off then On once
+    // (what the remote effectively does) and check again.
+    async startVerified() {
+      this.busy++;
+      try {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          await this.sendAll(this.proto.start());
+          await sleep(1800);
+          const s = await this.poll();
+          this.log(`· start attempt ${attempt}: ${s ? s.power + (s.fault ? " (fault " + s.fault + ")" : "") : "no reply"}`);
+          if (s && (s.power === "starting" || s.power === "running")) return s;
+          if (attempt === 1) {
+            if (this.proto === P.H && !this.unlocked) { this.log("· re-sending PIN"); this.unlocked = await this.unlock(); }
+            await this.sendAll(this.proto.stop()); await sleep(1500); await this.poll();
+          }
+        }
+        return this.status;
+      } finally { this.busy--; }
+    }
     async stop() { await this.sendAll(this.proto.stop()); return this.poll(); }
     async fan() { if (!this.proto.fan) return null; await this.sendAll(this.proto.fan()); await sleep(1200); return this.poll(); }
     // Turn off, checked: confirm the heater is shutting down, retry (and re-send the PIN) if not.
@@ -799,9 +818,9 @@
 
     // Power button
     const btn = $("btnPower");
-    btn.disabled = !s || s.power === "cooling" || recovering;
+    btn.disabled = !s || recovering; // starting again during cool-down is fine (the remote does it too)
     if (isOn(s)) { btn.textContent = tune().clean ? "Turn off" : "Turn off now"; btn.classList.add("off"); }
-    else { btn.textContent = recovering ? "Recovering…" : s && s.power === "error" ? "Try again" : restartWhenOff && s && s.power === "cooling" ? "Restarts after cool-down…" : s && s.power === "cooling" ? "Cooling down…" : "Start heating"; btn.classList.remove("off"); }
+    else { btn.textContent = recovering ? "Recovering…" : s && s.power === "error" ? "Try again" : restartWhenOff && s && s.power === "cooling" ? "Restarts after cool-down…" : "Start heating"; btn.classList.remove("off"); }
     $("btnRetry").disabled = $("btnReset").disabled = recovering;
     const co = coFault(s);
     $("btnRetry").hidden = co;
@@ -947,8 +966,9 @@
     if (s.power === "error") return recover(!coFault(s));
     if (isOn(s)) return openOffSheet();
     $("btnPower").disabled = true; $("btnPower").textContent = "Starting…";
-    lastThermo = 0;
-    await heater.start();
+    lastThermo = 0; restartWhenOff = false;
+    const r = await heater.startVerified();
+    if (!r || (r.power !== "starting" && r.power !== "running")) toast(r && r.power === "error" ? "The heater reported a fault. See the message at the top." : "The heater didn't confirm it started. Check its display; if it shows an error code, Settings → Copy log and send it over.", 9000);
     if (S.mode === "manual" && S.level) setTimeout(() => heater.stepTo(S.level), 1500);
   };
   $("btnFan").onclick = async () => {
@@ -997,7 +1017,7 @@
       }
       if (!start) { toast("Fault cleared. The heater is off."); return; }
       faultTries++; faultTriesAt = Date.now();
-      if (s.power === "off") { lastThermo = 0; await heater.start(); toast("Trying again…"); }
+      if (s.power === "off" || s.power === "cooling") { lastThermo = 0; toast("Trying again…"); await heater.startVerified(); }
       else { restartWhenOff = true; toast("Cooling down first. It restarts by itself when that's done.", 6000); }
     } finally { recovering = false; render(); }
   }
@@ -1184,7 +1204,7 @@
     log(`· remote: ${c.action}${c.value != null ? " " + c.value : ""}`);
     if (!heater || !heater.proto) return;
     const s = heater.status;
-    if (c.action === "start" && s && (s.power === "off" || s.power === "cooling")) { lastThermo = 0; await heater.start(); toast("Started from away"); }
+    if (c.action === "start" && s && (s.power === "off" || s.power === "cooling")) { lastThermo = 0; await heater.startVerified(); toast("Started from away"); }
     else if (c.action === "stop" && s && isOn(s) && !clean) { await beginClean("shutdown", [1, 5, 10].includes(c.value) ? c.value : undefined); }
     else if (c.action === "stopnow" && s && (isOn(s) || clean || s.power === "fan")) { await turnOff(); }
     else if (c.action === "fan" && s && s.power === "off") { await heater.fan(); }
@@ -1370,8 +1390,8 @@
     const live = st.connected && !stale && !fault;
     const btn = $("awPower");
     btn.hidden = on || !!st.clean || (fault && st.noRetry);
-    btn.disabled = !(st.connected && !stale) || st.power === "cooling";
-    if (Date.now() - awArmed > 4000) btn.textContent = fault ? "Try again" : st.power === "cooling" ? "Cooling down…" : "Start heating";
+    btn.disabled = !(st.connected && !stale);
+    if (Date.now() - awArmed > 4000) btn.textContent = fault ? "Try again" : "Start heating";
     $("awReset").hidden = !fault || !st.connected || stale;
     $("awFault").hidden = !fault; $("awFault").textContent = st.faultText || "";
     const fanOn = st.power === "fan";
