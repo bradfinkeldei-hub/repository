@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.15"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.16"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -17,7 +17,7 @@
   const S = Object.assign({
     unit: usLocale ? "F" : "C", targetC: 21, mode: "thermo", cleanMins: 10, coachHours: 4,
     tankGal: 5, minLevel: 2, tunes: [], tuneId: "std", lead: 30, batt: true, battV: 11.5, native: false, proto: "auto", hUnit: "auto",
-    showAll: false, pin: "0000", warmOn: false, warmTime: "06:30", room: "heater", goveeId: null,
+    showAll: false, pin: "0000", warmOn: false, warmTime: "06:30", room: "heater", goveeId: null, gwifi: null, gUnit: "F",
   }, store.get("settings", {}));
   const stats = Object.assign({ runSec: 0, lowSec: 0, sinceFillL: 0, days: {} }, store.get("stats", {}));
   if (S.mode !== "thermo" && S.mode !== "manual") S.mode = "thermo";
@@ -301,32 +301,85 @@
   }
 
   /* ---------------- Govee room gauge ---------------- */
+  // Two ways in: Wi-Fi (Govee cloud API, works on iPhone) or Bluetooth (Android Chrome).
   let govee = null;
-  const gsensor = new window.EmberGovee.GoveeSensor((r) => { govee = r; render(); }, log);
-  const goveeLive = () => !!govee && Date.now() - govee.at < 180000;
+  const onGovee = (r) => { govee = r; render(); };
+  const gsensor = new window.EmberGovee.GoveeSensor(onGovee, log);
+  const gcloud = new window.EmberGovee.GoveeCloud(onGovee, log);
+  if (S.goveeId === "demo") S.goveeId = null; // older versions saved the demo pairing
+  const goveeLive = () => !!govee && Date.now() - govee.at < (govee.via === "wifi" ? 300000 : 180000);
   const useGovee = () => S.room === "govee" && goveeLive();
+  const goveeSetUp = () => !!(S.gwifi || S.goveeId);
+  const demoRoom = () => (link && link.room != null ? link.room : null);
 
-  async function pairGovee() {
-    try {
-      if (demo) {
-        gsensor.startSim(() => (link && link.room != null ? link.room : null));
-        S.goveeId = "demo";
-      } else {
-        S.goveeId = await gsensor.pick();
-        toast("Thermometer paired. Readings appear in a few seconds.");
-      }
-      S.room = "govee"; $("setRoom").value = "govee"; saveS(); lastThermo = 0; render();
-    } catch (e) {
-      if (e.message === "NO_WATCH") toast(/iPhone|iPad/.test(navigator.userAgent)
-        ? "This browser can't read the thermometer yet. Using the heater's sensor for now."
-        : "Chrome needs one setting: open chrome://flags, turn on “Experimental Web Platform features”, restart Chrome.", 9000);
-      else if (!cancelled(e)) toast("Couldn't pair: " + errText(e), 6000);
-    }
+  function openGoveeSetup() {
+    $("gKey").value = (S.gwifi && S.gwifi.key) || S.gkey || "";
+    $("gList").innerHTML = ""; $("gMsg").textContent = "";
+    $("btnGForget").hidden = !goveeSetUp();
+    const ble = gsensor.supported || demo;
+    $("btnGBle").disabled = !ble;
+    $("btnGBle").textContent = demo ? "Use demo thermometer" : "Pair over Bluetooth";
+    $("gBleNote").textContent = ble
+      ? "Reads the thermometer directly every few seconds. No internet needed."
+      : "This browser can't listen to Govee over Bluetooth (Bluefy on iPhone can't). Use Wi-Fi above.";
+    $("settings").hidden = true; // open on top, not behind Settings
+    $("gsetup").hidden = false;
   }
 
+  function useGoveeNow(msg) {
+    S.room = "govee"; $("setRoom").value = "govee"; saveS(); lastThermo = 0;
+    $("gsetup").hidden = true; render(); toast(msg, 4500);
+  }
+
+  $("btnGFind").onclick = async () => {
+    const key = $("gKey").value.trim();
+    if (!key) return ($("gMsg").textContent = "Paste your API key first.");
+    S.gkey = key; saveS();
+    $("gMsg").textContent = "Looking for your thermometers…"; $("gList").innerHTML = "";
+    try {
+      const list = await gcloud.list(key);
+      if (!list.length) return ($("gMsg").textContent = "No thermometers found on this Govee account. Make sure the H5051 is set up on Wi-Fi in the Govee Home app.");
+      $("gMsg").textContent = "Tap your thermometer:";
+      $("gList").innerHTML = list.map((d, i) => `<button class="gs-dev" data-i="${i}"><b>${(d.deviceName || d.sku).replace(/</g, "&lt;")}</b><span>${d.sku}</span></button>`).join("");
+      $("gList").onclick = (e) => {
+        const b = e.target.closest(".gs-dev"); if (!b) return;
+        const d = list[+b.dataset.i];
+        S.gwifi = { key, sku: d.sku, device: d.device, deviceName: d.deviceName || d.sku };
+        gsensor.stop(); gcloud.start(key, S.gwifi, S.gUnit || "F");
+        useGoveeNow(`Connected to ${S.gwifi.deviceName} over Wi-Fi. First reading in a few seconds.`);
+      };
+    } catch (e) {
+      $("gMsg").textContent = e.message === "BAD_KEY" ? "Govee didn't accept that key. Check it and try again."
+        : e.message === "NO_RELAY" ? "Your Cloudflare site is missing the Govee relay. Upload the latest Ember zip (it includes _worker.js), then try again."
+        : "Couldn't reach Govee: " + e.message;
+    }
+  };
+
+  $("btnGBle").onclick = async () => {
+    try {
+      if (demo) { gcloud.stop(); gsensor.startSim(demoRoom); return useGoveeNow("Using the demo thermometer"); }
+      S.goveeId = await gsensor.pick();
+      gcloud.stop(); S.gwifi = null;
+      useGoveeNow("Thermometer paired. Readings appear in a few seconds.");
+    } catch (e) {
+      if (e.message === "NO_WATCH") $("gBleNote").textContent = "This browser can't listen to Govee over Bluetooth. Use Wi-Fi above.";
+      else if (!cancelled(e)) toast("Couldn't pair: " + errText(e), 6000);
+    }
+  };
+
+  $("btnGForget").onclick = () => {
+    gcloud.stop(); gsensor.stop(); govee = null;
+    S.gwifi = null; S.goveeId = null; S.room = "heater"; $("setRoom").value = "heater"; saveS();
+    $("gsetup").hidden = true; render(); toast("Thermometer disconnected. Using the heater's sensor.");
+  };
+  $("btnGsClose").onclick = () => ($("gsetup").hidden = true);
+  $("gsetup").addEventListener("click", (e) => { if (e.target.id === "gsetup") $("gsetup").hidden = true; });
+
+  // Reconnect the thermometer chosen last time.
   async function restoreGovee() {
-    if (S.room !== "govee" || !S.goveeId || goveeLive()) return;
-    if (demo) return gsensor.startSim(() => (link && link.room != null ? link.room : null));
+    if (S.room !== "govee" || goveeLive()) return;
+    if (S.gwifi) return gcloud.start(S.gwifi.key, S.gwifi, S.gUnit || "F");
+    if (demo || !S.goveeId) return;
     try { await gsensor.restore(S.goveeId); } catch (e) { log("✗ govee " + errText(e)); }
   }
 
@@ -585,7 +638,7 @@
     if (room == null) { $("dRoom").textContent = "Room —"; $("roomDot").style.display = "none"; }
     else {
       $("dRoom").textContent = "Room " + show(room) + "°" +
-        (useGovee() ? " · " + Math.round(govee.hum) + "%" : S.room === "govee" ? " · heater" : "");
+        (useGovee() ? (govee.hum != null ? " · " + Math.round(govee.hum) + "%" : "") + " · Govee" : S.room === "govee" ? " · heater" : "");
       const [rx, ry] = pt(A0 + SWEEP * frac(show(room)));
       $("roomDot").style.display = ""; $("roomDot").setAttribute("cx", rx); $("roomDot").setAttribute("cy", ry);
     }
@@ -731,10 +784,11 @@
     $("sHours").textContent = (stats.runSec / 3600).toFixed(1);
     $("protoName").textContent = heater && heater.proto ? ({ H: "Hcalory BD39 (H)", B: "Hcalory (B)", A: "AirHeater (A)" }[heater.proto.id]) : "—";
     $("btnGovee").hidden = !(S.room === "govee" && !goveeLive() && heater);
+    $("btnGovee").textContent = goveeSetUp() ? "Govee not reading. Tap to fix" : "Connect your Govee";
     $("goveeStatus").textContent = goveeLive()
-      ? `${govee.model} · ${show(govee.tempC)}° · ${Math.round(govee.hum)}% · battery ${govee.batt}%`
-      : S.goveeId ? "Paired, waiting for reading" : "Not paired";
-    $("btnPairGovee").textContent = S.goveeId ? "Re-pair" : "Pair";
+      ? [govee.model, show(govee.tempC) + "°", govee.hum != null ? Math.round(govee.hum) + "%" : "", govee.via === "wifi" ? "via Wi-Fi" : govee.batt != null ? "battery " + govee.batt + "%" : ""].filter(Boolean).join(" · ")
+      : S.gwifi ? `${S.gwifi.deviceName} (Wi-Fi) · waiting for a reading` : S.goveeId ? "Bluetooth · waiting for a reading" : "Not set up";
+    $("btnPairGovee").textContent = goveeSetUp() ? "Change" : "Set up";
     $("nativeRow").hidden = !(heater && heater.proto && heater.proto.hasThermostat);
   }
 
@@ -838,9 +892,11 @@
   bind("setTank", "tankGal", 1); bind("setMin", "minLevel", 1); bind("setLead", "lead", 1); bind("setBatt", "batt");
   bind("setBattV", "battV", 1); bind("setNative", "native"); bind("setProto", "proto");
   bind("setHUnit", "hUnit"); bind("setPin", "pin"); bind("setAll", "showAll"); bind("setRoom", "room");
-  $("setRoom").addEventListener("change", () => { lastThermo = 0; if (S.room === "govee" && !goveeLive()) (S.goveeId ? restoreGovee() : pairGovee()); });
-  $("btnPairGovee").onclick = pairGovee;
-  $("btnGovee").onclick = pairGovee; // the picker needs a tap, so this always opens it
+  bind("setGUnit", "gUnit");
+  $("setGUnit").addEventListener("change", () => { if (S.gwifi) gcloud.start(S.gwifi.key, S.gwifi, S.gUnit); });
+  $("setRoom").addEventListener("change", () => { lastThermo = 0; if (S.room === "govee" && !goveeLive()) (goveeSetUp() ? restoreGovee() : openGoveeSetup()); });
+  $("btnPairGovee").onclick = openGoveeSetup;
+  $("btnGovee").onclick = openGoveeSetup;
   /* ---------------- Tunes ---------------- */
   let draft = null;
   const bandShow = (c) => Math.round(S.unit === "F" ? c * 9 / 5 : c);
@@ -912,7 +968,7 @@
     try { await navigator.clipboard.writeText(text); toast("Log copied"); } catch { toast("Couldn't copy"); }
   };
   $("btnDisconnect").onclick = () => {
-    link && link.disconnect(); link = null; heater = null; gsensor.stop(); govee = null;
+    link && link.disconnect(); link = null; heater = null; gsensor.stop(); gcloud.stop(); govee = null;
     $("settings").hidden = true; $("main").hidden = true; $("connect").hidden = false;
     $("connectMsg").textContent = "";
   };

@@ -20,6 +20,9 @@ Web Bluetooth only works over https, so the folder has to be hosted:
 - If it connects but shows "No reply": Settings → **Copy log** and send it over.
 
 ## Govee thermometer as the room gauge
+**On iPhone use Wi-Fi:** in the Govee Home app go to Profile → Settings → Apply for API Key. Then in Ember open Settings → Govee thermometer → Set up,
+paste the key and tap Find. This needs `_worker.js` from the zip on your Cloudflare site. It relays two Govee calls and stores nothing.
+
 Settings → **Room gauge → Govee thermometer** opens the picker. Choose your `GVH5…` / `Govee_H5…` device.
 The app only listens to the thermometer's broadcasts, so the heater stays connected.
 The dial then shows the Govee temperature and humidity, and the thermostat aims for that reading.
@@ -33,6 +36,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.16 | Govee setup screen: connect over Wi-Fi with a Govee API key (works on iPhone, via the included _worker.js relay) or Bluetooth (Android Chrome). Fixes the "Re-pair" label. |
 | v1.15 | Every preset button (Frost, Sleep, Comfort, Boost and your own) can be edited: temperature, name, levels, clean burn. Reset in Settings. |
 | v1.14 | Custom tunes include their own temperature and appear as one-tap buttons next to the presets. |
 | v1.13 | Turning off is confirmed and retried (re-sends the PIN if needed); re-unlocks after a Bluetooth reconnect; warns to keep the screen unlocked during clean shutdown. |

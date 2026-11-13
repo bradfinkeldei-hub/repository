@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b0b0d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Ember Heater v1.15</title>
+<title>Ember Heater v1.16</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-512.png">
@@ -24,7 +24,7 @@
       <defs><linearGradient id="mg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff5a1f"/><stop offset="1" stop-color="#ffc06a"/></linearGradient></defs>
       <path fill="url(#mg)" d="M32 4c2 10 14 16 14 32a14 14 0 0 1-28 0c0-7 3-11 6-14 0 5 2 8 5 9-1-10 1-19 3-27z"/>
     </svg>
-    <h1>Ember <span class="ver" data-version>v1.15</span></h1>
+    <h1>Ember <span class="ver" data-version>v1.16</span></h1>
     <p class="sub">Smarter control for your Hcalory heater</p>
     <button id="btnConnect" class="btn primary wide">Connect heater</button>
     <button id="btnAll" class="btn ghost wide">Don't see it? Show all devices</button>
@@ -38,7 +38,7 @@
 <!-- Main -->
 <section id="main" class="screen" hidden>
   <header class="top">
-    <div class="brand">Ember <span class="ver" data-version>v1.15</span></div>
+    <div class="brand">Ember <span class="ver" data-version>v1.16</span></div>
     <div class="pill" id="pill"><span class="dot"></span><span id="pillText">Connected</span></div>
     <button class="icon-btn" id="btnSettings" aria-label="Settings">
       <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
@@ -180,6 +180,34 @@
   </div>
 </div>
 
+<!-- Govee setup -->
+<div id="gsetup" class="overlay sheet" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2>Connect your Govee</h2><button class="icon-btn" id="btnGsClose" aria-label="Close">✕</button></div>
+    <p class="fine">Use your Govee as the room gauge, so the heater aims for the temperature where you are.</p>
+
+    <div class="gs-opt">
+      <div class="gs-title">Wi-Fi <span class="tag">Works on iPhone</span></div>
+      <ol class="gs-steps">
+        <li>Open the <b>Govee Home</b> app → <b>Profile</b> → ⚙️ <b>Settings</b> → <b>Apply for API Key</b>. Govee emails you a key, usually within minutes.</li>
+        <li>Paste the key here and tap <b>Find</b>.</li>
+      </ol>
+      <div class="gs-row"><input id="gKey" placeholder="Paste your Govee API key" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn small" id="btnGFind">Find</button></div>
+      <p class="gs-msg" id="gMsg"></p>
+      <div class="gs-list" id="gList"></div>
+      <p class="fine">Updates about once a minute. Needs internet where the heater is.</p>
+    </div>
+
+    <div class="gs-opt">
+      <div class="gs-title">Bluetooth <span class="tag">Android Chrome</span></div>
+      <p class="fine" id="gBleNote">Reads the thermometer directly every few seconds. No internet needed.</p>
+      <button class="btn ghost wide" id="btnGBle">Pair over Bluetooth</button>
+    </div>
+
+    <button class="btn text wide" id="btnGForget" hidden>Disconnect thermometer</button>
+  </div>
+</div>
+
 <!-- Settings -->
 <div id="settings" class="overlay sheet" hidden>
   <div class="sheet-inner">
@@ -190,8 +218,8 @@
         <button class="btn small" id="btnResetPresets">Reset</button></div>
       <label class="row"><span>Room gauge<small>Where the room temperature comes from.</small></span>
         <select id="setRoom"><option value="heater">Heater sensor</option><option value="govee">Govee thermometer</option></select></label>
-      <div class="row"><span>Thermometer <span class="muted" id="goveeStatus">Not paired</span></span>
-        <button class="btn small" id="btnPairGovee">Pair</button></div>
+      <div class="row"><span>Govee thermometer<small id="goveeStatus">Not set up</small></span>
+        <button class="btn small" id="btnPairGovee">Set up</button></div>
     </div>
 
     <div class="group">
@@ -224,6 +252,8 @@
         <select id="setProto"><option value="auto">Auto-detect</option><option value="B">Hcalory (B)</option><option value="A">AirHeater (A)</option></select></label>
       <label class="row">Heater PIN
         <input id="setPin" class="pin" inputmode="numeric" maxlength="4" autocomplete="off"></label>
+      <label class="row"><span>Govee reports in<small>Only for the Wi-Fi connection.</small></span>
+        <select id="setGUnit"><option value="F">°F</option><option value="C">°C</option></select></label>
       <label class="row">Heater reports in
         <select id="setHUnit"><option value="auto">Auto</option><option value="C">°C</option><option value="F">°F</option></select></label>
       <label class="row">Show all Bluetooth devices
@@ -234,7 +264,7 @@
     </div>
 
     <button class="btn ghost wide" id="btnDisconnect">Disconnect</button>
-    <p class="fine center"><span data-version>v1.15</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
+    <p class="fine center"><span data-version>v1.16</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
   </div>
 </div>
 

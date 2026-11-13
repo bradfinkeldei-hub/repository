@@ -117,7 +117,63 @@
     }
   }
 
-  const api = { decode, GoveeSensor, COMPANY_IDS };
+  /* ---------------- Wi-Fi (Govee cloud API) ---------------- */
+  // Works on any phone, including iPhone. Calls go through the site's own
+  // _worker.js relay (browsers can't call Govee directly).
+  const API = "https://openapi.api.govee.com/router/api/v1/";
+  class GoveeCloud {
+    constructor(onReading, log) { this.onReading = onReading; this.log = log || (() => {}); this.timer = null; }
+    async call(path, key, body) {
+      const opts = { method: body ? "POST" : "GET", headers: { "Govee-API-Key": key, "Content-Type": "application/json" } };
+      if (body) opts.body = JSON.stringify(body);
+      let r = null;
+      try {
+        r = await fetch("govee/" + path, opts);
+        if (!(r.headers.get("content-type") || "").includes("json")) r = null; // relay not installed
+      } catch { r = null; }
+      if (!r) {
+        try { r = await fetch(API + path, opts); }
+        catch { throw new Error("NO_RELAY"); }
+      }
+      let j = {};
+      try { j = await r.json(); } catch {}
+      if (r.status === 401 || r.status === 403 || j.code === 401) throw new Error("BAD_KEY");
+      if (!r.ok || (j.code && j.code !== 200)) throw new Error(j.message || j.msg || "Govee error " + r.status);
+      return j;
+    }
+    async list(key) {
+      const j = await this.call("user/devices", key);
+      return (j.data || []).filter((d) =>
+        /thermometer|sensor/i.test(d.type || "") ||
+        (d.capabilities || []).some((c) => /sensorTemperature/i.test(c.instance || "")));
+    }
+    async read(key, dev, unit = "F") {
+      const j = await this.call("device/state", key, { requestId: String(Date.now()), payload: { sku: dev.sku, device: dev.device } });
+      const caps = (j.payload && j.payload.capabilities) || [];
+      const val = (name) => { const c = caps.find((x) => (x.instance || "").toLowerCase() === name.toLowerCase()); return c && c.state ? c.state.value : null; };
+      let t = val("sensorTemperature");
+      if (t && typeof t === "object") t = t.currentTemperature ?? t.value;
+      let h = val("sensorHumidity");
+      if (h && typeof h === "object") h = h.currentHumidity ?? h.value;
+      if (t == null || isNaN(+t)) throw new Error("No temperature from Govee yet");
+      const tempC = unit === "C" ? +t : (+t - 32) * 5 / 9;
+      return { tempC: Math.round(tempC * 10) / 10, hum: h == null ? null : +h, batt: null, raw: +t };
+    }
+    start(key, dev, unit) {
+      this.stop();
+      const tick = async () => {
+        try {
+          const r = await this.read(key, dev, unit);
+          this.onReading({ ...r, model: dev.sku, name: dev.deviceName || dev.sku, via: "wifi", at: Date.now() });
+        } catch (e) { this.log("✗ govee wifi: " + e.message); }
+      };
+      tick();
+      this.timer = setInterval(tick, 60000); // Govee allows 10,000 calls a day; this uses 1,440
+    }
+    stop() { clearInterval(this.timer); this.timer = null; }
+  }
+
+  const api = { decode, GoveeSensor, GoveeCloud, COMPANY_IDS };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.EmberGovee = api;
 })(typeof window !== "undefined" ? window : globalThis);

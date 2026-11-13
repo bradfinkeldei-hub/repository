@@ -255,3 +255,19 @@ select { background: var(--surface); border: 1px solid var(--line); border-radiu
 .presets { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .temp-step .stepper output { font-size: 18px; }
 .preset-hint { text-align: center; color: var(--muted); font-size: 12px; margin: 10px 0 0; }
+
+/* Govee setup */
+.gs-opt { background: var(--surface-2); border-radius: 18px; padding: 14px 16px; margin-top: 14px; }
+.gs-title { font-weight: 500; display: flex; align-items: center; gap: 8px; }
+.tag { font-size: 11px; font-weight: 500; color: var(--ember-2); background: rgba(255,196,114,.1); border: 1px solid rgba(255,196,114,.25); padding: 2px 8px; border-radius: 999px; }
+.gs-steps { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.gs-steps b { color: var(--text); font-weight: 500; }
+.gs-row { display: flex; gap: 8px; margin-top: 12px; }
+.gs-row input { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; color: var(--text); font: 13px ui-monospace, Menlo, monospace; }
+.gs-list { display: grid; gap: 8px; margin-top: 10px; }
+.gs-dev { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(255,138,42,.45); background: rgba(255,122,42,.08); cursor: pointer; text-align: left; }
+.gs-dev b { font-weight: 500; }
+.gs-dev span { color: var(--muted); font-size: 12px; }
+.gs-msg { color: var(--ember-2); font-size: 13px; margin: 10px 0 0; min-height: 0; }
+.gs-msg:empty { display: none; }
+#gsetup, #tuner, #how { z-index: 12; }
