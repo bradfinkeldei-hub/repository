@@ -16,7 +16,7 @@
   const S = Object.assign({
     unit: usLocale ? "F" : "C", targetC: 21, mode: "thermo", cleanMins: 10, coachHours: 4,
     tank: 6, lead: 30, batt: true, battV: 11.5, native: false, proto: "auto", hUnit: "auto",
-    showAll: false, warmOn: false, warmTime: "06:30",
+    showAll: false, warmOn: false, warmTime: "06:30", room: "heater", goveeId: null,
   }, store.get("settings", {}));
   const stats = Object.assign({ runSec: 0, lowSec: 0, sinceFillL: 0, days: {} }, store.get("stats", {}));
   const saveS = () => store.set("settings", S);
@@ -179,8 +179,37 @@
     clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), ms);
   }
 
+  /* ---------------- Govee room gauge ---------------- */
+  let govee = null;
+  const gsensor = new window.EmberGovee.GoveeSensor((r) => { govee = r; render(); }, log);
+  const goveeLive = () => !!govee && Date.now() - govee.at < 180000;
+  const useGovee = () => S.room === "govee" && goveeLive();
+
+  async function pairGovee() {
+    try {
+      if (demo) {
+        gsensor.startSim(() => (link && link.room != null ? link.room : null));
+        S.goveeId = "demo";
+      } else {
+        S.goveeId = await gsensor.pick();
+        toast("Thermometer paired. Readings appear in a few seconds.");
+      }
+      S.room = "govee"; $("setRoom").value = "govee"; saveS(); lastThermo = 0; render();
+    } catch (e) {
+      if (e.message === "NO_WATCH") toast("Chrome needs one setting: open chrome://flags, turn on “Experimental Web Platform features”, restart Chrome.", 9000);
+      else if (!/cancel/i.test(e.message)) toast("Couldn't pair: " + e.message, 5000);
+    }
+  }
+
+  async function restoreGovee() {
+    if (S.room !== "govee" || !S.goveeId || goveeLive()) return;
+    if (demo) return gsensor.startSim(() => (link && link.room != null ? link.room : null));
+    try { await gsensor.restore(S.goveeId); } catch (e) { log("✗ govee " + e.message); }
+  }
+
   const heaterUnit = () => (S.hUnit !== "auto" ? S.hUnit : heater && heater.proto ? heater.proto.unit : "C");
   const ambientC = () => {
+    if (useGovee()) return govee.tempC;
     const s = heater && heater.status;
     if (!s || s.ambient == null) return null;
     return heaterUnit() === "F" ? fToC(s.ambient) : s.ambient;
@@ -218,6 +247,7 @@
       }
       showMain();
       keepAwake();
+      restoreGovee();
       if (clean && heater.status && isOn(heater.status)) resumeClean();
       else if (clean) { clean = null; store.set("clean", null); }
     } catch (e) {
@@ -308,7 +338,7 @@
   async function thermostat() {
     const s = heater && heater.status;
     if (!s || s.power !== "running" || S.mode !== "thermo" || clean || heater.busy) return;
-    if (S.native && heater.proto.hasThermostat) {
+    if (S.native && heater.proto.hasThermostat && S.room !== "govee") {
       await heater.ensureMode("thermostat");
       const want = Math.round(heaterUnit() === "F" ? cToF(S.targetC) : S.targetC);
       if (heater.status.setpoint !== want) heater.stepTo(want, "setpoint");
@@ -409,7 +439,8 @@
     const room = ambientC();
     if (room == null) { $("dRoom").textContent = "Room —"; $("roomDot").style.display = "none"; }
     else {
-      $("dRoom").textContent = "Room " + show(room) + "°";
+      $("dRoom").textContent = "Room " + show(room) + "°" +
+        (useGovee() ? " · " + Math.round(govee.hum) + "%" : S.room === "govee" ? " · heater" : "");
       const [rx, ry] = pt(A0 + SWEEP * frac(show(room)));
       $("roomDot").style.display = ""; $("roomDot").setAttribute("cx", rx); $("roomDot").setAttribute("cy", ry);
     }
@@ -486,6 +517,11 @@
     $("sBody").textContent = b != null && s && s.power !== "off" ? show(b) + "°" : "—";
     $("sHours").textContent = (stats.runSec / 3600).toFixed(1);
     $("protoName").textContent = heater && heater.proto ? (heater.proto.id === "B" ? "Hcalory (B)" : "AirHeater (A)") : "—";
+    $("btnGovee").hidden = !(S.room === "govee" && !goveeLive() && heater);
+    $("goveeStatus").textContent = goveeLive()
+      ? `${govee.model} · ${show(govee.tempC)}° · ${Math.round(govee.hum)}% · battery ${govee.batt}%`
+      : S.goveeId ? "Paired, waiting for reading" : "Not paired";
+    $("btnPairGovee").textContent = S.goveeId ? "Re-pair" : "Pair";
     $("nativeRow").hidden = !(heater && heater.proto && heater.proto.hasThermostat);
   }
 
@@ -572,7 +608,10 @@
   bind("setUnit", "unit"); bind("setClean", "cleanMins", 1); bind("setCoach", "coachHours", 1);
   bind("setTank", "tank", 1); bind("setLead", "lead", 1); bind("setBatt", "batt");
   bind("setBattV", "battV", 1); bind("setNative", "native"); bind("setProto", "proto");
-  bind("setHUnit", "hUnit"); bind("setAll", "showAll");
+  bind("setHUnit", "hUnit"); bind("setAll", "showAll"); bind("setRoom", "room");
+  $("setRoom").addEventListener("change", () => { lastThermo = 0; if (S.room === "govee" && !goveeLive()) (S.goveeId ? restoreGovee() : pairGovee()); });
+  $("btnPairGovee").onclick = pairGovee;
+  $("btnGovee").onclick = pairGovee; // the picker needs a tap, so this always opens it
   $("btnSettings").onclick = () => { $("settings").hidden = false; log("· settings opened"); };
   $("btnClose").onclick = () => ($("settings").hidden = true);
   $("settings").addEventListener("click", (e) => { if (e.target.id === "settings") $("settings").hidden = true; });
@@ -581,7 +620,7 @@
     try { await navigator.clipboard.writeText(text); toast("Log copied"); } catch { toast("Couldn't copy"); }
   };
   $("btnDisconnect").onclick = () => {
-    link && link.disconnect(); link = null; heater = null;
+    link && link.disconnect(); link = null; heater = null; gsensor.stop(); govee = null;
     $("settings").hidden = true; $("main").hidden = true; $("connect").hidden = false;
     $("connectMsg").textContent = "";
   };

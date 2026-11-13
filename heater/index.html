@@ -76,6 +76,7 @@
       <button class="step" id="plus" aria-label="Warmer">+</button>
     </div>
     <div class="presets" id="presets"></div>
+    <button id="btnGovee" class="chip" hidden>Connect Govee thermometer</button>
   </div>
 
   <!-- Manual -->
@@ -149,6 +150,13 @@
     <div class="sheet-head"><h2>Settings</h2><button class="icon-btn" id="btnClose" aria-label="Close">✕</button></div>
 
     <div class="group">
+      <label class="row">Room gauge
+        <select id="setRoom"><option value="heater">Heater sensor</option><option value="govee">Govee thermometer</option></select></label>
+      <div class="row"><span>Thermometer <span class="muted" id="goveeStatus">Not paired</span></span>
+        <button class="btn small" id="btnPairGovee">Pair</button></div>
+    </div>
+
+    <div class="group">
       <label class="row">Temperature
         <select id="setUnit"><option value="F">°F</option><option value="C">°C</option></select></label>
       <label class="row">Clean shutdown length
@@ -191,6 +199,7 @@
 <div id="toast" class="toast" role="status" hidden></div>
 
 <script src="protocol.js"></script>
+<script src="govee.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

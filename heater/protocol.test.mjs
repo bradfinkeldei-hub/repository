@@ -45,3 +45,27 @@ test("simulator answers format A only", async () => {
   await sim.write(P.A.poll()); await new Promise((r) => setTimeout(r, 100));
   assert.ok(P.A.looksLike(got)); sim.disconnect();
 });
+
+const G = createRequire(import.meta.url)("./govee.js");
+test("Govee H5075 packed format", () => {
+  // 0x03 0x45 0x7B = 214395 -> 21.4°C, 39.5 %, battery 87
+  const r = G.decode(0xec88, [0x00, 0x03, 0x45, 0x7b, 87, 0x00], "GVH5075_1A2B");
+  assert.equal(r.tempC, 21.4); assert.equal(r.hum, 39.5); assert.equal(r.batt, 87); assert.equal(r.model, "H5075");
+});
+test("Govee negative temperature", () => {
+  const r = G.decode(0xec88, [0x00, 0x80 | 0x00, 0xc3, 0x50, 60, 0x00], "GVH5075"); // -5.0°C, 0 %
+  assert.equal(r.tempC, -5);
+});
+test("Govee H5101 / H5100 format", () => {
+  const r = G.decode(0x0001, [0x01, 0x01, 0x03, 0x45, 0x7b, 64], "GVH5101_AB12");
+  assert.equal(r.tempC, 21.4); assert.equal(r.batt, 64);
+});
+test("Govee H5074 and H5179 little-endian formats", () => {
+  const a = G.decode(0xec88, [0x00, 0x5c, 0x08, 0x10, 0x0e, 77, 0x02], "Govee_H5074_ABCD");
+  assert.equal(a.tempC, 21.4); assert.equal(a.hum, 36); assert.equal(a.batt, 77);
+  const b = G.decode(0x8801, [0, 0, 0, 0, 0x5c, 0x08, 0x10, 0x0e, 90], "Govee_H5179_ABCD");
+  assert.equal(b.tempC, 21.4); assert.equal(b.model, "H5179");
+});
+test("Govee ignores unrelated data", () => {
+  assert.equal(G.decode(0x004c, [1, 2, 3], "iPhone"), null);
+});

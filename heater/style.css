@@ -51,7 +51,7 @@ button, select, input { font: inherit; color: inherit; }
 }
 .btn.ghost { background: transparent; border: 1px solid rgba(255,255,255,.14); }
 .btn.text { background: transparent; color: var(--muted); }
-.btn.small { padding: 8px 14px; font-size: 13px; background: var(--surface-2); border: 1px solid var(--line); }
+.btn.small { white-space: nowrap; padding: 8px 14px; font-size: 13px; background: var(--surface-2); border: 1px solid var(--line); }
 .btn.wide { display: block; width: 100%; margin-top: 12px; }
 .btn.big { padding: 17px 22px; font-size: 16px; margin-top: 18px; }
 .icon-btn {
@@ -194,4 +194,9 @@ select { background: var(--surface); border: 1px solid var(--line); border-radiu
   background: #26262b; border: 1px solid var(--line); padding: 12px 18px; border-radius: 999px;
   z-index: 20; font-size: 14px; max-width: calc(100% - 32px); text-align: center;
   box-shadow: 0 10px 30px rgba(0,0,0,.5);
+}
+
+.chip {
+  display: block; margin: 12px auto 0; padding: 9px 16px; border-radius: 999px; cursor: pointer;
+  background: rgba(143, 182, 255, .08); border: 1px solid rgba(143, 182, 255, .35); color: var(--cool); font-size: 13px;
 }
