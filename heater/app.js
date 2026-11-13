@@ -196,7 +196,9 @@
       }
       S.room = "govee"; $("setRoom").value = "govee"; saveS(); lastThermo = 0; render();
     } catch (e) {
-      if (e.message === "NO_WATCH") toast("Chrome needs one setting: open chrome://flags, turn on “Experimental Web Platform features”, restart Chrome.", 9000);
+      if (e.message === "NO_WATCH") toast(/iPhone|iPad/.test(navigator.userAgent)
+        ? "This browser can't read the thermometer yet. Using the heater's sensor for now."
+        : "Chrome needs one setting: open chrome://flags, turn on “Experimental Web Platform features”, restart Chrome.", 9000);
       else if (!/cancel/i.test(e.message)) toast("Couldn't pair: " + e.message, 5000);
     }
   }
