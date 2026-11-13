@@ -360,3 +360,7 @@ body { max-width: 100%; }
 .aw-target small { color: var(--muted); font-size: 13px; }
 .aw-msg { text-align: center; color: var(--ember-2); font-size: 13px; margin: 12px 0 0; min-height: 18px; }
 #awaySetup { z-index: 12; }
+.aw-seg { margin: 0 0 6px; }
+#away .level-big { margin: 22px 0 14px; }
+.aw-off .btn.primary { background: linear-gradient(135deg, #3a3a40, #2a2a2f); color: var(--text); box-shadow: none; border: 1px solid rgba(255,196,114,.35); }
+.level-big small span { font-size: inherit; letter-spacing: 0; }

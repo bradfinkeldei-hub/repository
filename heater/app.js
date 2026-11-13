@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.21"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.22"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1058,7 +1058,7 @@
    * Away: your phone reads that status and sends commands. Both go through the
    * site's _worker.js (Cloudflare KV), protected by a PIN you choose. */
   const pinOf = (v) => String(v || "").replace(/\D/g, "");
-  const GW_EVERY = FAST > 1 ? 2000 : 10000;
+  const GW_EVERY = FAST > 1 ? 1000 : 5000; // how often the home device checks in, and the away screen refreshes
   const remoteMsg = (e) => ({
     NOT_SET_UP: "Cloudflare storage isn't switched on yet. Follow “Control from away” in the setup guide.",
     NO_RELAY: "Your Cloudflare site needs the latest Ember zip (with _worker.js).",
@@ -1099,6 +1099,7 @@
     const s = heater.status;
     if (c.action === "start" && s && (s.power === "off" || s.power === "cooling")) { lastThermo = 0; await heater.start(); toast("Started from away"); }
     else if (c.action === "stop" && s && isOn(s) && !clean) { await beginClean("shutdown"); }
+    else if (c.action === "stopnow" && s && (isOn(s) || clean)) { await turnOff(); }
     else if (c.action === "tune") {
       const t = S.tunes.find((x) => x.id === c.value);
       if (t) { S.tuneId = t.id; if (t.targetC != null) S.targetC = t.targetC; S.mode = "thermo"; }
@@ -1115,7 +1116,8 @@
     if (!S.gateway || !S.homePin || gwBusy || !heater) return;
     gwBusy = true;
     try {
-      const { cmds = [] } = await rcall("GET", "cmd?after=" + (S.gwLastId || 0), null, S.homePin);
+      const { cmds = [], watchAt = 0, now: srvNow = Date.now() } = await rcall("GET", "cmd?after=" + (S.gwLastId || 0), null, S.homePin);
+      const watched = srvNow - watchAt < 150000; // someone has the away screen open
       for (const c of cmds) {
         S.gwLastId = Math.max(S.gwLastId || 0, c.id); saveS();
         if (Date.now() - c.at > 15 * 60000) { log("· skipped an old remote command: " + c.action); continue; }
@@ -1125,9 +1127,13 @@
       // (and every 10 min regardless) to stay inside Cloudflare's free KV limits.
       const st = snapshot();
       const key = JSON.stringify([st.connected, st.power, st.fault, !!st.clean, st.mode, st.tuneId, Math.round(st.targetC * 2), st.tunes.map((t) => t.id + t.name + t.targetC).join()]);
-      const minor = JSON.stringify([st.level, st.roomC == null ? null : Math.round(st.roomC), Math.round(st.leftL / GAL * 4)]);
+      const minor = JSON.stringify([st.level, st.roomC == null ? null : Math.round(st.roomC), Math.round(st.leftL / GAL * 4), st.power]);
       const since = Date.now() - gwPushAt;
-      if (key !== gwKey || (minor !== gwMinor && since > 180000) || since > 600000) {
+      // Watched: send any change within 10 s and check in every minute.
+      // Not watched: send minor changes every 3 min and check in every 10 min (free-tier friendly).
+      const due = watched ? (minor !== gwMinor && since > 10000 / FAST) || since > 60000 / FAST
+                          : (minor !== gwMinor && since > 180000) || since > 600000;
+      if (key !== gwKey || due) {
         await rcall("POST", "state", st, S.homePin);
         gwKey = key; gwMinor = minor; gwPushAt = Date.now();
       }
@@ -1171,13 +1177,18 @@
   }
 
   /* ----- Away (your phone) ----- */
-  let awTimer = null, awState = null, awNow = 0, awPending = null, awArmed = 0, awTarget = null, awTargetTimer = null;
+  let awTimer = null, awState = null, awNow = 0, awPending = null, awArmed = 0, awTarget = null, awTargetTimer = null, awView = null, awLvl = null;
   function openAway() {
     if (!S.awayPin) return openPin("away");
     $("connect").hidden = true; $("main").hidden = true; $("away").hidden = false;
     awayPoll(); clearInterval(awTimer); awTimer = setInterval(awayPoll, GW_EVERY);
+    awayWatch(); clearInterval(awWatchTimer); awWatchTimer = setInterval(awayWatch, FAST > 1 ? 5000 : 60000);
   }
-  function closeAway() { clearInterval(awTimer); $("away").hidden = true; $("connect").hidden = false; }
+  function closeAway() { clearInterval(awTimer); clearInterval(awWatchTimer); $("away").hidden = true; $("connect").hidden = false; }
+  // Tell the home device someone is watching, so it sends updates every few seconds.
+  let awWatchTimer = null;
+  const awayWatch = () => { if (!document.hidden && S.awayPin) rcall("POST", "watch", null, S.awayPin).catch(() => {}); };
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("away").hidden) { awayWatch(); awayPoll(); } });
   $("btnAway").onclick = openAway;
   $("btnAwayExit").onclick = closeAway;
   $("btnAwsClose").onclick = () => ($("awaySetup").hidden = true);
@@ -1227,7 +1238,8 @@
     const stale = age > 15 * 60000;
     $("awPill").className = "pill" + (stale || !st.connected ? " warn" : "");
     $("awPillText").textContent = stale ? "Home offline?" : st.connected ? "Home online" : "Heater not connected";
-    $("awFresh").textContent = `Home device updated ${mins < 1 ? "just now" : mins + " min ago"}${st.name ? " · " + st.name : ""}`;
+    const secs = Math.round(age / 1000);
+    $("awFresh").textContent = `Updated ${secs < 10 ? "just now" : secs < 90 ? secs + " s ago" : mins + " min ago"}${st.name ? " · " + st.name : ""}`;
 
     // Status bar (same look as at home)
     const max = st.max || 10, on = st.power === "running" || st.power === "starting";
@@ -1236,7 +1248,7 @@
     if (!st.connected) { state = "warn"; label = "Heater not connected at home"; }
     if (st.clean) {
       const left = Math.max(0, st.clean.endAt - st.at - age);
-      state = "clean"; label = `Clean shutdown · about ${Math.max(1, Math.ceil(left / 60000))} min left`;
+      state = "clean"; label = `Clean shutdown · ${Math.max(1, Math.ceil(left / 60000))} min`;
     }
     $("awBar").dataset.state = state; $("awState").textContent = label;
     $("awLevel").innerHTML = on && st.level != null ? `Level <b>${st.level}</b><small> / ${max}</small>` : on && st.setpoint != null ? `Heater set <b>${st.setpoint}°</b>` : st.mode === "manual" ? `Runs level ${st.manualLevel || "—"}` : `Runs level ${st.hold}–${st.top}`;
@@ -1253,32 +1265,63 @@
     $("awRoom").textContent = st.roomC != null ? `Room ${show(st.roomC)}° (${st.roomSrc})` : "Room —";
     const esc = (x) => String(x).replace(/[<&"]/g, (m) => ({ "<": "&lt;", "&": "&amp;", '"': "&quot;" }[m]));
     $("awPresets").innerHTML = st.tunes.map((t) => `<button class="preset${t.id === st.tuneId && st.mode !== "manual" ? " on" : ""}" data-tune="${t.id}"><b>${show(t.targetC ?? st.targetC)}°</b><span>${esc(t.name)}</span></button>`).join("");
+    // Thermostat / Power level view
+    const view = awView || st.mode;
+    document.querySelectorAll("#away [data-awmode]").forEach((b) => b.classList.toggle("on", b.dataset.awmode === view));
+    $("awThermo").hidden = view !== "thermo"; $("awManual").hidden = view !== "manual";
+    const lvlNow = awLvl ?? (st.mode === "manual" ? (on && st.level != null ? st.level : st.manualLevel) : on ? st.level : null) ?? 1;
+    $("awLvl").textContent = lvlNow; $("awMax").textContent = max;
+    const bars = $("awBars");
+    if (bars.children.length !== max) bars.innerHTML = Array.from({ length: max }, (_, i) => `<button class="bar" data-l="${i + 1}" style="height:${30 + (70 * (i + 1)) / max}%" aria-label="Level ${i + 1}"></button>`).join("");
+    [...bars.children].forEach((b, i) => b.classList.toggle("on", i < lvlNow));
+
+    // Power: start, or shut down (clean or right away)
+    const live = st.connected && !stale && st.power !== "error";
     const btn = $("awPower");
-    btn.disabled = !st.connected || stale || st.power === "error" || !!st.clean;
-    if (Date.now() - awArmed > 4000) {
-      btn.textContent = on ? "Turn off" : st.power === "cooling" ? "Cooling down…" : "Start heating";
-      btn.classList.toggle("off", on);
-    }
+    btn.hidden = on || !!st.clean;
+    btn.disabled = !live || st.power === "cooling";
+    if (Date.now() - awArmed > 4000) btn.textContent = st.power === "cooling" ? "Cooling down…" : "Start heating";
+    $("awOff").hidden = !(on || st.clean);
+    $("awClean").hidden = !!st.clean; $("awClean").disabled = !live;
+    $("awOffNow").disabled = !live;
+    $("awOffNow").textContent = st.clean ? "Skip clean burn · off now" : "Off now";
     // Clear the "sent" note once the home device has caught up.
     if (awPending && (st.serverAt || 0) > awPending.at) {
       const done = (awPending.action === "start" && on) || (awPending.action === "stop" && (st.clean || st.power === "cooling" || st.power === "off")) ||
-        (awPending.action === "tune" && st.tuneId === awPending.value) || (awPending.action === "target" && Math.abs(st.targetC - awPending.value) < 0.3);
-      if (done) { $("awMsg").textContent = "Done ✓ The heater has it."; awPending = null; if (!awTargetTimer) awTarget = null; }
+        (awPending.action === "tune" && st.tuneId === awPending.value) || (awPending.action === "target" && Math.abs(st.targetC - awPending.value) < 0.3) ||
+        (awPending.action === "stopnow" && (st.power === "cooling" || st.power === "off")) ||
+        (awPending.action === "mode" && st.mode === awPending.value) ||
+        (awPending.action === "level" && st.mode === "manual" && (on ? st.level === awPending.value : st.manualLevel === awPending.value));
+      if (done) { $("awMsg").textContent = "Done ✓ The heater has it."; awPending = null; awView = null; awLvl = null; if (!awTargetTimer) awTarget = null; }
     }
   }
   $("awPower").onclick = () => {
-    const st = awState; if (!st) return;
-    const on = st.power === "running" || st.power === "starting";
+    if (!awState) return;
     if (Date.now() - awArmed > 4000) {
       awArmed = Date.now();
-      $("awPower").textContent = on ? "Tap again to turn off" : "Tap again to start heating";
+      $("awPower").textContent = "Tap again to start heating";
       return setTimeout(renderAway, 4100);
     }
     awArmed = 0;
-    if (on) awaySend("stop", null, "Sent. It will do the clean shutdown, then turn off.");
-    else awaySend("start", null, "Sent. The heater should start within about a minute.");
+    awaySend("start", null, "Sent. The heater should start within about a minute.");
     renderAway();
   };
+  $("awClean").onclick = () => awaySend("stop", null, "Sent. It runs the clean shutdown, then turns off.");
+  $("awOffNow").onclick = () => {
+    if (!confirm("Turn the heater off now, without the clean burn?")) return;
+    awaySend("stopnow", null, "Sent. The heater turns off and cools down.");
+  };
+  // Thermostat / Power level from away
+  document.querySelectorAll("#away [data-awmode]").forEach((b) => (b.onclick = () => {
+    if (!awState || awState.mode === b.dataset.awmode && !awView) return renderAway();
+    awView = b.dataset.awmode; awLvl = null; renderAway();
+    awaySend("mode", awView, awView === "manual" ? "Sent: power level mode." : "Sent: thermostat mode.");
+  }));
+  $("awBars").addEventListener("click", (e) => {
+    const b = e.target.closest(".bar"); if (!b || !awState) return;
+    awView = "manual"; awLvl = +b.dataset.l; renderAway();
+    awaySend("level", awLvl, `Sent: level ${awLvl}.`);
+  });
   const bumpAway = (d) => {
     if (!awState) return;
     const cur = awTarget ?? show(awState.targetC);

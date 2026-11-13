@@ -76,9 +76,12 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 3. Leave it plugged in, with Ember open, the screen on and Auto-Lock set to Never.
 
 **On your phone:** open Ember → **🏠 Control from away** → enter your PIN.
-- **Commands take about a minute** to reach the heater.
-- **Starting the heater** needs two taps, so it can't start by accident.
-- **Turn off** runs the clean shutdown first.
+- **Start:** needs two taps, so it can't start by accident.
+- **Thermostat:** pick a temperature or a preset button.
+- **Power level:** tap levels 1–10 to set the speed directly.
+- **Clean shutdown:** runs at full power for your clean-burn time, then turns off.
+- **Off now:** turns off right away. It also works during a clean shutdown.
+- **Updates:** while the away screen is open, the status updates every few seconds and the "Updated … ago" line shows how fresh it is. Commands usually arrive within seconds, and can take up to about a minute.
 
 **Security:**
 - **A PIN you choose protects away control.** Only a salted, scrambled (hashed) version of it is stored.

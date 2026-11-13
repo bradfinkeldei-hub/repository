@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b0b0d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Ember Heater v1.21</title>
+<title>Ember Heater v1.22</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-512.png">
@@ -24,7 +24,7 @@
       <defs><linearGradient id="mg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff5a1f"/><stop offset="1" stop-color="#ffc06a"/></linearGradient></defs>
       <path fill="url(#mg)" d="M32 4c2 10 14 16 14 32a14 14 0 0 1-28 0c0-7 3-11 6-14 0 5 2 8 5 9-1-10 1-19 3-27z"/>
     </svg>
-    <h1>Ember <span class="ver" data-version>v1.21</span></h1>
+    <h1>Ember <span class="ver" data-version>v1.22</span></h1>
     <p class="sub">Smarter control for your Hcalory heater</p>
     <button id="btnConnect" class="btn primary wide">Connect heater</button>
     <button id="btnAll" class="btn ghost wide">Don't see it? Show all devices</button>
@@ -39,7 +39,7 @@
 <!-- Main -->
 <section id="main" class="screen" hidden>
   <header class="top">
-    <div class="brand">Ember <span class="ver" data-version>v1.21</span></div>
+    <div class="brand">Ember <span class="ver" data-version>v1.22</span></div>
     <div class="pill" id="pill"><span class="dot"></span><span id="pillText">Connected</span></div>
     <button class="icon-btn" id="btnSettings" aria-label="Settings">
       <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
@@ -161,13 +161,29 @@
     <div class="sb-row"><span class="sb-setting" id="awSetting"></span><span class="sb-fuel" id="awFuel"></span></div>
   </section>
   <p class="aw-fresh" id="awFresh"></p>
-  <div class="aw-temp">
-    <button class="step" id="awMinus" aria-label="Cooler">−</button>
-    <div class="aw-target"><span>SET TO</span><b id="awTarget">—</b><small id="awRoom">Room —</small></div>
-    <button class="step" id="awPlus" aria-label="Warmer">+</button>
+  <div class="seg aw-seg" role="tablist">
+    <button class="seg-btn" data-awmode="thermo">Thermostat</button>
+    <button class="seg-btn" data-awmode="manual">Power level</button>
   </div>
-  <div class="presets" id="awPresets"></div>
+  <div id="awThermo">
+    <div class="aw-temp">
+      <button class="step" id="awMinus" aria-label="Cooler">−</button>
+      <div class="aw-target"><span>SET TO</span><b id="awTarget">—</b><small id="awRoom">Room —</small></div>
+      <button class="step" id="awPlus" aria-label="Warmer">+</button>
+    </div>
+    <div class="presets" id="awPresets"></div>
+  </div>
+  <div id="awManual" hidden>
+    <div class="level-big"><span id="awLvl">—</span><small>of <span id="awMax">10</span></small></div>
+    <div class="bars" id="awBars"></div>
+    <p class="hint">Tap a level. Higher burns cleaner.</p>
+  </div>
   <button id="awPower" class="btn primary wide big" disabled>Start heating</button>
+  <div class="aw-off" id="awOff" hidden>
+    <button id="awClean" class="btn primary wide big">Clean shutdown</button>
+    <button id="awOffNow" class="btn ghost wide">Off now</button>
+    <p class="fine center">Clean shutdown runs at full power for your clean-burn time, then turns off. Off now skips that.</p>
+  </div>
   <p class="aw-msg" id="awMsg"></p>
   <p class="fine center">Commands go to the device at home and usually reach the heater within a minute.</p>
   <button class="btn text wide" id="btnAwayForget">Use a different PIN</button>
@@ -326,7 +342,7 @@
     </div>
 
     <button class="btn ghost wide" id="btnDisconnect">Disconnect</button>
-    <p class="fine center"><span data-version>v1.21</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
+    <p class="fine center"><span data-version>v1.22</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
   </div>
 </div>
 

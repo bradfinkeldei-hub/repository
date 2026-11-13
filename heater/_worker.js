@@ -9,7 +9,7 @@
 //    Protected by a PIN you choose; only a salted hash of it is stored.
 const GOVEE = "https://openapi.api.govee.com/router/api/v1/";
 const ALLOWED = { "user/devices": "GET", "device/state": "POST" };
-const ACTIONS = new Set(["start", "stop", "tune", "target", "mode", "level"]);
+const ACTIONS = new Set(["start", "stop", "stopnow", "tune", "target", "mode", "level"]);
 
 const json = (status, body) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
@@ -71,7 +71,7 @@ async function remote(request, env, path) {
       if (!ACTIONS.has(c.action)) return json(400, { code: 400, message: "Unknown action" });
       // Only sensible values get through to the heater.
       const v = c.value;
-      const ok = { start: v == null, stop: v == null,
+      const ok = { start: v == null, stop: v == null, stopnow: v == null,
         tune: typeof v === "string" && /^[\w-]{1,40}$/.test(v),
         target: typeof v === "number" && v >= 4 && v <= 32,
         mode: v === "thermo" || v === "manual",
@@ -86,7 +86,14 @@ async function remote(request, env, path) {
     if (path === "cmd" && request.method === "GET") {
       const after = Number(new URL(request.url).searchParams.get("after") || 0);
       const list = (await env.EMBER.get("cmd", { type: "json" })) || [];
-      return json(200, { code: 200, cmds: list.filter((c) => c.id > after), now: Date.now() });
+      const watchAt = Number(await env.EMBER.get("watch")) || 0;
+      return json(200, { code: 200, cmds: list.filter((c) => c.id > after), watchAt, now: Date.now() });
+    }
+    // Your phone: "I'm watching" (about once a minute while the away screen is open),
+    // so the home device sends updates every few seconds instead of every few minutes.
+    if (path === "watch" && request.method === "POST") {
+      await env.EMBER.put("watch", String(Date.now()), { expirationTtl: 600 });
+      return json(200, { code: 200 });
     }
   } catch (e) {
     return json(400, { code: 400, message: "Bad request" });
