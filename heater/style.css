@@ -254,3 +254,4 @@ select { background: var(--surface); border: 1px solid var(--line); border-radiu
 .preset.add b { font-weight: 300; }
 .presets { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .temp-step .stepper output { font-size: 18px; }
+.preset-hint { text-align: center; color: var(--muted); font-size: 12px; margin: 10px 0 0; }

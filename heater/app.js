@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.14"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.15"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -25,6 +25,16 @@
   // Heating styles ("tunes"): Standard is built in; custom ones are saved on this phone.
   const STD = () => ({ id: "std", name: "Standard", max: 10, bandC: 3, hold: S.minLevel || 2, clean: S.cleanMins });
   const tune = () => S.tunes.find((t) => t.id === S.tuneId) || STD();
+  // The four starter buttons are ordinary tunes, so every one can be edited.
+  const STARTERS = [["Frost", 5], ["Sleep", 17], ["Comfort", 21], ["Boost", 25]];
+  const starterTunes = () => STARTERS.map(([n, c]) => ({ id: "p-" + n.toLowerCase(), name: n, targetC: c, max: 10, bandC: 3, hold: S.minLevel || 2, clean: S.cleanMins }));
+  if (!S.seeded) {
+    S.tunes = [...starterTunes(), ...S.tunes];
+    S.seeded = true;
+    const match = S.tunes.find((t) => Math.abs(t.targetC - S.targetC) < 0.3);
+    if (S.tuneId === "std" && match) S.tuneId = match.id;
+    store.set("settings", S);
+  }
   const GAL = 3.785; // litres per US gallon (fuel use is tracked in litres, shown in gallons)
   const saveStats = () => store.set("stats", stats);
 
@@ -586,15 +596,14 @@
   function renderPresets() {
     const esc = (x) => String(x).replace(/[<&"]/g, (m) => ({ "<": "&lt;", "&": "&amp;", '"': "&quot;" }[m]));
     $("presets").innerHTML =
-      PRESETS.map(([n, c]) => `<button class="preset" data-c="${c}"><b>${show(c)}°</b><span>${n}</span></button>`).join("") +
-      S.tunes.map((t) => `<button class="preset custom" data-tune="${t.id}"><b>${show(t.targetC ?? S.targetC)}°</b><span>${esc(t.name)}</span></button>`).join("") +
+      S.tunes.map((t) => `<button class="preset" data-tune="${t.id}"><b>${show(t.targetC ?? S.targetC)}°</b><span>${esc(t.name)}</span></button>`).join("") +
       `<button class="preset add" data-new="1"><b>＋</b><span>Custom</span></button>`;
     markPresets();
   }
   function markPresets() {
     const v = show(S.targetC);
     document.querySelectorAll(".preset").forEach((b) => {
-      const on = b.dataset.tune ? b.dataset.tune === S.tuneId : b.dataset.c ? S.tuneId === "std" && show(+b.dataset.c) === v : false;
+      const on = !!b.dataset.tune && b.dataset.tune === S.tuneId;
       b.classList.toggle("on", on);
     });
   }
@@ -786,8 +795,13 @@
       saveS(); lastThermo = 0; render();
       return toast(`${t.name}: ${show(S.targetC)}° · tap again to edit`);
     }
-    S.tuneId = "std"; saveS(); setTarget(show(+b.dataset.c)); render();
   });
+  $("btnResetPresets").onclick = () => {
+    const custom = S.tunes.filter((t) => !t.id.startsWith("p-"));
+    S.tunes = [...starterTunes(), ...custom];
+    if (!S.tunes.some((t) => t.id === S.tuneId)) S.tuneId = "p-comfort";
+    saveS(); renderPresets(); render(); toast("Frost, Sleep, Comfort and Boost reset");
+  };
 
   document.querySelectorAll(".seg-btn[data-mode]").forEach((b) => (b.onclick = () => { S.mode = b.dataset.mode; saveS(); lastThermo = 0; render(); }));
 
@@ -833,7 +847,7 @@
   const bandFrom = (d) => (S.unit === "F" ? d * 5 / 9 : d);
   function openTuner(base) {
     const T = base || tune();
-    const isNew = !base && T.id === "std" || base === "new";
+    const isNew = (!base && T.id === "std") || base === "new";
     const src = base === "new" ? tune() : T;
     draft = { ...src, band: bandShow(src.bandC), temp: show(src.targetC ?? S.targetC), id: isNew ? "t" + Date.now() : src.id, isNew };
     if (isNew) draft.name = "Custom " + (S.tunes.length + 1);
