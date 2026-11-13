@@ -46,7 +46,7 @@
     async pick(showAll, log) {
       const all = { acceptAllDevices: true, optionalServices: [P.SERVICE] };
       const filtered = {
-        filters: [{ services: [P.SERVICE] }, ...["HC", "Hc", "TY", "Air", "BT", "Heater"].map((n) => ({ namePrefix: n }))],
+        filters: [{ services: [P.SERVICE] }, ...["hcalory", "Hcalory", "HCALORY", "hc", "HC", "Hc", "TY", "Air", "BT", "Heater"].map((n) => ({ namePrefix: n }))],
         optionalServices: [P.SERVICE],
       };
       if (showAll) this.device = await navigator.bluetooth.requestDevice(all);
