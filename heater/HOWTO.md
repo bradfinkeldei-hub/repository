@@ -136,6 +136,7 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 | Problem | Fix |
 | --- | --- |
 | Heater not in the list | Force-close the Hcalory app, toggle Bluetooth off and on, and try **Show all devices**. In iPhone Settings → Bluefy, make sure **Bluetooth** is on. |
+| Heater shows a fault (E-xx) | Tap **Try again** (it clears the fault, then restarts) or **Reset** (clears it and stays off). Both work from away too. After 3 failed tries, check fuel, the fuel line and the exhaust before trying again. For a carbon monoxide fault (E-10/E-11), Ember won't restart the heater. Ventilate and check the exhaust first. If the fault won't clear, switch the heater's main power off for 30 seconds. |
 | Connected, but no reply | Settings → **Copy log**, and include it when you ask for help. |
 | Didn't reach full power or didn't turn off | Make sure the screen stayed on. Then Settings → **Copy log**. |
 | "Missing the Govee relay" | Re-upload the full zip (it includes `_worker.js`). |

@@ -288,7 +288,7 @@
     constructor(speed = 1) {
       this.speed = speed; this.transport = "bd39";
       this.state = 0; this.step = 0; this.mode = 2; this.level = 4; this.temp = 21;
-      this.room = 9; this.body = 12; this.volts = 12.9; this.timer = 0; this.authed = false;
+      this.room = 9; this.body = 12; this.volts = 12.9; this.timer = 0; this.authed = false; this.fault = 0;
       this.listener = null; this.connected = false; this._t = null;
     }
     async connect() { this.connected = true; this._t = setInterval(() => this.tick(1), 1000); }
@@ -323,6 +323,7 @@
       if (cmd === 0x0a0a) return this.reply();
       if (cmd === 0x0e04) {
         const v = p[8];
+        if (this.fault) { if (v === 1) { this.fault = 0; this.state = 0; this.step = 0; } return; } // off clears a fault
         if (v === 2 && (this.state === 0 || this.state === 4)) { this.state = 8; this.step = 3; this.timer = 30; }
         else if (v === 1 && this.state === 8) { this.state = 4; this.step = 0; this.timer = 120; }
         else if (v === 1 && this.state === 0xc) { this.state = 0; this.step = 0; }
@@ -335,8 +336,8 @@
     reply() {
       const f = new Array(39).fill(0);
       f[1] = 2; f[3] = 1; f[5] = 1; f[7] = 0x0a; f[8] = 0x03; f[11] = 27;
-      f[20] = (this.state << 4) | this.step; f[21] = this.state === 0xc ? 3 : this.state ? this.mode : 0;
-      f[22] = this.mode === 1 ? this.temp : this.level; f[23] = 2;
+      f[20] = this.fault ? 0xf0 : (this.state << 4) | this.step; f[21] = this.state === 0xc ? 3 : this.state ? this.mode : 0;
+      f[22] = this.fault || (this.mode === 1 ? this.temp : this.level); f[23] = 2;
       const v = Math.round(this.volts * 10); f[24] = v >> 8; f[25] = v & 0xff;
       const b = Math.round(this.body * 10); f[27] = (b >> 8) & 0xff; f[28] = b & 0xff;
       const r = Math.round(Math.abs(this.room) * 10); f[29] = this.room < 0 ? 1 : 0; f[30] = r >> 8; f[31] = r & 0xff;

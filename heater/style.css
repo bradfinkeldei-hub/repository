@@ -375,3 +375,7 @@ body { max-width: 100%; }
 #offSheet .btn.ghost { margin-top: 14px; }
 .fan-btn { border-color: rgba(143, 182, 255, .35); color: var(--cool); }
 .fan-btn.on { background: rgba(143, 182, 255, .1); }
+.fault-actions { display: flex; gap: 8px; margin-top: 10px; }
+.fault-actions .btn { border-color: rgba(255, 93, 93, .35); }
+.fault-code { white-space: nowrap; }
+.aw-fault { margin: -4px 0 14px; padding: 12px 14px; border-radius: 16px; background: rgba(255, 93, 93, .08); border: 1px solid rgba(255, 93, 93, .3); color: var(--text); font-size: 13px; line-height: 1.45; }

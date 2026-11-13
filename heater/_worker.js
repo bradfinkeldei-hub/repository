@@ -9,7 +9,7 @@
 //    Protected by a PIN you choose; only a salted hash of it is stored.
 const GOVEE = "https://openapi.api.govee.com/router/api/v1/";
 const ALLOWED = { "user/devices": "GET", "device/state": "POST" };
-const ACTIONS = new Set(["start", "stop", "stopnow", "fan", "tune", "target", "mode", "level"]);
+const ACTIONS = new Set(["start", "stop", "stopnow", "fan", "retry", "reset", "tune", "target", "mode", "level"]);
 
 const json = (status, body) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
@@ -71,7 +71,7 @@ async function remote(request, env, path) {
       if (!ACTIONS.has(c.action)) return json(400, { code: 400, message: "Unknown action" });
       // Only sensible values get through to the heater.
       const v = c.value;
-      const ok = { start: v == null, stop: v == null || v === 1 || v === 5 || v === 10, stopnow: v == null, fan: v == null,
+      const ok = { start: v == null, stop: v == null || v === 1 || v === 5 || v === 10, stopnow: v == null, fan: v == null, retry: v == null, reset: v == null,
         tune: typeof v === "string" && /^[\w-]{1,40}$/.test(v),
         target: typeof v === "number" && v >= 4 && v <= 32,
         mode: v === "thermo" || v === "manual",

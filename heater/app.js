@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.24"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.25"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -619,6 +619,10 @@
     }
     schedule();
     thermostat();
+    if (restartWhenOff && heater.status && heater.status.power === "off" && !recovering) {
+      restartWhenOff = false; lastThermo = 0; heater.start(); toast("Cool-down done. Trying again…");
+    }
+    if (heater.status && heater.status.power === "running" && faultTries) faultTries = 0; // it worked
   }
   setInterval(() => { if (heater && heater.proto && !heater.busy && !reconnecting) heater.poll(); }, 2500);
   setInterval(tick, 1000);
@@ -744,6 +748,7 @@
     const lvl = running ? s.level : null;
     $("sbLevel").innerHTML = lvl != null ? `Level <b>${lvl}</b><small> / ${max}</small>`
       : s && s.power === "fan" ? "No heat · no fuel"
+      : s && s.power === "error" ? "Needs attention"
       : running && s.setpoint != null ? `Heater set <b>${s.setpoint}°</b>`
       : S.mode === "manual" ? `Runs level ${S.level || 5}`
       : `Runs level ${tune().hold}–${Math.min(max, tune().max)}`;
@@ -794,9 +799,13 @@
 
     // Power button
     const btn = $("btnPower");
-    btn.disabled = !s || s.power === "cooling" || s.power === "error";
+    btn.disabled = !s || s.power === "cooling" || recovering;
     if (isOn(s)) { btn.textContent = tune().clean ? "Turn off" : "Turn off now"; btn.classList.add("off"); }
-    else { btn.textContent = s && s.power === "cooling" ? "Cooling down…" : "Start heating"; btn.classList.remove("off"); }
+    else { btn.textContent = recovering ? "Recovering…" : s && s.power === "error" ? "Try again" : restartWhenOff && s && s.power === "cooling" ? "Restarts after cool-down…" : s && s.power === "cooling" ? "Cooling down…" : "Start heating"; btn.classList.remove("off"); }
+    $("btnRetry").disabled = $("btnReset").disabled = recovering;
+    const co = coFault(s);
+    $("btnRetry").hidden = co;
+    if (co) { btn.textContent = "Reset (no restart: CO fault)"; }
     // Fan only: offered when the heater is off; becomes "Stop fan" while the fan runs.
     const fanOn = s && s.power === "fan";
     $("btnFan").hidden = !s || !(s.power === "off" || fanOn) || !heater.proto.fan;
@@ -935,6 +944,7 @@
 
   $("btnPower").onclick = async () => {
     const s = heater && heater.status; if (!s) return;
+    if (s.power === "error") return recover(!coFault(s));
     if (isOn(s)) return openOffSheet();
     $("btnPower").disabled = true; $("btnPower").textContent = "Starting…";
     lastThermo = 0;
@@ -952,6 +962,48 @@
       }
     } finally { $("btnFan").disabled = false; }
   };
+  /* ---------------- Fault recovery ----------------
+   * Reset = send Off until the fault clears (Hcalory clears faults on Off).
+   * Try again = reset, wait for any cool-down, then start. After 3 failed
+   * tries in 30 min it asks first (home) or only resets (away), because
+   * repeated failed ignitions can flood the burner with fuel. */
+  let recovering = false, restartWhenOff = false, faultTries = 0, faultTriesAt = 0;
+  // Never restart by itself after a carbon monoxide fault (Hcalory E-10 / E-11).
+  const coFault = (s) => !!s && s.power === "error" && heater && heater.proto === P.H && (s.fault === 10 || s.fault === 11);
+  async function recover(start, remote = false) {
+    if (!heater || !heater.proto || recovering) return;
+    if (Date.now() - faultTriesAt > 30 * 60000) faultTries = 0;
+    if (start && coFault(heater.status)) {
+      start = false; log("· carbon monoxide fault: not restarting, reset only");
+      toast("Carbon monoxide fault: Ember won't restart the heater. Ventilate, check the exhaust, then start it yourself.", 10000);
+    }
+    if (start && faultTries >= 3) {
+      if (remote) { log("· remote retry refused after 3 failed tries; resetting only"); start = false; }
+      else if (!confirm("It has failed 3 times. Check fuel, the fuel line and the exhaust first. Try once more?")) return;
+    }
+    recovering = true; render();
+    log(`· fault recovery: ${start ? "try again" : "reset"} (fault ${heater.status && heater.status.fault})`);
+    try {
+      let s = heater.status;
+      for (let i = 0; i < 4 && s && s.power === "error"; i++) {
+        await heater.sendAll(heater.proto.stop());
+        await sleep(1500);
+        s = await heater.poll();
+        if (i === 1 && heater.proto === P.H) heater.unlocked = await heater.unlock();
+      }
+      if (!s || s.power === "error") {
+        toast("The fault didn't clear. Switch the heater's main power off for 30 seconds, then try again.", 9000);
+        return;
+      }
+      if (!start) { toast("Fault cleared. The heater is off."); return; }
+      faultTries++; faultTriesAt = Date.now();
+      if (s.power === "off") { lastThermo = 0; await heater.start(); toast("Trying again…"); }
+      else { restartWhenOff = true; toast("Cooling down first. It restarts by itself when that's done.", 6000); }
+    } finally { recovering = false; render(); }
+  }
+  $("btnRetry").onclick = () => recover(true);
+  $("btnReset").onclick = () => recover(false);
+
   // Turn off: pick 1, 5 or 10 min burn-off, or off right away.
   function openOffSheet() {
     const def = tune().clean;
@@ -1119,6 +1171,8 @@
       v: 1, at: Date.now(), connected: !!(heater && heater.proto && !reconnecting), name: link ? link.name : null,
       power: s ? s.power : null, level: s ? s.level : null, setpoint: s ? s.setpoint : null, max: maxLevel(),
       fault: s ? s.fault : null, volts: s ? s.volts : null,
+      noRetry: coFault(s),
+      faultText: s && s.power === "error" ? ((heater.proto.faults || P.FAULTS)[s.fault] || ["Heater fault", "Check the heater's display."]).join(": ") : null,
       mode: S.mode, targetC: S.targetC, roomC: ambientC(), roomSrc: useGovee() ? "Govee" : "heater",
       tuneId: tune().id, tuneName: tune().name, hold: tune().hold, top: Math.min(maxLevel(), tune().max),
       tunes: S.tunes.map((t) => ({ id: t.id, name: t.name, targetC: t.targetC })),
@@ -1134,6 +1188,8 @@
     else if (c.action === "stop" && s && isOn(s) && !clean) { await beginClean("shutdown", [1, 5, 10].includes(c.value) ? c.value : undefined); }
     else if (c.action === "stopnow" && s && (isOn(s) || clean || s.power === "fan")) { await turnOff(); }
     else if (c.action === "fan" && s && s.power === "off") { await heater.fan(); }
+    else if (c.action === "retry") { await recover(true, true); }
+    else if (c.action === "reset") { await recover(false, true); }
     else if (c.action === "tune") {
       const t = S.tunes.find((x) => x.id === c.value);
       if (t) { S.tuneId = t.id; if (t.targetC != null) S.targetC = t.targetC; S.mode = "thermo"; }
@@ -1285,7 +1341,7 @@
       state = "clean"; label = `Clean shutdown · ${Math.max(1, Math.ceil(left / 60000))} min`;
     }
     $("awBar").dataset.state = state; $("awState").textContent = label;
-    $("awLevel").innerHTML = st.power === "fan" ? "No heat · no fuel" : on && st.level != null ? `Level <b>${st.level}</b><small> / ${max}</small>` : on && st.setpoint != null ? `Heater set <b>${st.setpoint}°</b>` : st.mode === "manual" ? `Runs level ${st.manualLevel || "—"}` : `Runs level ${st.hold}–${st.top}`;
+    $("awLevel").innerHTML = st.power === "fan" ? "No heat · no fuel" : st.power === "error" ? "Needs attention" : on && st.level != null ? `Level <b>${st.level}</b><small> / ${max}</small>` : on && st.setpoint != null ? `Heater set <b>${st.setpoint}°</b>` : st.mode === "manual" ? `Runs level ${st.manualLevel || "—"}` : `Runs level ${st.hold}–${st.top}`;
     const segs = $("awSegs"); if (segs.children.length !== max) segs.innerHTML = "<i></i>".repeat(max);
     [...segs.children].forEach((el, i) => el.classList.toggle("on", on && st.level != null && i < st.level));
     const room = st.roomC != null ? ` · room ${show(st.roomC)}°` : "";
@@ -1310,11 +1366,14 @@
     [...bars.children].forEach((b, i) => b.classList.toggle("on", i < lvlNow));
 
     // Power: start, or shut down (clean or right away)
-    const live = st.connected && !stale && st.power !== "error";
+    const fault = st.power === "error";
+    const live = st.connected && !stale && !fault;
     const btn = $("awPower");
-    btn.hidden = on || !!st.clean;
-    btn.disabled = !live || st.power === "cooling";
-    if (Date.now() - awArmed > 4000) btn.textContent = st.power === "cooling" ? "Cooling down…" : "Start heating";
+    btn.hidden = on || !!st.clean || (fault && st.noRetry);
+    btn.disabled = !(st.connected && !stale) || st.power === "cooling";
+    if (Date.now() - awArmed > 4000) btn.textContent = fault ? "Try again" : st.power === "cooling" ? "Cooling down…" : "Start heating";
+    $("awReset").hidden = !fault || !st.connected || stale;
+    $("awFault").hidden = !fault; $("awFault").textContent = st.faultText || "";
     const fanOn = st.power === "fan";
     $("awFan").hidden = !(st.power === "off" || fanOn) || !live;
     $("awFan").textContent = fanOn ? "Stop fan" : "Fan only (no heat)";
@@ -1329,6 +1388,7 @@
         (awPending.action === "tune" && st.tuneId === awPending.value) || (awPending.action === "target" && Math.abs(st.targetC - awPending.value) < 0.3) ||
         (awPending.action === "stopnow" && (st.power === "cooling" || st.power === "off")) ||
         (awPending.action === "fan" && st.power === "fan") ||
+        ((awPending.action === "retry" || awPending.action === "reset") && st.power !== "error") ||
         (awPending.action === "mode" && st.mode === awPending.value) ||
         (awPending.action === "level" && st.mode === "manual" && (on ? st.level === awPending.value : st.manualLevel === awPending.value));
       if (done) { $("awMsg").textContent = "Done ✓ The heater has it."; awPending = null; awView = null; awLvl = null; if (!awTargetTimer) awTarget = null; }
@@ -1338,11 +1398,12 @@
     if (!awState) return;
     if (Date.now() - awArmed > 4000) {
       awArmed = Date.now();
-      $("awPower").textContent = "Tap again to start heating";
+      $("awPower").textContent = awState.power === "error" ? "Tap again to try again" : "Tap again to start heating";
       return setTimeout(renderAway, 4100);
     }
     awArmed = 0;
-    awaySend("start", null, "Sent. The heater should start within about a minute.");
+    if (awState.power === "error") awaySend("retry", null, "Sent. It clears the fault and tries again (after any cool-down).");
+    else awaySend("start", null, "Sent. The heater should start within about a minute.");
     renderAway();
   };
   $("awBurn").onclick = (e) => {
@@ -1350,6 +1411,7 @@
     const m = +b.dataset.min;
     awaySend("stop", m, `Sent. ${m} min burn-off at full power, then it turns off.`);
   };
+  $("awReset").onclick = () => awaySend("reset", null, "Sent. It clears the fault and stays off.");
   $("awFan").onclick = () => {
     if (!awState) return;
     if (awState.power === "fan") awaySend("stopnow", null, "Sent. The fan turns off.");
