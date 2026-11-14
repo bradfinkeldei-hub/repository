@@ -92,7 +92,7 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 3. Leave it plugged in, with Ember open, the screen on and Auto-Lock set to Never.
 
 **On your phone:** open Ember → **🏠 Control from away** → enter your PIN.
-- **Start:** needs two taps, so it can't start by accident.
+- **Start:** one tap. An **Undo** button shows for 15 seconds in case you tapped it by mistake.
 - **Thermostat:** pick a temperature or a preset button.
 - **Power level:** tap levels 1–10 to set the speed directly.
 - **Shut down:** pick a **1, 5 or 10 min** burn-off at full power, and then it turns off.

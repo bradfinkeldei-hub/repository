@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.30"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.31"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -230,19 +230,24 @@
     async start() { await this.sendAll(this.proto.start()); return this.poll(); }
     // Start, checked: confirm the heater is igniting/heating; if not, send Off then On once
     // (what the remote effectively does) and check again.
+    // Start, checked. Give the heater ~6 s to report it's igniting (it can be slow to
+    // update its status). Never send Off in between: that could cancel the start.
+    // If it still shows off, re-send the PIN if needed and send Start once more.
     async startVerified() {
       this.busy++;
+      const ok = (s) => s && (s.power === "starting" || s.power === "running");
       try {
         for (let attempt = 1; attempt <= 2; attempt++) {
           await this.sendAll(this.proto.start());
-          await sleep(1800);
-          const s = await this.poll();
-          this.log(`· start attempt ${attempt}: ${s ? s.power + (s.fault ? " (fault " + s.fault + ")" : "") : "no reply"}`);
-          if (s && (s.power === "starting" || s.power === "running")) return s;
-          if (attempt === 1) {
-            if (this.proto === P.H && !this.unlocked) { this.log("· re-sending PIN"); this.unlocked = await this.unlock(); }
-            await this.sendAll(this.proto.stop()); await sleep(1500); await this.poll();
+          let s = null;
+          for (let i = 0; i < 6 && !ok(s); i++) {
+            await sleep(1000);
+            s = await this.poll();
+            if (s && s.power === "error") break;
           }
+          this.log(`· start attempt ${attempt}: ${s ? s.power + (s.fault ? " (fault " + s.fault + ")" : "") : "no reply"}`);
+          if (ok(s) || (s && s.power === "error")) return s;
+          if (attempt === 1 && this.proto === P.H) { this.log("· re-sending PIN"); this.unlocked = await this.unlock(); }
         }
         return this.status;
       } finally { this.busy--; }
@@ -1617,17 +1622,20 @@
       if (done) { $("awMsg").textContent = "Done ✓ The heater has it."; awPending = null; awView = null; awLvl = null; awFanLvl = null; if (!awTargetTimer) awTarget = null; }
     }
   }
-  $("awPower").onclick = () => {
+  // One tap starts. An Undo button shows for 15 s in case it was a mis-tap.
+  let awUndoTimer = null;
+  $("awPower").onclick = async () => {
     if (!awState) return;
-    if (Date.now() - awArmed > 4000) {
-      awArmed = Date.now();
-      $("awPower").textContent = awState.power === "error" ? "Tap again to try again" : "Tap again to start heating";
-      return setTimeout(renderAway, 4100);
-    }
-    awArmed = 0;
-    if (awState.power === "error") awaySend("retry", null, "Sent. It clears the fault and tries again (after any cool-down).");
-    else awaySend("start", null, "Sent. The heater should start within about a minute.");
-    renderAway();
+    $("awPower").disabled = true; $("awPower").textContent = "Sending…";
+    if (awState.power === "error") await awaySend("retry", null, "Sent. It clears the fault and tries again (after any cool-down).");
+    else await awaySend("start", null, "Sent. The heater should start within about a minute.");
+    $("awUndo").hidden = false;
+    clearTimeout(awUndoTimer); awUndoTimer = setTimeout(() => ($("awUndo").hidden = true), 15000);
+    setTimeout(renderAway, 1500);
+  };
+  $("awUndo").onclick = () => {
+    clearTimeout(awUndoTimer); $("awUndo").hidden = true;
+    awaySend("stopnow", null, "Undone. The heater turns off (or stays off).");
   };
   $("awBurn").onclick = (e) => {
     const b = e.target.closest("[data-min]"); if (!b) return;

@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.31 | Start from away is one tap (with Undo), and starting waits longer for the heater to confirm instead of sending Off then On. |
 | v1.30 | Govee smart plug: turn the heater's power on, off (safely, after cool-down) or power-cycle it, at home and from away. |
 | v1.29 | Status bar scrolls with the page instead of sticking over content; it shows the level the heater actually reports. |
 | v1.28 | Schedule: Morning, Midday and Evening windows, each with start and stop times and a setting. Replaces Warm by. |
