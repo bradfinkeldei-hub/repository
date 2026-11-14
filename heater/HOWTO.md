@@ -110,7 +110,7 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 
 | | |
 | --- | --- |
-| **Status bar** (top) | On/off, current level 1–10, the setting it follows, room temperature, fuel left and hours at that level. It stays visible while you scroll. |
+| **Status bar** (top) | On/off, current level 1–10, the setting it follows, room temperature, fuel left and hours at that level. |
 | **Thermostat** | Drag the dial or use −/+. It runs at full power until it's close, eases down, then holds at a low level. Tap **How it heats** for the details. |
 | **Buttons** | Sleep, Comfort, Boost and one Custom. Tap to use; tap again to change its temperature, levels and burn-off. |
 | **Power level** | Pick a fixed level 1–10 instead of the thermostat. |

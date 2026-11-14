@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.28"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.29"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -851,7 +851,7 @@
     const room = ambientC();
     const roomTxt = room != null ? ` · room ${show(room)}°` : "";
     $("sbSetting").textContent = s && s.power === "fan" ? `Fan only · no fuel used${roomTxt}` : S.mode === "manual"
-      ? `Manual · level ${S.level || (lvl ?? "—")}${roomTxt}`
+      ? `Manual · level ${lvl ?? S.level ?? "—"}${roomTxt}`
       : `${tune().name} · ${show(S.targetC)}°${roomTxt}`;
 
     // Fuel left, and how long it lasts at the level it's running (or will run) at.
@@ -1455,7 +1455,7 @@
     const segL = (on || st.power === "fan") && st.level != null ? st.level : null;
     [...segs.children].forEach((el, i) => el.classList.toggle("on", segL != null && i < segL));
     const room = st.roomC != null ? ` · room ${show(st.roomC)}°` : "";
-    $("awSetting").textContent = st.power === "fan" ? `Fan only · no fuel used${room}` : st.mode === "manual" ? `Manual · level ${st.manualLevel || "—"}${room}` : `${st.tuneName} · ${show(st.targetC)}°${room}`;
+    $("awSetting").textContent = st.power === "fan" ? `Fan only · no fuel used${room}` : st.mode === "manual" ? `Manual · level ${(on && st.level != null ? st.level : st.manualLevel) || "—"}${room}` : `${st.tuneName} · ${show(st.targetC)}°${room}`;
     const gal = (st.leftL / GAL).toFixed(1), lvl = on && st.level != null ? st.level : st.mode === "manual" ? st.manualLevel || 5 : st.top;
     const rate = 0.16 + (0.62 - 0.16) * (Math.max(1, Math.min(max, lvl)) - 1) / (max - 1);
     $("awFuel").textContent = `${gal} gal · ≈ ${Math.round(st.leftL / rate)} h at level ${lvl}`;

@@ -274,7 +274,7 @@ select { background: var(--surface); border: 1px solid var(--line); border-radiu
 
 /* ---------- Status bar ---------- */
 .sbar {
-  position: sticky; top: max(8px, env(safe-area-inset-top)); z-index: 6;
+  position: relative; z-index: 1; /* scrolls with the page (pinning overlapped content on iPhone) */
   margin: 0 0 14px; padding: 12px 14px 12px; border-radius: 20px;
   background: rgba(21, 21, 24, .86); border: 1px solid var(--line);
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
