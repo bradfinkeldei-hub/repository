@@ -106,6 +106,16 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 - **Settings → Change PIN** cuts off any phone using the old PIN.
 - **Only a short list of commands with sensible values is accepted.** The home device ignores commands older than 15 minutes.
 
+### 6. Optional: Govee smart plug (full power off)
+
+Plug the heater into a **Govee Wi-Fi smart plug** to cut its power completely, or power-cycle it, from the app or from away.
+
+1. Set the plug up in the **Govee Home** app first.
+2. In Ember, go to **Settings → Govee smart plug → Set up**. Paste your Govee API key (the same one as the thermometer), tap **Find** and pick the plug.
+3. A **Power plug** card appears with **Turn on**, **Turn off safely** and **Power-cycle** (off for 30 seconds, then on).
+
+**Safety:** Ember never cuts power while the heater is burning or cooling down. If it's on, Ember turns it off first, waits for the cool-down to finish, then switches the plug off. The relay on your Cloudflare site only allows switching a plug on or off.
+
 ## Quick tour
 
 | | |

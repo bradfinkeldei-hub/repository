@@ -147,6 +147,22 @@
         /thermometer|sensor/i.test(d.type || "") ||
         (d.capabilities || []).some((c) => /sensorTemperature/i.test(c.instance || "")));
     }
+    // Smart plugs (e.g. H5080/H5083): list, read on/off, switch on/off.
+    async listPlugs(key) {
+      const j = await this.call("user/devices", key);
+      return (j.data || []).filter((d) => /socket|plug/i.test(d.type || "") ||
+        ((d.capabilities || []).some((c) => c.instance === "powerSwitch") && !/light|heater|humidifier|purifier|fan/i.test(d.type || "")));
+    }
+    async plugState(key, dev) {
+      const j = await this.call("device/state", key, { requestId: String(Date.now()), payload: { sku: dev.sku, device: dev.device } });
+      const caps = (j.payload && j.payload.capabilities) || [];
+      const p = caps.find((c) => c.instance === "powerSwitch"), o = caps.find((c) => c.instance === "online");
+      return { on: p && p.state ? Number(p.state.value) === 1 : null, online: o && o.state ? o.state.value !== false : true };
+    }
+    async plugSet(key, dev, on) {
+      await this.call("device/control", key, { requestId: String(Date.now()), payload: { sku: dev.sku, device: dev.device,
+        capability: { type: "devices.capabilities.on_off", instance: "powerSwitch", value: on ? 1 : 0 } } });
+    }
     async read(key, dev, unit = "F") {
       const j = await this.call("device/state", key, { requestId: String(Date.now()), payload: { sku: dev.sku, device: dev.device } });
       const caps = (j.payload && j.payload.capabilities) || [];

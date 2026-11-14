@@ -397,3 +397,11 @@ body { max-width: 100%; }
 .slot.off .slot-row { opacity: .5; }
 .slot-row .time { width: auto; flex: 1 1 8.6em; max-width: 11em; }
 .slot-row .slot-tune { flex: 1 1 100%; }
+
+/* Smart plug */
+.plug-state { font-size: 13px; color: var(--muted); }
+.plug-state.on { color: #4bd585; }
+.plug-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.plug-btns .btn { flex: 1 1 auto; }
+.aw-plug { margin-top: 14px; }
+#plugSheet { z-index: 12; }

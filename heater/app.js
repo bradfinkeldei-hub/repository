@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.29"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.30"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -714,6 +714,7 @@
       restartWhenOff = false; lastThermo = 0; heater.start(); toast("Cool-down done. Trying again…");
     }
     if (heater.status && heater.status.power === "running" && faultTries) faultTries = 0; // it worked
+    if (plugPending && safeToCut() && !plugBusy) plugFinish(plugPending);
   }
   setInterval(() => { if (heater && heater.proto && !heater.busy && !reconnecting) heater.poll(); }, 2500);
   setInterval(tick, 1000);
@@ -895,6 +896,7 @@
     if (isOn(s)) { btn.textContent = tune().clean ? "Turn off" : "Turn off now"; btn.classList.add("off"); }
     else { btn.textContent = recovering ? "Recovering…" : s && s.power === "error" ? "Try again" : restartWhenOff && s && s.power === "cooling" ? "Restarts after cool-down…" : "Start heating"; btn.classList.remove("off"); }
     $("btnRetry").disabled = $("btnReset").disabled = recovering;
+    if (S.gplug && plugOn === false && !isOn(s)) { btn.textContent = "Power plug is off · turn it on below"; btn.disabled = true; }
     const co = coFault(s);
     $("btnRetry").hidden = co;
     if (co) { btn.textContent = "Reset (no restart: CO fault)"; }
@@ -943,6 +945,7 @@
 
     // Schedule
     renderSchedule();
+    renderPlug();
 
     // Stats
     $("sVolts").textContent = s && s.volts ? s.volts.toFixed(1) + " V" : "—";
@@ -1055,6 +1058,103 @@
       }
     } finally { $("btnFan").disabled = false; }
   };
+  /* ---------------- Govee smart plug ----------------
+   * Cuts or restores the heater's mains power. Never cuts power while the heater
+   * is burning or cooling down: it turns the heater off first, waits for the
+   * cool-down to finish, then switches the plug off. */
+  let plugOn = null, plugBusy = "", plugPending = null; // plugPending: "off" | "cycle"
+  const plugKey = () => S.gplug && (S.gplug.key || S.gkey || (S.gwifi && S.gwifi.key));
+  async function plugRefresh() {
+    if (!S.gplug) return;
+    try { const st = await gcloud.plugState(plugKey(), S.gplug); plugOn = st.on; } catch (e) { log("✗ plug: " + e.message); }
+    render();
+  }
+  setInterval(plugRefresh, 60000);
+  async function plugSwitch(on) {
+    await gcloud.plugSet(plugKey(), S.gplug, on);
+    plugOn = on; log("· plug " + (on ? "on" : "off")); render();
+    if (on && link && !demo) setTimeout(() => { if (link && !link.connected) onDrop(); }, 8000); // heater boots, reconnect
+  }
+  // Is it safe to cut power right now?
+  const safeToCut = () => { const s = heater && heater.status; return !s || s.power === "off" || s.power === "error"; };
+  async function plugAction(kind, remote = false) {
+    if (!S.gplug || plugBusy) return;
+    try {
+      if (kind === "on") { plugBusy = "Turning on…"; render(); await plugSwitch(true); toast("Plug on. The heater is powering up."); return; }
+      const s = heater && heater.status;
+      if (!heater && !remote && !confirm("Ember isn't connected to the heater, so it can't check it's off and cooled down. Only cut power if it is. Continue?")) return;
+      if (s && (isOn(s) || s.power === "fan")) {
+        if (!remote && !confirm("The heater is on. Turn it off now and cut the power once it has cooled down?")) return;
+        clean = null; store.set("clean", null); $("clean").hidden = true;
+        await heater.stopVerified();
+      }
+      if (safeToCut()) return await plugFinish(kind);
+      plugPending = kind; render();
+      toast("Waiting for the cool-down to finish, then cutting power…", 6000);
+    } catch (e) { toast("Plug: " + (e.message === "BAD_KEY" ? "Govee didn't accept the API key." : e.message), 7000); }
+    finally { plugBusy = ""; render(); }
+  }
+  async function plugFinish(kind) {
+    plugPending = null;
+    plugBusy = "Cutting power…"; render();
+    try {
+      await plugSwitch(false);
+      if (kind === "cycle") {
+        plugBusy = "Power off · back on in 30 s"; render();
+        toast("Power off. Turning it back on in 30 seconds.", 6000);
+        await sleep(30000 / FAST);
+        await plugSwitch(true);
+        toast("Power restored. The heater is powering up.");
+      } else toast("Heater power is off.");
+    } finally { plugBusy = ""; render(); }
+  }
+  function renderPlug() {
+    $("plugCard").hidden = !S.gplug;
+    $("plugStatus").textContent = S.gplug ? `${S.gplug.deviceName} · ${plugOn == null ? "checking…" : plugOn ? "on" : "off"}` : "Not set up";
+    $("btnPlugSetup").textContent = S.gplug ? "Change" : "Set up";
+    if (!S.gplug) return;
+    $("plugName").textContent = "· " + S.gplug.deviceName;
+    $("plugState").textContent = plugBusy || (plugPending ? "Waiting for cool-down…" : plugOn == null ? "—" : plugOn ? "On" : "Off");
+    $("plugState").classList.toggle("on", plugOn === true);
+    const busy = !!plugBusy || !!plugPending;
+    $("btnPlugOn").hidden = plugOn === true; $("btnPlugOn").disabled = busy;
+    $("btnPlugOff").hidden = plugOn === false; $("btnPlugOff").disabled = busy;
+    $("btnPlugCycle").hidden = plugOn === false; $("btnPlugCycle").disabled = busy;
+  }
+  $("btnPlugOn").onclick = () => plugAction("on");
+  $("btnPlugOff").onclick = () => plugAction("off");
+  $("btnPlugCycle").onclick = () => plugAction("cycle");
+
+  // Setup sheet
+  $("btnPlugSetup").onclick = () => {
+    $("pKey").value = plugKey() || S.gkey || (S.gwifi && S.gwifi.key) || "";
+    $("pList").innerHTML = ""; $("pMsg").textContent = ""; $("btnPForget").hidden = !S.gplug;
+    $("settings").hidden = true; $("plugSheet").hidden = false;
+  };
+  $("btnPlugClose").onclick = () => ($("plugSheet").hidden = true);
+  $("plugSheet").addEventListener("click", (e) => { if (e.target.id === "plugSheet") $("plugSheet").hidden = true; });
+  $("btnPForget").onclick = () => { S.gplug = null; plugOn = null; saveS(); $("plugSheet").hidden = true; render(); toast("Smart plug removed"); };
+  $("btnPFind").onclick = async () => {
+    const key = $("pKey").value.trim();
+    if (!key) return ($("pMsg").textContent = "Paste your API key first.");
+    S.gkey = key; saveS();
+    $("pMsg").textContent = "Looking for your plugs…"; $("pList").innerHTML = "";
+    try {
+      const list = await gcloud.listPlugs(key);
+      if (!list.length) return ($("pMsg").textContent = "No smart plugs found on this Govee account. Set the plug up in the Govee Home app first.");
+      $("pMsg").textContent = "Tap the plug the heater is plugged into:";
+      $("pList").innerHTML = list.map((d, i) => `<button class="gs-dev" data-i="${i}"><b>${(d.deviceName || d.sku).replace(/</g, "&lt;")}</b><span>${d.sku}</span></button>`).join("");
+      $("pList").onclick = (e) => {
+        const b = e.target.closest(".gs-dev"); if (!b) return;
+        const d = list[+b.dataset.i];
+        S.gplug = { key, sku: d.sku, device: d.device, deviceName: d.deviceName || d.sku }; saveS();
+        $("plugSheet").hidden = true; plugRefresh(); toast(`Smart plug set: ${S.gplug.deviceName}`);
+      };
+    } catch (e) {
+      $("pMsg").textContent = e.message === "BAD_KEY" ? "Govee didn't accept that key." : e.message === "NO_RELAY" ? "Upload the latest Ember zip (it includes _worker.js) to your Cloudflare site." : "Couldn't reach Govee: " + e.message;
+    }
+  };
+
   /* ---------------- Fault recovery ----------------
    * Reset = send Off until the fault clears (Hcalory clears faults on Off).
    * Try again = reset, wait for any cool-down, then start. After 3 failed
@@ -1284,7 +1384,8 @@
       mode: S.mode, targetC: S.targetC, roomC: ambientC(), roomSrc: useGovee() ? "Govee" : "heater",
       tuneId: tune().id, tuneName: tune().name, hold: tune().hold, top: Math.min(maxLevel(), tune().max),
       tunes: S.tunes.map((t) => ({ id: t.id, name: t.name, targetC: t.targetC })),
-      manualLevel: S.level || null, leftL: left, schedNext: schedNext(), clean: clean ? { kind: clean.kind, endAt: clean.endAt } : null,
+      manualLevel: S.level || null, leftL: left, schedNext: schedNext(),
+      plug: S.gplug ? { name: S.gplug.deviceName, on: plugOn, busy: plugBusy || (plugPending ? "Waiting for cool-down…" : "") } : null, clean: clean ? { kind: clean.kind, endAt: clean.endAt } : null,
     };
   }
   let gwKey = "", gwMinor = "", gwPushAt = 0, gwBusy = false, gwInfo = "";
@@ -1298,6 +1399,9 @@
     else if (c.action === "fan" && s && s.power === "off") { await heater.fan(); }
     else if (c.action === "fanlevel" && s && s.power === "fan") { await heater.stepTo(Math.max(1, Math.min(maxLevel(), +c.value))); }
     else if (c.action === "retry") { await recover(true, true); }
+    else if (c.action === "plugon") { await plugAction("on", true); }
+    else if (c.action === "plugoff") { await plugAction("off", true); }
+    else if (c.action === "plugcycle") { await plugAction("cycle", true); }
     else if (c.action === "reset") { await recover(false, true); }
     else if (c.action === "tune") {
       const t = S.tunes.find((x) => x.id === c.value);
@@ -1325,7 +1429,7 @@
       // Publish status: right away for important changes, otherwise at most every 3 min
       // (and every 10 min regardless) to stay inside Cloudflare's free KV limits.
       const st = snapshot();
-      const key = JSON.stringify([st.connected, st.power, st.fault, !!st.clean, st.mode, st.tuneId, Math.round(st.targetC * 2), st.tunes.map((t) => t.id + t.name + t.targetC).join()]);
+      const key = JSON.stringify([st.plug && st.plug.on, st.plug && st.plug.busy, st.connected, st.power, st.fault, !!st.clean, st.mode, st.tuneId, Math.round(st.targetC * 2), st.tunes.map((t) => t.id + t.name + t.targetC).join()]);
       const minor = JSON.stringify([st.level, st.roomC == null ? null : Math.round(st.roomC), Math.round(st.leftL / GAL * 4), st.power]);
       const since = Date.now() - gwPushAt;
       // Watched: send any change within 10 s and check in every minute.
@@ -1483,7 +1587,14 @@
     btn.disabled = !(st.connected && !stale);
     if (Date.now() - awArmed > 4000) btn.textContent = fault ? "Try again" : "Start heating";
     $("awReset").hidden = !fault || !st.connected || stale;
+    if (st.plug && st.plug.on === false && !on && Date.now() - awArmed > 4000) { btn.textContent = "Power plug is off · turn it on below"; btn.disabled = true; }
     $("awFault").hidden = !fault; $("awFault").textContent = st.faultText || "";
+    $("awPlug").hidden = !st.plug;
+    if (st.plug) {
+      $("awPlugState").textContent = st.plug.busy || (st.plug.on == null ? "—" : st.plug.on ? "On" : "Off");
+      $("awPlugState").classList.toggle("on", st.plug.on === true);
+      $("awPlugOn").hidden = st.plug.on === true; $("awPlugOff").hidden = st.plug.on === false; $("awPlugCycle").hidden = st.plug.on === false;
+    }
     const fanOn = st.power === "fan";
     $("awFan").hidden = !(st.power === "off" || fanOn) || !live;
     $("awFan").textContent = fanOn ? "Stop fan" : "Fan only (no heat)";
@@ -1529,6 +1640,9 @@
     awFanLvl = +b.dataset.l; renderAway();
     awaySend("fanlevel", awFanLvl, `Sent: fan speed ${awFanLvl}.`);
   });
+  $("awPlugOn").onclick = () => awaySend("plugon", null, "Sent. The plug turns on and the heater powers up.");
+  $("awPlugOff").onclick = () => { if (confirm("Cut the heater's power? It turns the heater off first and waits for the cool-down.")) awaySend("plugoff", null, "Sent. Power is cut once the heater has cooled down."); };
+  $("awPlugCycle").onclick = () => { if (confirm("Power-cycle the heater? Safe off, 30 seconds, then on.")) awaySend("plugcycle", null, "Sent. Safe off, 30 seconds, then power back on."); };
   $("awReset").onclick = () => awaySend("reset", null, "Sent. It clears the fault and stays off.");
   $("awFan").onclick = () => {
     if (!awState) return;
@@ -1577,6 +1691,7 @@
   log("· Ember v" + VERSION);
   renderPresets();
   render();
+  plugRefresh();
   if (params.has("demo")) connect(true);
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 })();

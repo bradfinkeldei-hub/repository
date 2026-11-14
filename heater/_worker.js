@@ -8,8 +8,8 @@
 //    sends commands. Needs a KV namespace bound as EMBER (see HOWTO.md).
 //    Protected by a PIN you choose; only a salted hash of it is stored.
 const GOVEE = "https://openapi.api.govee.com/router/api/v1/";
-const ALLOWED = { "user/devices": "GET", "device/state": "POST" };
-const ACTIONS = new Set(["start", "stop", "stopnow", "fan", "fanlevel", "retry", "reset", "tune", "target", "mode", "level"]);
+const ALLOWED = { "user/devices": "GET", "device/state": "POST", "device/control": "POST" };
+const ACTIONS = new Set(["start", "stop", "stopnow", "fan", "fanlevel", "retry", "reset", "plugon", "plugoff", "plugcycle", "tune", "target", "mode", "level"]);
 
 const json = (status, body) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
@@ -71,7 +71,7 @@ async function remote(request, env, path) {
       if (!ACTIONS.has(c.action)) return json(400, { code: 400, message: "Unknown action" });
       // Only sensible values get through to the heater.
       const v = c.value;
-      const ok = { start: v == null, stop: v == null || v === 1 || v === 5 || v === 10, stopnow: v == null, fan: v == null, fanlevel: Number.isInteger(v) && v >= 1 && v <= 10, retry: v == null, reset: v == null,
+      const ok = { start: v == null, stop: v == null || v === 1 || v === 5 || v === 10, stopnow: v == null, fan: v == null, fanlevel: Number.isInteger(v) && v >= 1 && v <= 10, retry: v == null, reset: v == null, plugon: v == null, plugoff: v == null, plugcycle: v == null,
         tune: typeof v === "string" && /^[\w-]{1,40}$/.test(v),
         target: typeof v === "number" && v >= 4 && v <= 32,
         mode: v === "thermo" || v === "manual",
@@ -112,6 +112,12 @@ export default {
       if (!key) return json(400, { code: 400, message: "Missing Govee API key" });
       const init = { method: request.method, headers: { "Govee-API-Key": key, "Content-Type": "application/json" } };
       if (request.method === "POST") init.body = await request.text();
+      // device/control: only switching a device's power on or off is allowed.
+      if (path === "device/control") {
+        let c = null; try { c = JSON.parse(init.body).payload.capability; } catch {}
+        if (!c || c.type !== "devices.capabilities.on_off" || c.instance !== "powerSwitch" || (c.value !== 0 && c.value !== 1))
+          return json(400, { code: 400, message: "Only power on/off is allowed" });
+      }
       try {
         const r = await fetch(GOVEE + path, init);
         return new Response(r.body, { status: r.status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });

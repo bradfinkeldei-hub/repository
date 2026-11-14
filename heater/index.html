@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b0b0d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Ember Heater v1.29</title>
+<title>Ember Heater v1.30</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-512.png">
@@ -24,7 +24,7 @@
       <defs><linearGradient id="mg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff5a1f"/><stop offset="1" stop-color="#ffc06a"/></linearGradient></defs>
       <path fill="url(#mg)" d="M32 4c2 10 14 16 14 32a14 14 0 0 1-28 0c0-7 3-11 6-14 0 5 2 8 5 9-1-10 1-19 3-27z"/>
     </svg>
-    <h1>Ember <span class="ver" data-version>v1.29</span></h1>
+    <h1>Ember <span class="ver" data-version>v1.30</span></h1>
     <p class="sub">Smarter control for your Hcalory heater</p>
     <button id="btnConnect" class="btn primary wide">Connect heater</button>
     <button id="btnAll" class="btn ghost wide">Don't see it? Show all devices</button>
@@ -39,7 +39,7 @@
 <!-- Main -->
 <section id="main" class="screen" hidden>
   <header class="top">
-    <div class="brand">Ember <span class="ver" data-version>v1.29</span></div>
+    <div class="brand">Ember <span class="ver" data-version>v1.30</span></div>
     <div class="pill" id="pill"><span class="dot"></span><span id="pillText">Connected</span></div>
     <button class="icon-btn" id="btnSettings" aria-label="Settings">
       <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
@@ -133,6 +133,16 @@
       <div class="runtime" id="runtime" role="img" aria-label="Hours of fuel left at each power level"></div>
     </div>
 
+    <div class="card" id="plugCard" hidden>
+      <div class="card-head"><span>Power plug <span class="muted" id="plugName"></span></span><span class="plug-state" id="plugState">—</span></div>
+      <p class="gal-hint" id="plugHint">Cuts power only after the heater is off and cooled down.</p>
+      <div class="plug-btns">
+        <button class="btn small" id="btnPlugOn">Turn on</button>
+        <button class="btn small" id="btnPlugOff">Turn off safely</button>
+        <button class="btn small" id="btnPlugCycle">Power-cycle</button>
+      </div>
+    </div>
+
     <div class="card" id="schedCard">
       <div class="card-head"><span>Schedule</span><span class="muted" id="schedNext">Off</span></div>
       <p class="gal-hint">Turns the heater on at the start time and off at the stop time (with your burn-off). Keep Ember open on this device.</p>
@@ -193,6 +203,14 @@
   <button id="awFan" class="btn ghost wide fan-btn" hidden>Fan only (no heat)</button>
   <div class="fan-speed" id="awFanBox" hidden><p class="burn-label">Fan speed</p><div class="bars fan-bars" id="awFanBoxBars"></div></div>
   <button id="awReset" class="btn ghost wide" hidden>Reset (clear the fault, stay off)</button>
+  <div class="card aw-plug" id="awPlug" hidden>
+    <div class="card-head"><span>Power plug</span><span class="plug-state" id="awPlugState">—</span></div>
+    <div class="plug-btns">
+      <button class="btn small" id="awPlugOn">Turn on</button>
+      <button class="btn small" id="awPlugOff">Turn off safely</button>
+      <button class="btn small" id="awPlugCycle">Power-cycle</button>
+    </div>
+  </div>
   <div class="aw-off" id="awOff" hidden>
     <div id="awClean"><p class="burn-label">Shut down with a burn-off at full power</p><div class="burn-pick" id="awBurn"><button type="button" data-min="1">1 min</button><button type="button" data-min="5">5 min</button><button type="button" data-min="10">10 min</button></div></div>
     <button id="awOffNow" class="btn ghost wide">Off now</button>
@@ -299,6 +317,18 @@
   </div>
 </div>
 
+<!-- Govee smart plug setup -->
+<div id="plugSheet" class="overlay sheet" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2>Govee smart plug</h2><button class="icon-btn" id="btnPlugClose" aria-label="Close">✕</button></div>
+    <p class="fine">Plug the heater into a Govee Wi-Fi smart plug to cut its power completely, safely and from anywhere. Uses your free Govee API key (Govee Home → Profile → ⚙️ Settings → Apply for API Key).</p>
+    <div class="gs-row"><input id="pKey" placeholder="Paste your Govee API key" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn small" id="btnPFind">Find</button></div>
+    <p class="gs-msg" id="pMsg"></p>
+    <div class="gs-list" id="pList"></div>
+    <button class="btn text wide" id="btnPForget" hidden>Remove smart plug</button>
+  </div>
+</div>
+
 <!-- Settings -->
 <div id="settings" class="overlay sheet" hidden>
   <div class="sheet-inner">
@@ -309,6 +339,8 @@
         <button class="btn small" id="btnResetPresets">Reset</button></div>
       <label class="row"><span>Room gauge<small>Where the room temperature comes from.</small></span>
         <select id="setRoom"><option value="heater">Heater sensor</option><option value="govee">Govee thermometer</option></select></label>
+      <div class="row"><span>Govee smart plug<small id="plugStatus">Not set up</small></span>
+        <button class="btn small" id="btnPlugSetup">Set up</button></div>
       <div class="row"><span>Govee thermometer<small id="goveeStatus">Not set up</small></span>
         <button class="btn small" id="btnPairGovee">Set up</button></div>
     </div>
@@ -364,7 +396,7 @@
     </div>
 
     <button class="btn ghost wide" id="btnDisconnect">Disconnect</button>
-    <p class="fine center"><span data-version>v1.29</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
+    <p class="fine center"><span data-version>v1.30</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
   </div>
 </div>
 
