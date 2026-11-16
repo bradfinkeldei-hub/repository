@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.40"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.41"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -738,6 +738,9 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     }
     schedule();
     thermostat();
+    if (fanWhenOff && heater.status && heater.status.power === "off" && !recovering) {
+      fanWhenOff = false; heater.fan(); toast("Cool-down done. Fan only now.");
+    }
     if (restartWhenOff && heater.status && heater.status.power === "off" && !recovering) {
       restartWhenOff = false; lastThermo = 0; heater.start(); toast("Cool-down done. Trying again…");
     }
@@ -931,8 +934,8 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     if (co) { btn.textContent = "Reset (no restart: CO fault)"; }
     // Fan only: offered when the heater is off; becomes "Stop fan" while the fan runs.
     const fanOn = s && s.power === "fan";
-    $("btnFan").hidden = !s || !(s.power === "off" || fanOn) || !heater.proto.fan;
-    $("btnFan").textContent = fanOn ? "Stop fan" : "Fan only (no heat)";
+    $("btnFan").hidden = !s || !heater.proto.fan;
+    $("btnFan").textContent = fanOn ? "Stop fan" : fanWhenOff ? "Fan starts after cool-down…" : s && s.power === "error" ? "Clear fault and run fan only" : "Fan only (no heat)";
     $("btnFan").classList.toggle("on", !!fanOn);
     renderFanBars("fanBox", fanOn ? s.level : null, !!fanOn);
 
@@ -1081,16 +1084,26 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     if (!r || (r.power !== "starting" && r.power !== "running")) toast(r && r.power === "error" ? "The heater reported a fault. See the message at the top." : "The heater didn't confirm it started. Check its display; if it shows an error code, Settings → Copy log and send it over.", 9000);
     if (S.mode === "manual" && S.level) setTimeout(() => heater.stepTo(S.level), 1500);
   };
+  // Fan only, from any state: clears a fault first, ends heating first (with its cool-down).
+  async function fanOnly(remote = false) {
+    const s = heater && heater.status; if (!s || !heater.proto.fan) return;
+    if (s.power === "fan") { fanWhenOff = false; await heater.stopVerified(); toast("Fan off"); return; }
+    if (s.power === "error") {
+      await recover(false, remote);
+      if (!heater.status || heater.status.power === "error") return;
+    } else if (s.power === "running" || s.power === "starting") {
+      if (!remote && !confirm("Stop heating and run the fan only? The heater cools down first.")) return;
+      clean = null; store.set("clean", null); $("clean").hidden = true;
+      await heater.stopVerified();
+    }
+    const now = heater.status && heater.status.power;
+    if (now === "cooling") { fanWhenOff = true; toast("Cooling down first. The fan keeps running, then switches to fan only.", 6000); render(); return; }
+    const r = await heater.fan();
+    toast(r && r.power === "fan" ? "Fan only: blowing air, no fuel used" : "The heater didn't confirm fan-only yet. If nothing happens, Settings → Copy log and send it over.", 6000);
+  }
   $("btnFan").onclick = async () => {
-    const s = heater && heater.status; if (!s) return;
     $("btnFan").disabled = true;
-    try {
-      if (s.power === "fan") { await heater.stopVerified(); toast("Fan off"); }
-      else {
-        const r = await heater.fan();
-        toast(r && r.power === "fan" ? "Fan only: blowing air, no fuel used" : "The heater didn't confirm fan-only yet. If nothing happens, Settings → Copy log and send it over.", 6000);
-      }
-    } finally { $("btnFan").disabled = false; }
+    try { await fanOnly(); } finally { $("btnFan").disabled = false; render(); }
   };
   /* ---------------- Govee smart plug ----------------
    * Cuts or restores the heater's mains power. Never cuts power while the heater
@@ -1194,7 +1207,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
    * Try again = reset, wait for any cool-down, then start. After 3 failed
    * tries in 30 min it asks first (home) or only resets (away), because
    * repeated failed ignitions can flood the burner with fuel. */
-  let recovering = false, restartWhenOff = false, faultTries = 0, faultTriesAt = 0;
+  let recovering = false, restartWhenOff = false, fanWhenOff = false, faultTries = 0, faultTriesAt = 0;
   // Never restart by itself after a carbon monoxide fault (Hcalory E-10 / E-11).
   const coFault = (s) => !!s && s.power === "error" && heater && heater.proto === P.H && (s.fault === 10 || s.fault === 11);
   async function recover(start, remote = false) {
@@ -1482,7 +1495,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     if (c.action === "start" && s && (s.power === "off" || s.power === "cooling")) { lastThermo = 0; await heater.startVerified(); toast("Started from away"); }
     else if (c.action === "stop" && s && isOn(s) && !clean) { await beginClean("shutdown", [1, 5, 10, 20].includes(c.value) ? c.value : undefined); }
     else if (c.action === "stopnow" && s && (isOn(s) || clean || s.power === "fan")) { await turnOff(); }
-    else if (c.action === "fan" && s && s.power === "off") { await heater.fan(); }
+    else if (c.action === "fan" && s && s.power !== "fan") { await fanOnly(true); }
     else if (c.action === "fanlevel" && s && s.power === "fan") { await heater.stepTo(Math.max(1, Math.min(maxLevel(), +c.value))); }
     else if (c.action === "retry") { await recover(true, true); }
     else if (c.action === "plugon") { await plugAction("on", true); }
@@ -1715,8 +1728,9 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
       $("awPlugOn").hidden = st.plug.on === true; $("awPlugOff").hidden = st.plug.on === false; $("awPlugCycle").hidden = st.plug.on === false;
     }
     const fanOn = st.power === "fan";
-    $("awFan").hidden = !(st.power === "off" || fanOn) || !live;
-    $("awFan").textContent = fanOn ? "Stop fan" : "Fan only (no heat)";
+    $("awFan").hidden = false;
+    $("awFan").disabled = !(st.connected && !stale);
+    $("awFan").textContent = fanOn ? "Stop fan" : fault ? "Clear fault and run fan only" : on ? "Stop heat, fan only" : "Fan only (no heat)";
     $("awFan").classList.toggle("on", fanOn);
     renderFanBars("awFanBox", fanOn ? (awFanLvl ?? st.level) : null, fanOn && st.connected && !stale);
     $("awOff").hidden = !(on || st.clean);
@@ -1769,7 +1783,8 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
   $("awFan").onclick = () => {
     if (!awState) return;
     if (awState.power === "fan") awaySend("stopnow", null, "Sent. The fan turns off.");
-    else awaySend("fan", null, "Sent. The fan should start within about a minute (no heat, no fuel).");
+    else if (awState.power === "running" || awState.power === "starting") { if (confirm("Stop heating and run the fan only? The heater cools down first.")) awaySend("fan", null, "Sent. It cools down, then runs the fan only."); }
+    else awaySend("fan", null, awState.power === "error" ? "Sent. It clears the fault, then runs the fan only." : "Sent. The fan should start within about a minute (no heat, no fuel).");
   };
   $("awOffNow").onclick = () => {
     if (!confirm("Turn the heater off now, without the clean burn?")) return;
