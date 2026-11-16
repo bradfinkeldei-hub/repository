@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.37"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.38"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1812,6 +1812,17 @@
   };
   new MutationObserver(syncModal).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden"] });
   $("logBox").addEventListener("toggle", () => { if ($("logBox").open) { $("log").textContent = logLines.slice(-80).join("\n"); $("log").scrollTop = $("log").scrollHeight; } });
+  // Appearance: Auto (follow the phone), Light or Dark.
+  function applyTheme() {
+    const t = S.theme === "light" || S.theme === "dark" ? S.theme : "auto";
+    if (t === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+    document.querySelectorAll("#themePick button").forEach((b) => b.classList.toggle("on", b.dataset.t === t));
+    const light = t === "light" || (t === "auto" && matchMedia("(prefers-color-scheme: light)").matches);
+    document.querySelector('meta[name="theme-color"]').setAttribute("content", light ? "#f5f2ed" : "#0b0b0d");
+  }
+  $("themePick").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; S.theme = b.dataset.t; saveS(); applyTheme(); });
+  matchMedia("(prefers-color-scheme: light)").addEventListener?.("change", applyTheme);
+  applyTheme();
   document.querySelectorAll("[data-version]").forEach((el) => (el.textContent = "v" + VERSION));
   document.title = "Ember Heater v" + VERSION;
   log("· Ember v" + VERSION);
