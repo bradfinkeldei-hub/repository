@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b0b0d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Ember Heater v1.35</title>
+<title>Ember Heater v1.36</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-512.png">
@@ -24,7 +24,7 @@
       <defs><linearGradient id="mg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff5a1f"/><stop offset="1" stop-color="#ffc06a"/></linearGradient></defs>
       <path fill="url(#mg)" d="M32 4c2 10 14 16 14 32a14 14 0 0 1-28 0c0-7 3-11 6-14 0 5 2 8 5 9-1-10 1-19 3-27z"/>
     </svg>
-    <h1>Ember <span class="ver" data-version>v1.35</span></h1>
+    <h1>Ember <span class="ver" data-version>v1.36</span></h1>
     <p class="sub">Smarter control for your Hcalory heater</p>
     <button id="btnConnect" class="btn primary wide">Connect heater</button>
     <button id="btnAll" class="btn ghost wide">Don't see it? Show all devices</button>
@@ -39,7 +39,7 @@
 <!-- Main -->
 <section id="main" class="screen" hidden>
   <header class="top">
-    <div class="brand">Ember <span class="ver" data-version>v1.35</span></div>
+    <div class="brand">Ember <span class="ver" data-version>v1.36</span></div>
     <div class="pill" id="pill"><span class="dot"></span><span id="pillText">Connected</span></div>
     <button class="icon-btn" id="btnSettings" aria-label="Settings">
       <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
@@ -293,7 +293,7 @@
 </div>
 
 <!-- How it heats -->
-<div id="how" class="overlay sheet" hidden>
+<div id="how" class="overlay sheet as-page" hidden>
   <div class="sheet-inner">
     <div class="sheet-head"><h2>How it heats</h2><button class="icon-btn" id="btnHowClose" aria-label="Close">✕</button></div>
     <ol class="how" id="howSteps"></ol>
@@ -302,7 +302,7 @@
 </div>
 
 <!-- Manual tune -->
-<div id="tuner" class="overlay sheet" hidden>
+<div id="tuner" class="overlay sheet as-page" hidden>
   <div class="sheet-inner">
     <div class="sheet-head"><h2>Manual tune</h2><button class="icon-btn" id="btnTunerClose" aria-label="Close">✕</button></div>
     <label class="name-row">Name <input id="tuneName" maxlength="16" placeholder="e.g. Night"></label>
@@ -321,7 +321,7 @@
 </div>
 
 <!-- Govee setup -->
-<div id="gsetup" class="overlay sheet" hidden>
+<div id="gsetup" class="overlay sheet as-page" hidden>
   <div class="sheet-inner">
     <div class="sheet-head"><h2>Connect your Govee</h2><button class="icon-btn" id="btnGsClose" aria-label="Close">✕</button></div>
     <p class="fine">Use your Govee as the room gauge, so the heater aims for the temperature where you are.</p>
@@ -349,7 +349,7 @@
 </div>
 
 <!-- Govee smart plug setup -->
-<div id="plugSheet" class="overlay sheet" hidden>
+<div id="plugSheet" class="overlay sheet as-page" hidden>
   <div class="sheet-inner">
     <div class="sheet-head"><h2>Govee smart plug</h2><button class="icon-btn" id="btnPlugClose" aria-label="Close">✕</button></div>
     <p class="fine">Plug the heater into a Govee Wi-Fi smart plug to cut its power completely, safely and from anywhere. Uses your free Govee API key (Govee Home → Profile → ⚙️ Settings → Apply for API Key).</p>
@@ -374,7 +374,7 @@
 </div>
 
 <!-- Settings -->
-<div id="settings" class="overlay sheet" hidden>
+<div id="settings" class="overlay sheet as-page" hidden>
   <div class="sheet-inner">
     <div class="sheet-head"><h2>Settings</h2><button class="icon-btn" id="btnClose" aria-label="Close">✕</button></div>
 
@@ -440,7 +440,7 @@
     </div>
 
     <button class="btn ghost wide" id="btnDisconnect">Disconnect</button>
-    <p class="fine center"><span data-version>v1.35</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
+    <p class="fine center"><span data-version>v1.36</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
   </div>
 </div>
 

@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.36 | Settings, Manual tune, How it heats and the Govee screens open as normal pages, so scrolling never gets stuck on iPad/iPhone. |
 | v1.35 | Tank size box on the Fuel card; Settings and other sheets fit the screen on iPad. |
 | v1.34 | Set any tank size (e.g. 10 or 7.5 gal) from the fuel gauge or Settings; your current fuel is kept. |
 | v1.33 | Away screen: connection strip, status bar and badge always agree ("Last known: …" when the home app is offline); fewer false "not connected" alarms. |

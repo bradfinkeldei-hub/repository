@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.35"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.36"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1784,7 +1784,17 @@
   renderGateway();
 
   // While any sheet is open, keep the page behind it still (smooth scrolling on iPhone).
-  const syncModal = () => document.documentElement.classList.toggle("modal-open", [...document.querySelectorAll(".overlay")].some((o) => !o.hidden));
+  // Tall screens (Settings, Manual tune, …) open as normal pages that scroll with the
+  // page itself: no scroll-inside-a-popup, which gets stuck on iPad and iPhone.
+  // Small pop-ups and the shutdown countdown stay as overlays with the page locked behind.
+  let pageScroll = 0;
+  const syncModal = () => {
+    const root = document.documentElement, all = [...document.querySelectorAll(".overlay")].filter((o) => !o.hidden);
+    const page = all.some((o) => o.classList.contains("as-page"));
+    if (page && !root.classList.contains("sheet-page")) { pageScroll = window.scrollY; root.classList.add("sheet-page"); window.scrollTo(0, 0); }
+    else if (!page && root.classList.contains("sheet-page")) { root.classList.remove("sheet-page"); const y = pageScroll; requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y))); }
+    root.classList.toggle("modal-open", all.some((o) => !o.classList.contains("as-page")));
+  };
   new MutationObserver(syncModal).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden"] });
   $("logBox").addEventListener("toggle", () => { if ($("logBox").open) { $("log").textContent = logLines.slice(-80).join("\n"); $("log").scrollTop = $("log").scrollHeight; } });
   document.querySelectorAll("[data-version]").forEach((el) => (el.textContent = "v" + VERSION));

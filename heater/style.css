@@ -483,3 +483,10 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .fuel-main { margin-top: 2px; }
 .fuel-main .tank-row { margin: 10px 0 0; }
 .fuel-actions { justify-content: flex-end; gap: 8px; margin-top: 10px; }
+
+/* v1.36: tall sheets become normal pages (scroll with the page, never get stuck) */
+html.sheet-page .screen { display: none !important; }
+html.sheet-page .overlay.as-page:not([hidden]) { position: static; display: block; background: var(--bg); overflow: visible; min-height: 100dvh;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom)); }
+html.sheet-page .overlay.as-page > .sheet-inner { margin: 0 auto; border: 0; background: transparent; padding: 4px 0 24px; max-width: 520px; }
+html.sheet-page .overlay.as-page .sheet-head { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 8px 0; }
