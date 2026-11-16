@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.32"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.33"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1564,16 +1564,26 @@
     $("cnText").textContent = text;
     $("awConn").dataset.st = site === "ok" && home === "ok" && heater === "ok" ? "ok" : [site, home, heater].includes("bad") ? "bad" : "wait";
   }
-  function renderConn() {
+  // One connection check for the whole away screen (strip, status bar, badge, buttons).
+  // Updates pass through Cloudflare's storage, which can lag a minute or two, so:
+  // fresh ≤ 4 min = connected, 4–10 min = slow (amber), > 10 min = home app offline (red).
+  function awHealth() {
     const st = awState;
-    if (!st) return setConn("ok", "wait", "idle", "Waiting for the home app to check in…");
+    if (!st) return { home: "wait", heater: "idle", age: 0, ago: "" };
     const age = Math.max(0, (awNow || Date.now()) - (st.serverAt || st.at));
     const ago = age < 10000 ? "just now" : age < 90000 ? Math.round(age / 1000) + " s ago" : Math.round(age / 60000) + " min ago";
-    if (age > 150000) return setConn("ok", "bad", "idle", `Home app not responding · last seen ${ago}. Check the device at home is awake with Ember open.`);
-    if (!st.connected) return st.reconnecting
-      ? setConn("ok", "ok", "wait", "Home app is connecting to the heater…")
-      : setConn("ok", "ok", "bad", "Not connected · the home app can't reach the heater (out of range, unplugged or powered off).");
-    setConn("ok", "ok", "ok", `Connected · updated ${ago}`);
+    const home = age > 10 * 60000 ? "bad" : age > 4 * 60000 ? "wait" : "ok";
+    const heater = home === "bad" ? "idle" : !st.connected ? (st.reconnecting ? "wait" : "bad") : "ok";
+    return { home, heater, age, ago };
+  }
+  function renderConn() {
+    if (!awState) return setConn("ok", "wait", "idle", "Waiting for the home app to check in…");
+    const h = awHealth();
+    if (h.home === "bad") return setConn("ok", "bad", "idle", `Not connected · the home app last reported ${h.ago}. Check the device at home is awake with Ember open.`);
+    if (h.heater === "bad") return setConn("ok", "ok", "bad", "Not connected · the home app can't reach the heater (out of range, unplugged or powered off).");
+    if (h.heater === "wait") return setConn("ok", "ok", "wait", "Home app is connecting to the heater…");
+    if (h.home === "wait") return setConn("ok", "wait", "ok", `Checking in with the home app… last update ${h.ago}`);
+    setConn("ok", "ok", "ok", `Connected · updated ${h.ago}`);
   }
   async function awayPoll() {
     if (!awState) setConn("wait", "idle", "idle", "Establishing connection to home app…");
@@ -1582,6 +1592,7 @@
       awState = j.state; awNow = j.now; renderAway(); renderConn();
     } catch (e) {
       setConn("bad", "idle", "idle", e.message === "offline" ? "Not connected · this phone has no internet." : "Not connected · " + remoteMsg(e));
+      if (awState) { $("awBar").dataset.state = "stale"; $("awState").textContent = "No connection"; $("awLevel").textContent = "can't reach your site"; }
       if (e.message === "WRONG_PIN") { S.awayPin = null; saveS(); closeAway(); openPin("away"); $("awsMsg").textContent = "The PIN was changed. Enter the new one."; return; }
       $("awFresh").textContent = remoteMsg(e); $("awPill").className = "pill bad"; $("awPillText").textContent = "No connection";
     }
@@ -1598,9 +1609,10 @@
     if (!st) { $("awState").textContent = "Home device hasn't reported yet"; return; }
     const age = Math.max(0, (awNow || Date.now()) - (st.serverAt || st.at));
     const mins = Math.round(age / 60000);
-    const stale = age > 15 * 60000;
-    $("awPill").className = "pill" + (stale || !st.connected ? " warn" : "");
-    $("awPillText").textContent = stale ? "Home offline?" : st.connected ? "Home online" : "Heater not connected";
+    const hl = awHealth();
+    const stale = hl.home === "bad";
+    $("awPill").className = "pill" + (stale ? " bad" : hl.home === "wait" || hl.heater !== "ok" ? " warn" : "");
+    $("awPillText").textContent = stale ? "Home offline" : hl.heater === "bad" ? "Heater not connected" : hl.home === "wait" || hl.heater === "wait" ? "Checking…" : "Connected";
     const secs = Math.round(age / 1000);
     $("awFresh").textContent = `Updated ${secs < 10 ? "just now" : secs < 90 ? secs + " s ago" : mins + " min ago"}${st.name ? " · " + st.name : ""}${st.schedNext ? " · ⏱ " + st.schedNext : ""}`;
 
@@ -1608,15 +1620,16 @@
     const max = st.max || 10, on = st.power === "running" || st.power === "starting";
     let state = { running: "on", starting: "on", cooling: "cool", fan: "cool", error: "bad" }[st.power] || "off";
     let label = { off: "Off", starting: "Igniting", running: "Heating", cooling: "Cooling down", fan: "Fan only", error: "Fault" + (st.fault ? " E-" + String(st.fault).padStart(2, "0") : "") }[st.power] || "Unknown";
-    if (!st.connected) { state = "warn"; label = "Heater not connected at home"; }
+    if (stale) { state = "stale"; label = `Last known: ${label}`; }
+    else if (!st.connected) { state = "warn"; label = "Heater not connected"; }
     if (st.clean) {
       const left = Math.max(0, st.clean.endAt - st.at - age);
       state = "clean"; label = `Clean shutdown · ${Math.max(1, Math.ceil(left / 60000))} min`;
     }
     $("awBar").dataset.state = state; $("awState").textContent = label;
-    $("awLevel").innerHTML = st.power === "fan" ? (st.level != null ? `Fan <b>${st.level}</b><small> / ${max}</small>` : "Fan · no fuel") : st.power === "error" ? "Needs attention" : on && st.level != null ? `Level <b>${st.level}</b><small> / ${max}</small>` : on && st.setpoint != null ? `Heater set <b>${st.setpoint}°</b>` : st.mode === "manual" ? `Runs level ${st.manualLevel || "—"}` : `Runs level ${st.hold}–${st.top}`;
+    $("awLevel").innerHTML = stale ? `as of ${hl.ago}` : !st.connected ? "No live data" : st.power === "fan" ? (st.level != null ? `Fan <b>${st.level}</b><small> / ${max}</small>` : "Fan · no fuel") : st.power === "error" ? "Needs attention" : on && st.level != null ? `Level <b>${st.level}</b><small> / ${max}</small>` : on && st.setpoint != null ? `Heater set <b>${st.setpoint}°</b>` : st.mode === "manual" ? `Runs level ${st.manualLevel || "—"}` : `Runs level ${st.hold}–${st.top}`;
     const segs = $("awSegs"); if (segs.children.length !== max) segs.innerHTML = "<i></i>".repeat(max);
-    const segL = (on || st.power === "fan") && st.level != null ? st.level : null;
+    const segL = !stale && st.connected && (on || st.power === "fan") && st.level != null ? st.level : null;
     [...segs.children].forEach((el, i) => el.classList.toggle("on", segL != null && i < segL));
     const room = st.roomC != null ? ` · room ${show(st.roomC)}°` : "";
     $("awSetting").textContent = st.power === "fan" ? `Fan only · no fuel used${room}` : st.mode === "manual" ? `Manual · level ${(on && st.level != null ? st.level : st.manualLevel) || "—"}${room}` : `${st.tuneName} · ${show(st.targetC)}°${room}`;

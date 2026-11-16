@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.33 | Away screen: connection strip, status bar and badge always agree ("Last known: …" when the home app is offline); fewer false "not connected" alarms. |
 | v1.32 | Away connection indicator; classic fuel gauge with custom amount; schedule folds away; Start under the dial; 20-min burn-off; shutdown shows status and level; smoother Settings scrolling. |
 | v1.31 | Start from away is one tap (with Undo), and starting waits longer for the heater to confirm instead of sending Off then On. |
 | v1.30 | Govee smart plug: turn the heater's power on, off (safely, after cool-down) or power-cycle it, at home and from away. |

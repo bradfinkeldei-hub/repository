@@ -467,3 +467,5 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .conn[data-st="bad"] .conn-text { color: #ff8f8f; }
 .conn[data-st="wait"] .conn-text { color: #ffcf85; }
 .overlay { background: rgba(8, 8, 10, .975); }
+.sbar[data-state="stale"] { --tone: #6f6b66; opacity: .75; border-style: dashed; }
+.sbar[data-state="stale"] .sb-segs i.on { background: var(--surface-2); }
