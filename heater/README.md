@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.37 | Connecting: retries the Bluetooth device list in simpler forms when the browser rejects it, explains bare Bluefy errors, and ignores repeated taps. |
 | v1.36 | Settings, Manual tune, How it heats and the Govee screens open as normal pages, so scrolling never gets stuck on iPad/iPhone. |
 | v1.35 | Tank size box on the Fuel card; Settings and other sheets fit the screen on iPad. |
 | v1.34 | Set any tank size (e.g. 10 or 7.5 gal) from the fuel gauge or Settings; your current fuel is kept. |

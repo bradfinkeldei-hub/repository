@@ -490,3 +490,4 @@ html.sheet-page .overlay.as-page:not([hidden]) { position: static; display: bloc
   padding: max(16px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom)); }
 html.sheet-page .overlay.as-page > .sheet-inner { margin: 0 auto; border: 0; background: transparent; padding: 4px 0 24px; max-width: 520px; }
 html.sheet-page .overlay.as-page .sheet-head { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 8px 0; }
+#connectMsg { line-height: 1.55; text-align: left; } #connectMsg b { color: var(--text); font-weight: 500; }

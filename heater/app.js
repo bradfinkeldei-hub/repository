@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.36"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.37"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -68,8 +68,10 @@
 
   // Turn any error (including ones with no message) into readable text.
   const errText = (e) => {
-    if (!e) return "no details";
-    if (typeof e === "string") return e;
+    if (e == null || e === "") return "no details";
+    if (typeof e === "number") return "Bluetooth error " + e; // Bluefy sometimes rejects with a bare number
+    if (typeof e === "string") return /^\d+$/.test(e) ? "Bluetooth error " + e : e;
+    if (e.code != null && !e.message) return "Bluetooth error " + e.code;
     const t = [e.name, e.message].filter((x) => x && x !== "Error").join(": ");
     try { return t || JSON.stringify(e) || String(e); } catch { return String(e); }
   };
@@ -85,15 +87,16 @@
         filters: [{ services: [P.BD39] }, { services: [P.SERVICE] }, ...["hcalory", "Hcalory", "HCALORY", "hc", "HC", "Hc", "TY", "Air", "BT", "Heater"].map((n) => ({ namePrefix: n }))],
         optionalServices: [P.BD39, P.SERVICE],
       };
-      if (showAll) this.device = await navigator.bluetooth.requestDevice(all);
-      else {
-        try { this.device = await navigator.bluetooth.requestDevice(filtered); }
-        catch (e) {
-          if (cancelled(e)) throw e;
-          log("✗ filtered picker: " + errText(e) + " → showing all devices");
-          this.device = await navigator.bluetooth.requestDevice(all);
-        }
+      // Try the preferred list first; if the browser rejects it (not a cancel), fall back
+      // to simpler requests. Bluefy has been seen to reject some forms with a bare "2".
+      const short = { acceptAllDevices: true, optionalServices: [0xbd39, 0xfff0] };
+      const tries = showAll ? [["all devices", all], ["listed heaters", filtered], ["basic", short]] : [["listed heaters", filtered], ["all devices", all], ["basic", short]];
+      let last = null;
+      for (const [name, opts] of tries) {
+        try { this.device = await navigator.bluetooth.requestDevice(opts); last = null; break; }
+        catch (e) { if (cancelled(e)) throw e; last = e; log(`✗ device list (${name}): ${errText(e)}`); }
       }
+      if (last) throw last;
       log("· picked " + (this.device.name || "(no name)"));
       this.device.addEventListener("gattserverdisconnected", () => this.onDrop && this.onDrop());
     }
@@ -446,7 +449,13 @@
   const isOn = (s) => s && (s.power === "running" || s.power === "starting");
 
   /* ---------------- Connect ---------------- */
+  let connecting = false;
   async function connect(useDemo) {
+    if (connecting) return;
+    connecting = true;
+    try { await connectInner(useDemo); } finally { connecting = false; }
+  }
+  async function connectInner(useDemo) {
     $("connectMsg").textContent = "";
     demo = useDemo;
     try {
@@ -454,6 +463,10 @@
         link = new SimLink(FAST);
         await link.connect();
       } else {
+        if (navigator.bluetooth.getAvailability) {
+          const ok = await navigator.bluetooth.getAvailability().catch(() => true);
+          if (!ok) throw new Error("Bluetooth is unavailable (off, or not allowed for this browser)");
+        }
         link = new BleLink();
         await link.pick(S.showAll, log);
         $("connectMsg").textContent = "Connecting…";
@@ -478,7 +491,9 @@
     } catch (e) {
       const why = errText(e);
       log("✗ " + why);
-      $("connectMsg").textContent = cancelled(e) ? "" : "Couldn't connect: " + why;
+      $("connectMsg").innerHTML = cancelled(e) ? "" : /Bluetooth error|NotAllowed|NotSupported|unavailable|SecurityError|InvalidState/i.test(why) || !/failed \(/.test(why)
+        ? `<b>Couldn't open Bluetooth</b> (${why.replace(/</g, "&lt;")}). Try:<br>1. Turn Bluetooth on in Control Center.<br>2. iPhone Settings → <b>Bluefy</b> → allow <b>Bluetooth</b>.<br>3. If an iPad or other phone is your home gateway, close Ember there. A heater connects to one device at a time (or use <b>Control from away</b> here).<br>4. Fully close Bluefy, reopen it, then tap Connect once.`
+        : "Couldn't connect: " + why.replace(/</g, "&lt;");
       $("btnCopyLog2").hidden = cancelled(e);
     }
   }
