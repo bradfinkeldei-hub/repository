@@ -50,6 +50,8 @@ The version number shows next to the name in the app (e.g. **EMBER v1.23**).
 
 **To update later:** open your project, choose **Create deployment**, and drop in the new zip.
 
+**Optional: automatic deploys from GitHub.** If you fork this repo, add a repository secret `CLOUDFLARE_API_TOKEN` (Cloudflare token with Account → Cloudflare Pages → Edit), then set your project name and account ID in `.github/workflows/deploy-ember.yml`. Every change to `heater/` then deploys by itself.
+
 ### 3. Connect the heater
 
 1. Turn the heater's power on.
