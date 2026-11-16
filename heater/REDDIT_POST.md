@@ -17,11 +17,11 @@ I have a Hcalory TB2S and kept wishing the app did a few things better, so I bui
 
 **What it does that the stock app doesn't**
 
-- **Clean-burn shutdown.** When you turn it off, pick a **1, 5 or 10 minute** burn at full power to burn off carbon, then it shuts down by itself. Diesel heaters coke up when they run low for hours, and this is the easy fix.
+- **Clean-burn shutdown.** When you turn it off, pick a **1, 5, 10 or 20 minute** burn at full power to burn off carbon, then it shuts down by itself. Diesel heaters coke up when they run low for hours, and this is the easy fix.
 - **A thermostat that doesn't cycle.** Full power while it's cold, eases down as it gets close, then holds at a low level (you pick, I use 2) instead of turning on and off all night.
 - **Sleep / Comfort / Boost + one Custom button.** Tap to use, tap again to change the temperature, levels and burn-off for that button.
 - **Schedule.** Morning, Midday and Evening windows with start and stop times.
-- **Fuel gauge.** One bar per gallon (tap to set after a fill-up), plus **hours left at each power level**.
+- **Fuel gauge.** A classic E–F gauge (tap it to enter the exact amount), plus **hours left at each power level**.
 - **Control from anywhere.** Leave an old phone or iPad by the heater as a "home gateway", then start, stop, change temp, power level or fan from your phone. Protected by a PIN with lockout.
 - **Govee thermometer as the room sensor** (optional), so it heats to the temp where you actually sit.
 - **Fan only** (no heat), **fault codes in plain English** with Try again / Reset, **battery guard**, and a **status bar** that shows on/off, level and fuel at a glance.

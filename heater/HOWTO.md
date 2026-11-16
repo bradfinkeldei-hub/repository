@@ -7,7 +7,7 @@ It isn't made by or affiliated with Hcalory.
 
 <p>
 <img src="docs/02-heating.png" width="240" alt="Heating at level 10 toward 70 degrees, with the status bar on top">
-<img src="docs/03-turn-off.png" width="240" alt="Turn off: choose a 1, 5 or 10 minute burn-off, or off now">
+<img src="docs/03-turn-off.png" width="240" alt="Turn off: choose a 1, 5, 10 or 20 minute burn-off, or off now">
 <img src="docs/06-away.png" width="240" alt="Controlling the heater from away">
 </p>
 
@@ -15,11 +15,11 @@ It isn't made by or affiliated with Hcalory.
 
 ## What it adds
 
-- **Clean shutdown.** When you tap Turn off, you pick a **1, 5 or 10 minute** burn-off at full power (or Off now). It then shuts down, and the heater still does its own safe cool-down.
+- **Clean shutdown.** When you tap Turn off, you pick a **1, 5, 10 or 20 minute** burn-off at full power (or Off now). It then shuts down, and the heater still does its own safe cool-down.
 - **One-dial thermostat.** It runs at full power while the room is cold, eases down as it gets close, then holds at a low level (2 by default) instead of cycling on and off.
 - **Three temperature buttons plus one Custom** (Sleep, Comfort, Boost). Tap to use, tap again to change. Each button can have its own power levels and clean-burn length.
 - **Status bar** at the top: on/off, current level, the setting it follows, and fuel left.
-- **Fuel gauge.** One bar per gallon. Tap a bar to set it, and it shows the hours left at every power level.
+- **Fuel gauge.** A classic E–F gauge. Tap it to enter exactly how much fuel is in the tank, and the hours left at every power level update to match.
 - **Govee thermometer as the room gauge** (optional), so it heats to the temperature where you sit.
 - **Schedule:** Morning, Midday and Evening windows, each with a start and stop time and which button to use.
 - **Extras:** a carbon-health reminder, battery guard and plain-English fault codes.
@@ -92,10 +92,11 @@ Leave an old phone or iPad next to the heater as the **home gateway**. You can t
 3. Leave it plugged in, with Ember open, the screen on and Auto-Lock set to Never.
 
 **On your phone:** open Ember → **🏠 Control from away** → enter your PIN.
+A connection strip at the top shows **Internet → Home app → Heater**: green means connected, amber means connecting, red means not connected, with a line saying what to check.
 - **Start:** one tap. An **Undo** button shows for 15 seconds in case you tapped it by mistake.
 - **Thermostat:** pick a temperature or a preset button.
 - **Power level:** tap levels 1–10 to set the speed directly.
-- **Shut down:** pick a **1, 5 or 10 min** burn-off at full power, and then it turns off.
+- **Shut down:** pick a **1, 5, 10 or 20 min** burn-off at full power, and then it turns off.
 - **Off now:** turns off right away. It also works during a clean shutdown.
 - **Fan only:** runs the blower with no heat and no fuel. Tap the bars to set the fan speed (1–10). Tap the button again to stop it.
 - **Updates:** while the away screen is open, the status updates every few seconds and the "Updated … ago" line shows how fresh it is. Commands usually arrive within seconds, and can take up to about a minute.
@@ -124,10 +125,10 @@ Plug the heater into a **Govee Wi-Fi smart plug** to cut its power completely, o
 | **Thermostat** | Drag the dial or use −/+. It runs at full power until it's close, eases down, then holds at a low level. Tap **How it heats** for the details. |
 | **Buttons** | Sleep, Comfort, Boost and one Custom. Tap to use; tap again to change its temperature, levels and burn-off. |
 | **Power level** | Pick a fixed level 1–10 instead of the thermostat. |
-| **Turn off** | Choose a 1, 5 or 10 min burn-off at full power, or Off now. |
+| **Turn off** | Choose a 1, 5, 10 or 20 min burn-off at full power, or Off now. |
 | **Fan only** | When the heater is off, run just the blower (no heat, no fuel). New in v1.24: if it doesn't work on your heater, send the log. |
-| **Fuel** | One bar per gallon. Tap a bar to set it (the last bar means full). Shows hours left at every level. |
-| **Schedule** | Turn on Morning, Midday or Evening and set start, stop and which button to use. It turns on at the start time and off (with your burn-off) at the stop time. Overnight windows work too. Keep Ember open on the device by the heater. |
+| **Fuel** | A classic E–F gauge. Tap it to enter a custom amount, or tap **Filled up**. Shows hours left at every level, worked out from the amount you set. |
+| **Schedule** | Folded away until you tap it. Turn on Morning, Midday or Evening and set start, stop and which button to use. It turns on at the start time and off (with your burn-off) at the stop time. Overnight windows work too. Keep Ember open on the device by the heater. |
 | **Carbon health** | Counts hours on low and suggests a 15-min clean burn when it's due. |
 | **Settings** | Room gauge (heater or Govee), units, tank size, battery guard, home gateway, heater PIN, and **Copy log** for help. |
 
@@ -142,7 +143,7 @@ Plug the heater into a **Govee Wi-Fi smart plug** to cut its power completely, o
 - **Keep the app open and your screen unlocked** during a clean shutdown or a scheduled start. On iPhone, set **Settings → Display & Brightness → Auto-Lock → Never** while you're using the heater.
 - **Changing the level on the heater or remote:** Ember sees the change within about 3 seconds. In **Thermostat** mode Ember takes back control within about 45 seconds, so switch to the **Power level** tab if you want to adjust by hand.
 - **Govee over Wi-Fi updates every few minutes**, because the thermometer only reports to Govee every few minutes. Bluetooth updates every few seconds.
-- **Fuel is an estimate.** The heater doesn't report fuel, so Ember calculates it from the power level. Tap the gallon bars when you refill.
+- **Fuel is an estimate.** The heater doesn't report fuel, so Ember calculates it from the power level. Tap the gauge (or Filled up) when you refill.
 
 ## Troubleshooting
 

@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.31"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.32"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -42,7 +42,7 @@
     S.threeButtons = true;
     store.set("settings", S);
   }
-  if (S.cleanMins === 15) S.cleanMins = 10; // v1.23: burn-off choices are 1, 5 or 10 min
+  if (S.cleanMins === 15) S.cleanMins = 10; // burn-off choices are 1, 5, 10 or 20 min
   S.tunes.forEach((t) => { if (t.clean === 15) t.clean = 10; });
   // Schedule: three daily windows. Each turns the heater on at its start time and off at its stop time.
   const SLOT_DEFAULTS = [
@@ -337,7 +337,7 @@
     logLines.push(t + "  " + line);
     if (logLines.length > 300) logLines.shift();
     const el = $("log");
-    if (el && !$("settings").hidden) { el.textContent = logLines.slice(-80).join("\n"); el.scrollTop = el.scrollHeight; }
+    if (el && !$("settings").hidden && $("logBox").open) { el.textContent = logLines.slice(-80).join("\n"); el.scrollTop = el.scrollHeight; }
   }
 
   function toast(msg, ms = 3200) {
@@ -523,6 +523,7 @@
 
   /* ---------------- Status updates ---------------- */
   function onStatus(s) {
+    if (clean) renderClean();
     account(s);
     batteryGuard(s);
     render();
@@ -683,8 +684,11 @@
       el.classList.toggle("off", !slot.on);
       el.querySelector(".slot-sum").textContent = slot.on ? (S.schedOwn[slot.id] ? "running" : "") : "off";
     });
-    $("schedNext").textContent = schedNext() || "Off";
+    $("schedNext").textContent = schedNext() || "Not set";
+    $("schedBody").hidden = !S.schedOpen;
+    $("schedToggle").setAttribute("aria-expanded", String(!!S.schedOpen));
   }
+  $("schedToggle").onclick = () => { S.schedOpen = !S.schedOpen; saveS(); renderSchedule(); };
   $("schedCard").addEventListener("change", (e) => {
     const el = e.target.closest(".slot"); if (!el) return;
     const slot = S.sched.find((x) => x.id === el.dataset.slot);
@@ -875,6 +879,7 @@
     const s = heater && heater.status;
     $("thermoView").hidden = S.mode !== "thermo";
     $("manualView").hidden = S.mode !== "manual";
+    $("presetBox").hidden = S.mode !== "thermo";
     document.querySelectorAll(".seg-btn[data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === S.mode));
     renderDial(); renderManual();
 
@@ -925,11 +930,7 @@
     const tankL = S.tankGal * GAL;
     const left = Math.max(0, tankL - stats.sinceFillL);
     const hrs = left / fuelRate(s && s.level);
-    const nBars = Math.max(1, Math.round(S.tankGal)), per = S.tankGal / nBars, leftGal = left / GAL;
-    const gb = $("galBars");
-    if (gb.children.length !== nBars) gb.innerHTML = Array.from({ length: nBars }, (_, i) => `<button class="gal" data-n="${i + 1}" aria-label="${+((i + 1) * per).toFixed(1)} gallons"><i></i><span>${+((i + 1) * per).toFixed(1)}</span></button>`).join("");
-    gb.classList.toggle("low", leftGal <= per);
-    [...gb.children].forEach((el, i) => { el.querySelector("i").style.setProperty("--h", Math.max(0, Math.min(1, (leftGal - i * per) / per)) * 100 + "%"); });
+    renderFuelGauge(left / GAL);
     $("fuelLeft").textContent = `≈ ${(left / GAL).toFixed(1)} gal · ${hrs.toFixed(0)} h left`;
     $("fuelText").textContent = `Today ${(today.sec / 3600).toFixed(1)} h · ${(today.L / GAL).toFixed(2)} gal`;
 
@@ -983,6 +984,15 @@
       ? "Burning off carbon at full power. Goes back to your setting after."
       : "Burning off carbon at full power. The heater turns itself off when the timer ends.";
     $("btnSkip").textContent = burn ? "Stop clean burn" : "Turn off now";
+    const s = heater && heater.status, max = maxLevel(), lvl = s && s.level;
+    const atMax = lvl === max;
+    $("csState").textContent = !s ? "Waiting for the heater…" : s.power === "error" ? "Heater fault" : s.power === "starting" ? "Igniting" :
+      s.power !== "running" ? (s.power === "cooling" ? "Cooling down" : "Waiting for the heater…") : atMax ? "Burning at full power" : "Ramping up to full power";
+    $("csLevel").textContent = lvl != null ? `Level ${lvl} / ${max}` : "Level — / " + max;
+    $("ringSub").textContent = lvl != null ? `level ${lvl} of ${max}` : "full power";
+    $("cleanStatus").classList.toggle("ok", atMax);
+    const segs = $("cleanSegs"); if (segs.children.length !== max) segs.innerHTML = "<i></i>".repeat(max);
+    [...segs.children].forEach((el, i) => el.classList.toggle("on", lvl != null && i < lvl));
     $("btnKeep").hidden = burn;
   }
 
@@ -1235,17 +1245,43 @@
   $("btnSkip").onclick = () => (clean && clean.kind === "burn" ? finishClean() : turnOff());
   $("btnKeep").onclick = () => { clean = null; store.set("clean", null); $("clean").hidden = true; lastThermo = 0; toast("Still heating"); };
   $("btnBurn").onclick = () => beginClean("burn");
-  // Fuel: one bar per gallon. Tap a bar to set the tank to that many gallons
-  // (tap the last one after filling up; tap the first one again to set it empty).
-  $("galBars").addEventListener("click", (e) => {
-    const b = e.target.closest(".gal"); if (!b) return;
-    const per = S.tankGal / Math.max(1, Math.round(S.tankGal));
-    let gal = +b.dataset.n * per;
-    const now = Math.max(0, S.tankGal - stats.sinceFillL / GAL);
-    if (+b.dataset.n === 1 && Math.abs(now - gal) < 0.05) gal = 0;
-    stats.sinceFillL = Math.max(0, (S.tankGal - gal) * GAL); saveStats(); render();
-    toast(gal >= S.tankGal - 0.01 ? "Tank set to full" : gal === 0 ? "Tank set to empty" : `Tank set to ${+gal.toFixed(1)} gal`);
-  });
+  // Fuel: a classic E–F gauge. Tap it to enter a custom amount; the hours at
+  // each level are worked out from whatever amount you set.
+  function renderFuelGauge(gal) {
+    const f = Math.max(0, Math.min(1, gal / S.tankGal));
+    const ang = Math.PI * (1 - f), r = 74;
+    const n = $("fgNeedle");
+    n.setAttribute("x2", (110 + r * Math.cos(ang)).toFixed(1)); n.setAttribute("y2", (110 - r * Math.sin(ang)).toFixed(1));
+    $("fgArc").style.strokeDasharray = `${f * 100} 100`;
+    $("fgVal").textContent = gal.toFixed(1);
+    $("fgUnit").textContent = `gal of ${+S.tankGal}`;
+    $("fuelGauge").classList.toggle("low", f <= 0.2);
+    if (!$("fgTicks").childElementCount) {
+      $("fgTicks").innerHTML = [0, 0.25, 0.5, 0.75, 1].map((t) => {
+        const a = Math.PI * (1 - t), c = Math.cos(a), si = Math.sin(a);
+        return `<line x1="${(110 + 82 * c).toFixed(1)}" y1="${(110 - 82 * si).toFixed(1)}" x2="${(110 + 98 * c).toFixed(1)}" y2="${(110 - 98 * si).toFixed(1)}" class="fg-tick"/>`;
+      }).join("");
+    }
+  }
+  const fuelGalNow = () => Math.max(0, S.tankGal - stats.sinceFillL / GAL);
+  function setFuel(gal) {
+    gal = Math.max(0, Math.min(S.tankGal, Math.round(gal * 10) / 10));
+    stats.sinceFillL = (S.tankGal - gal) * GAL; saveStats(); render();
+    toast(gal >= S.tankGal - 0.01 ? "Tank set to full" : `Fuel set to ${gal.toFixed(1)} gal`);
+  }
+  $("fuelGauge").onclick = () => {
+    $("fuelInput").value = fuelGalNow().toFixed(1); $("fuelInput").max = S.tankGal;
+    $("fuelCapNote").textContent = `gallons · tank holds ${+S.tankGal} gal (change in Settings)`;
+    $("fuelSheet").hidden = false;
+  };
+  const nudgeFuel = (d) => { $("fuelInput").value = Math.max(0, Math.min(S.tankGal, (+$("fuelInput").value || 0) + d)).toFixed(1); };
+  $("fuelMinus").onclick = () => nudgeFuel(-0.1);
+  $("fuelPlus").onclick = () => nudgeFuel(0.1);
+  $("fuelQuick").onclick = (e) => { const b = e.target.closest("button"); if (b) $("fuelInput").value = (+b.dataset.f * S.tankGal).toFixed(1); };
+  $("btnFuelSave").onclick = () => { setFuel(+$("fuelInput").value || 0); $("fuelSheet").hidden = true; };
+  $("btnFuelClose").onclick = () => ($("fuelSheet").hidden = true);
+  $("fuelSheet").addEventListener("click", (e) => { if (e.target.id === "fuelSheet") $("fuelSheet").hidden = true; });
+  $("btnFuelFull").onclick = () => setFuel(S.tankGal);
 
   // Settings
   const bind = (id, key, num) => {
@@ -1381,7 +1417,7 @@
     const s = heater && heater.status;
     const left = Math.max(0, S.tankGal * GAL - stats.sinceFillL);
     return {
-      v: 1, at: Date.now(), connected: !!(heater && heater.proto && !reconnecting), name: link ? link.name : null,
+      v: 1, at: Date.now(), connected: !!(heater && heater.proto && !reconnecting), reconnecting: !!reconnecting, name: link ? link.name : null,
       power: s ? s.power : null, level: s ? s.level : null, setpoint: s ? s.setpoint : null, max: maxLevel(),
       fault: s ? s.fault : null, volts: s ? s.volts : null,
       noRetry: coFault(s),
@@ -1399,7 +1435,7 @@
     if (!heater || !heater.proto) return;
     const s = heater.status;
     if (c.action === "start" && s && (s.power === "off" || s.power === "cooling")) { lastThermo = 0; await heater.startVerified(); toast("Started from away"); }
-    else if (c.action === "stop" && s && isOn(s) && !clean) { await beginClean("shutdown", [1, 5, 10].includes(c.value) ? c.value : undefined); }
+    else if (c.action === "stop" && s && isOn(s) && !clean) { await beginClean("shutdown", [1, 5, 10, 20].includes(c.value) ? c.value : undefined); }
     else if (c.action === "stopnow" && s && (isOn(s) || clean || s.power === "fan")) { await turnOff(); }
     else if (c.action === "fan" && s && s.power === "off") { await heater.fan(); }
     else if (c.action === "fanlevel" && s && s.power === "fan") { await heater.stepTo(Math.max(1, Math.min(maxLevel(), +c.value))); }
@@ -1522,11 +1558,30 @@
     }
   };
 
+  // Connection steps on the away screen: Internet → Home app → Heater.
+  function setConn(site, home, heater, text) {
+    for (const [id, st] of [["cnSite", site], ["cnHome", home], ["cnHeater", heater]]) $(id).dataset.st = st;
+    $("cnText").textContent = text;
+    $("awConn").dataset.st = site === "ok" && home === "ok" && heater === "ok" ? "ok" : [site, home, heater].includes("bad") ? "bad" : "wait";
+  }
+  function renderConn() {
+    const st = awState;
+    if (!st) return setConn("ok", "wait", "idle", "Waiting for the home app to check in…");
+    const age = Math.max(0, (awNow || Date.now()) - (st.serverAt || st.at));
+    const ago = age < 10000 ? "just now" : age < 90000 ? Math.round(age / 1000) + " s ago" : Math.round(age / 60000) + " min ago";
+    if (age > 150000) return setConn("ok", "bad", "idle", `Home app not responding · last seen ${ago}. Check the device at home is awake with Ember open.`);
+    if (!st.connected) return st.reconnecting
+      ? setConn("ok", "ok", "wait", "Home app is connecting to the heater…")
+      : setConn("ok", "ok", "bad", "Not connected · the home app can't reach the heater (out of range, unplugged or powered off).");
+    setConn("ok", "ok", "ok", `Connected · updated ${ago}`);
+  }
   async function awayPoll() {
+    if (!awState) setConn("wait", "idle", "idle", "Establishing connection to home app…");
     try {
       const j = await rcall("GET", "state", null, S.awayPin);
-      awState = j.state; awNow = j.now; renderAway();
+      awState = j.state; awNow = j.now; renderAway(); renderConn();
     } catch (e) {
+      setConn("bad", "idle", "idle", e.message === "offline" ? "Not connected · this phone has no internet." : "Not connected · " + remoteMsg(e));
       if (e.message === "WRONG_PIN") { S.awayPin = null; saveS(); closeAway(); openPin("away"); $("awsMsg").textContent = "The PIN was changed. Enter the new one."; return; }
       $("awFresh").textContent = remoteMsg(e); $("awPill").className = "pill bad"; $("awPillText").textContent = "No connection";
     }
@@ -1694,6 +1749,10 @@
   });
   renderGateway();
 
+  // While any sheet is open, keep the page behind it still (smooth scrolling on iPhone).
+  const syncModal = () => document.documentElement.classList.toggle("modal-open", [...document.querySelectorAll(".overlay")].some((o) => !o.hidden));
+  new MutationObserver(syncModal).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden"] });
+  $("logBox").addEventListener("toggle", () => { if ($("logBox").open) { $("log").textContent = logLines.slice(-80).join("\n"); $("log").scrollTop = $("log").scrollHeight; } });
   document.querySelectorAll("[data-version]").forEach((el) => (el.textContent = "v" + VERSION));
   document.title = "Ember Heater v" + VERSION;
   log("· Ember v" + VERSION);

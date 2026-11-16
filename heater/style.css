@@ -405,3 +405,65 @@ body { max-width: 100%; }
 .plug-btns .btn { flex: 1 1 auto; }
 .aw-plug { margin-top: 14px; }
 #plugSheet { z-index: 12; }
+
+/* ---------- v1.32 ---------- */
+/* Smoother scrolling sheets (no heavy blur), and the page behind stays put */
+.overlay { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(8, 8, 10, .94); overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+html.modal-open, html.modal-open body { overflow: hidden; }
+#logBox summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 4px 0 10px; }
+
+/* Start button sits right under the dial */
+#btnPower { margin-top: 10px; }
+#presetBox { margin-top: 18px; }
+
+/* Classic fuel gauge */
+.fuel-gauge { display: block; width: 100%; max-width: 300px; margin: 6px auto 0; background: none; border: 0; padding: 0; cursor: pointer; }
+.fuel-gauge svg { width: 100%; height: auto; display: block; }
+.fg-track { fill: none; stroke: var(--surface-2); stroke-width: 12; stroke-linecap: round; }
+.fg-arc { fill: none; stroke: url(#fuelArc); stroke-width: 12; stroke-linecap: round; transition: stroke-dasharray .6s ease; }
+.fg-tick { stroke: rgba(255,255,255,.35); stroke-width: 2; }
+.fg-end { fill: var(--muted); font-size: 12px; text-anchor: middle; font-weight: 600; }
+.fg-needle { stroke: #fff; stroke-width: 3; stroke-linecap: round; transition: all .6s ease; }
+.fg-hub { fill: #fff; }
+.fg-val { fill: var(--text); font-size: 26px; font-weight: 500; text-anchor: middle; }
+.fg-unit { fill: var(--muted); font-size: 11px; text-anchor: middle; }
+.fuel-gauge.low .fg-val { fill: var(--bad); }
+.fuel-actions { margin-top: 4px; }
+.fuel-entry { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 18px 0 4px; }
+.fuel-entry input { width: 130px; text-align: center; font-size: 40px; font-weight: 300; background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; padding: 8px; color: var(--text); color-scheme: dark; }
+#fuelSheet { z-index: 12; }
+.fuel-quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0 4px; }
+.fuel-quick button { padding: 10px 0; border-radius: 14px; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; font-size: 15px; color: var(--text); }
+
+/* Collapsible schedule */
+.sched-toggle { width: 100%; background: none; border: 0; padding: 0; color: var(--text); font: inherit; font-weight: 500; cursor: pointer; text-align: left; }
+.chev { font-style: normal; display: inline-block; transition: transform .2s ease; margin-left: 4px; }
+.sched-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
+
+/* 20-minute option: four choices */
+.burn-pick { grid-template-columns: repeat(4, 1fr); }
+
+/* Shutdown overlay: live status */
+.clean-status { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 2px 0 8px; font-size: 14px; }
+.clean-status b { font-weight: 500; }
+.clean-status span:last-child { color: var(--muted); }
+.cs-dot { width: 8px; height: 8px; border-radius: 50%; background: #ffb547; animation: sbpulse 1.4s ease-in-out infinite; }
+.clean-status.ok .cs-dot { background: #ff8a2a; box-shadow: 0 0 10px #ff8a2a; }
+.clean-segs { max-width: 300px; margin: 0 auto 14px; }
+
+/* Away: connection steps */
+.conn { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 12px 14px; margin: 0 0 12px; }
+.conn[data-st="ok"] { border-color: rgba(75, 213, 133, .35); }
+.conn[data-st="bad"] { border-color: rgba(255, 93, 93, .4); }
+.conn-steps { display: flex; align-items: center; }
+.conn-step { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); min-width: 64px; }
+.conn-step i { width: 14px; height: 14px; border-radius: 50%; background: var(--surface-2); border: 2px solid rgba(255,255,255,.15); }
+.conn-step[data-st="ok"] i { background: #4bd585; border-color: #4bd585; box-shadow: 0 0 10px rgba(75,213,133,.6); }
+.conn-step[data-st="ok"] { color: var(--text); }
+.conn-step[data-st="wait"] i { background: #ffb547; border-color: #ffb547; animation: sbpulse 1.2s ease-in-out infinite; }
+.conn-step[data-st="bad"] i { background: var(--bad); border-color: var(--bad); }
+.conn-line { flex: 1; height: 2px; background: var(--surface-2); margin: 0 4px 18px; }
+.conn-text { margin: 10px 0 0; font-size: 13px; text-align: center; color: var(--text); }
+.conn[data-st="bad"] .conn-text { color: #ff8f8f; }
+.conn[data-st="wait"] .conn-text { color: #ffcf85; }
+.overlay { background: rgba(8, 8, 10, .975); }
