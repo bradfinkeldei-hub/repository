@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.39"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.40"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -537,6 +537,8 @@
   document.addEventListener("visibilitychange", () => { if (!document.hidden && heater) { keepAwake(); tick(); } });
 
   /* ---------------- Status updates ---------------- */
+const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
+  const steps = (el, list) => { el.replaceChildren(...(list || []).map((t) => Object.assign(document.createElement("li"), { textContent: t }))); };
   let faultLogged = "";
   function onStatus(s) {
     if (s && s.power === "error" && s.raw !== faultLogged) { faultLogged = s.raw; log("· fault frame (code " + (s.fault || "?") + "): " + s.raw); }
@@ -857,7 +859,7 @@
       state = "clean"; label = `${clean.kind === "burn" ? "Clean burn" : "Clean shutdown"} · ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
     } else if (s) {
       state = { running: "on", starting: "on", cooling: "cool", fan: "cool", error: "bad" }[s.power] || "off";
-      label = { off: "Off", starting: "Igniting", running: "Heating", cooling: "Cooling down", fan: "Fan only", error: "Fault" + (s.fault ? " E-" + String(s.fault).padStart(2, "0") : "") }[s.power] || "On";
+      label = { off: "Off", starting: "Igniting", running: "Heating", cooling: "Cooling down", fan: "Fan only", error: "Fault " + fcode(s.fault) }[s.power] || "On";
     }
     $("sbar").dataset.state = state;
     $("sbState").textContent = label;
@@ -915,7 +917,7 @@
     const faults = (heater && heater.proto && heater.proto.faults) || P.FAULTS;
     const f = s && s.power === "error" ? faults[s.fault] || (s.fault ? ["Heater fault", "Code E-" + String(s.fault).padStart(2, "0") + ". Check the heater's display for details."] : ["Heater fault", "The heater didn't send a code. Its own display shows the E- number."]) : null;
     $("fault").hidden = !f;
-    if (f) { $("faultCode").textContent = s.fault ? "E-" + String(s.fault).padStart(2, "0") : "E-?"; $("faultTitle").textContent = f[0]; $("faultText").textContent = f[1]; }
+    if (f) { $("faultCode").textContent = fcode(s.fault); $("faultTitle").textContent = f[0]; $("faultText").textContent = f[1]; steps($("faultSteps"), f[2]); }
 
     // Power button
     const btn = $("btnPower");
@@ -1459,7 +1461,11 @@
       power: s ? s.power : null, level: s ? s.level : null, setpoint: s ? s.setpoint : null, max: maxLevel(),
       fault: s ? s.fault : null, volts: s ? s.volts : null,
       noRetry: coFault(s),
-      faultText: s && s.power === "error" ? ((heater.proto.faults || P.FAULTS)[s.fault] || [s.fault ? "Heater fault E-" + String(s.fault).padStart(2, "0") : "Heater fault", "Check the heater's display."]).join(": ") : null,
+      ...(() => {
+        if (!s || s.power !== "error") return { faultText: null };
+        const f = (heater.proto.faults || P.FAULTS)[s.fault] || ["Heater fault", "Check the heater's display for the code."];
+        return { faultText: fcode(s.fault) + " " + f[0] + ": " + f[1], faultTitle: fcode(s.fault) + " · " + f[0], faultInfo: f[1], faultSteps: f[2] || [] };
+      })(),
       raw: s && s.power === "error" ? s.raw : undefined,
       mode: S.mode, targetC: S.targetC, roomC: ambientC(), roomSrc: useGovee() ? "Govee" : "heater",
       tuneId: tune().id, tuneName: tune().name, hold: tune().hold, top: Math.min(maxLevel(), tune().max),
@@ -1658,7 +1664,7 @@
     // Status bar (same look as at home)
     const max = st.max || 10, on = st.power === "running" || st.power === "starting";
     let state = { running: "on", starting: "on", cooling: "cool", fan: "cool", error: "bad" }[st.power] || "off";
-    let label = { off: "Off", starting: "Igniting", running: "Heating", cooling: "Cooling down", fan: "Fan only", error: "Fault" + (st.fault ? " E-" + String(st.fault).padStart(2, "0") : "") }[st.power] || "Unknown";
+    let label = { off: "Off", starting: "Igniting", running: "Heating", cooling: "Cooling down", fan: "Fan only", error: "Fault " + fcode(st.fault) }[st.power] || "Unknown";
     if (stale) { state = "stale"; label = `Last known: ${label}`; }
     else if (!st.connected) { state = "warn"; label = "Heater not connected"; }
     if (st.clean) {
@@ -1700,7 +1706,8 @@
     if (Date.now() - awArmed > 4000) btn.textContent = fault ? "Try again" : "Start heating";
     $("awReset").hidden = !fault || !st.connected || stale;
     if (st.plug && st.plug.on === false && !on && Date.now() - awArmed > 4000) { btn.textContent = "Power plug is off · turn it on below"; btn.disabled = true; }
-    $("awFault").hidden = !fault; $("awFault").textContent = st.faultText || "";
+    $("awFault").hidden = !fault;
+    if (fault) { $("awFaultTitle").textContent = st.faultTitle || "Fault"; $("awFaultText").textContent = st.faultInfo || st.faultText || ""; steps($("awFaultSteps"), st.faultSteps); }
     $("awPlug").hidden = !st.plug;
     if (st.plug) {
       $("awPlugState").textContent = st.plug.busy || (st.plug.on == null ? "—" : st.plug.on ? "On" : "Off");

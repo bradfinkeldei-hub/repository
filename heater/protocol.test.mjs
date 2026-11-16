@@ -120,3 +120,10 @@ test("fan only: H frame and simulator", async () => {
   s = P.H.parse(got.pop()); assert.equal(s.power, "off");
   sim.disconnect();
 });
+
+test("H: real TB2S fault frame reads E-11 (carbon monoxide shutdown)", () => {
+  const raw = "00 01 00 01 00 01 00 23 03 00 00 1E 00 00 01 F4 00 00 00 00 FF 0B 00 02 00 82 00 04 56 00 02 EE 00 07 08 00 00 01 00 00 00 00 FE";
+  const s = P.H.parse(Uint8Array.from(raw.split(" ").map((b) => parseInt(b, 16))));
+  assert.equal(s.power, "error"); assert.equal(s.fault, 11);
+  assert.equal(P.H_FAULTS[11][0], "Carbon monoxide shutdown"); assert.ok(P.H_FAULTS[11][2].length >= 3);
+});

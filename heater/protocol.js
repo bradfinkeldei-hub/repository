@@ -148,19 +148,21 @@
     return Uint8Array.from([0x00, 0x02, 0x00, 0x01, 0x00, 0x01, 0x00, (cmd >> 8) & 0xff, ...body, sum8(body)]);
   };
   const power = (v) => [hcmd(0x0e04, [0, 0, 0, 0, 0, 0, 0, 0, v])];
+  // [title, what it means, steps to fix]. Codes as the TB2S sends them (byte 21 of a fault frame).
   const H_FAULTS = {
-    1: ["Didn't ignite", "Often low fuel, air in the line or carbon. Prime and retry."],
-    2: ["Flame went out", "Usually low fuel or air in the line. Top up and prime the pump."],
-    3: ["Overheating", "Something is blocking airflow. Clear the inlet and outlet."],
-    4: ["Fan fault", "The fan is stuck or unplugged. Check for debris."],
-    5: ["Fuel pump fault", "Check the pump wiring and that the fuel line isn't kinked."],
-    6: ["Sensor fault", "A temperature sensor isn't reading. Check its plug."],
-    7: ["Battery too low", "Charge the battery or check the wiring."],
-    8: ["Voltage too high", "Check your charger or alternator output."],
-    9: ["Lost connection", "The control board isn't talking to the heater. Check the cable."],
-    10: ["Carbon monoxide high", "Ventilate now and check the exhaust for leaks."],
-    11: ["Carbon monoxide critical", "Get fresh air immediately. Check the exhaust before using again."],
+    1: ["Didn't ignite", "The heater tried to light and no flame formed.", ["Check there's fuel in the tank.", "Prime the pump (hold the pump button on the remote) until fuel flows.", "Try again. Two failures in a row usually mean carbon on the glow plug or a blocked fuel filter."]],
+    2: ["Flame went out", "It was burning, then lost the flame.", ["Top up the fuel; low fuel pulls in air.", "Check the fuel line for bubbles or a loose clamp.", "Prime the pump and try again."]],
+    3: ["Overheating", "The heater got too hot inside and shut itself off.", ["Clear anything blocking the warm-air outlet or the air inlet.", "Let it cool fully (the fan runs first).", "Try again on a lower level."]],
+    4: ["Fan fault", "The blower isn't spinning at the right speed.", ["Turn it off and unplug the main power.", "Check the fan for debris and that it spins freely.", "Plug back in and try again."]],
+    5: ["Fuel pump fault", "The pump isn't drawing power properly.", ["Check the pump's plug and wiring for damage or corrosion.", "Make sure the fuel line isn't kinked.", "Try again. If it repeats, the pump may need replacing."]],
+    6: ["Sensor fault", "A temperature sensor isn't reading.", ["Unplug the main power for 30 seconds.", "Check the sensor plugs on the control board.", "Try again. If it repeats, contact Hcalory support."]],
+    7: ["Battery too low", "Supply voltage dropped too low to run safely.", ["Charge the battery or start the engine.", "Check the cables are tight and not too thin.", "It needs about 12.5 V to start reliably."]],
+    8: ["Voltage too high", "Supply voltage is above the safe limit.", ["Check your charger or alternator output (should be under 15 V).", "Try again once the voltage is normal."]],
+    9: ["Lost connection", "The control board isn't talking to the heater.", ["Check the cable between the panel and the heater.", "Unplug main power for 30 seconds, then try again."]],
+    10: ["Carbon monoxide high", "The CO sensor passed the alarm level.", ["Open a door or window now.", "Check the exhaust pipe for leaks, cracks or a loose clamp, and that it vents outside.", "Only restart once the air is clear and the exhaust is fixed."]],
+    11: ["Carbon monoxide shutdown", "CO passed the shutdown level, so the heater turned itself off.", ["Get fresh air now. If anyone has a headache, dizziness or nausea, go outside.", "Check the exhaust: it must vent outside, with no cracks, gaps or loose clamps, and the exhaust gasket intact.", "Keep the remote (it holds the CO sensor) away from the exhaust outlet and fuel smells.", "Don't restart until the cause is found. Ember won't restart it for you."]],
   };
+
   const H = {
     id: "H",
     maxLevel: 10,
@@ -206,8 +208,8 @@
         auto: x[23] === 1,
       };
       if (state === 0xf) {
-        // TB2S: the code is usually in byte 22; some firmwares put it in the low nibble of byte 20 or in byte 23.
-        s.power = "error"; s.fault = value || step || (x[23] > 2 ? x[23] : 0) || null; return s;
+        // TB2S fault frame: byte 20 = FF, byte 21 = the code (seen: FF 0B = E-11).
+        s.power = "error"; s.fault = mode || value || null; return s;
       }
       s.power = state === 0x4 ? "cooling" : state === 0xc ? "fan" : state === 0x8 ? (step === 3 ? "starting" : "running") : "off";
       if (s.power !== "off" && s.power !== "cooling") {
@@ -339,8 +341,8 @@
     reply() {
       const f = new Array(39).fill(0);
       f[1] = 2; f[3] = 1; f[5] = 1; f[7] = 0x0a; f[8] = 0x03; f[11] = 27;
-      f[20] = this.fault ? 0xf0 : (this.state << 4) | this.step; f[21] = this.state === 0xc ? 3 : this.state ? this.mode : 0;
-      f[22] = this.fault || (this.state === 0xc ? this.level : this.mode === 1 ? this.temp : this.level); f[23] = 2;
+      f[20] = this.fault ? 0xff : (this.state << 4) | this.step; f[21] = this.fault || (this.state === 0xc ? 3 : this.state ? this.mode : 0);
+      f[22] = this.fault ? 0 : (this.state === 0xc ? this.level : this.mode === 1 ? this.temp : this.level); f[23] = 2;
       const v = Math.round(this.volts * 10); f[24] = v >> 8; f[25] = v & 0xff;
       const b = Math.round(this.body * 10); f[27] = (b >> 8) & 0xff; f[28] = b & 0xff;
       const r = Math.round(Math.abs(this.room) * 10); f[29] = this.room < 0 ? 1 : 0; f[30] = r >> 8; f[31] = r & 0xff;

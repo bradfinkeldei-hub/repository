@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.40 | Fault codes now match the heater (TB2S sends the code in byte 21; e.g. E-11). Every fault shows what it means and step-by-step fixes, at home and away. |
 | v1.39 | Fault codes: reads the code from every byte the TB2S may use, shows E-? (never E-00) when none is sent, and logs the raw fault frame. |
 | v1.38 | Higher-contrast text and outlines everywhere; light and dark themes (Settings → Appearance: Auto, Light, Dark). |
 | v1.37 | Connecting: retries the Bluetooth device list in simpler forms when the browser rejects it, explains bare Bluefy errors, and ignores repeated taps. |

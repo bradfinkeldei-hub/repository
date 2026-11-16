@@ -406,7 +406,7 @@ body { max-width: 100%; }
 .fan-btn.on { background: rgba(143, 182, 255, .1); }
 .fault-actions { display: flex; gap: 8px; margin-top: 10px; }
 .fault-actions .btn { border-color: rgba(255, 93, 93, .35); }
-.fault-code { white-space: nowrap; }
+.fault-code { white-space: nowrap; align-self: start; padding-top: 1px; }
 .aw-fault { margin: -4px 0 14px; padding: 12px 14px; border-radius: 16px; background: rgba(255, 93, 93, .08); border: 1px solid rgba(255, 93, 93, .3); color: var(--text); font-size: 13px; line-height: 1.45; }
 .fan-speed { margin-top: 6px; }
 .fan-bars { height: 80px; }
@@ -539,3 +539,8 @@ html.sheet-page .overlay.as-page .sheet-head { position: sticky; top: 0; z-index
 .theme-pick button.on { background: var(--surface-2); color: var(--text); }
 .group .btn.small, .card .btn.small { background: var(--surface); }
 .card .btn.small { background: var(--surface-2); }
+
+.fault-steps { margin: 8px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.45; color: var(--text); }
+.fault-steps li + li { margin-top: 3px; }
+.fault-steps:empty { display: none; }
+.aw-fault b { display: block; color: var(--bad); }
