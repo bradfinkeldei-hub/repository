@@ -472,3 +472,14 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .tank-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 0 6px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); font-size: 14px; }
 .tank-in { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
 .tank-in input { width: 84px; text-align: center; font-size: 17px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 7px 8px; color: var(--text); color-scheme: dark; }
+
+/* v1.35: sheets fit the screen on iPad (keep the 480 px width, start at the top, scroll inside) */
+.overlay { align-items: start; justify-items: center; overflow-x: hidden; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+.overlay > .sheet-inner { width: 100%; max-width: min(480px, 100%); margin: auto 0; }
+.overlay > .clean-inner { margin: auto 0; }
+.sheet-inner, .sheet-inner * { max-width: 100%; }
+.sheet-inner .row { flex-wrap: wrap; }
+/* Fuel card: tank size right on the main page */
+.fuel-main { margin-top: 2px; }
+.fuel-main .tank-row { margin: 10px 0 0; }
+.fuel-actions { justify-content: flex-end; gap: 8px; margin-top: 10px; }

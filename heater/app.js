@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.34"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.35"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1273,11 +1273,11 @@
   const clampTank = (n) => Math.max(0.5, Math.min(200, Math.round((+n || S.tankGal) * 10) / 10));
   function setTankSize(n) {
     n = clampTank(n);
-    if (n === +S.tankGal) return ($("setTank").value = n);
+    if (n === +S.tankGal) { $("setTank").value = n; $("tankMain").value = n; return; }
     const gal = Math.min(fuelGalNow(), n);
     S.tankGal = n; saveS();
     stats.sinceFillL = Math.max(0, (n - gal) * GAL); saveStats();
-    $("setTank").value = n; render();
+    $("setTank").value = n; $("tankMain").value = n; render();
     toast(`Tank size set to ${n} gal`);
   }
   const tankNow = () => clampTank($("tankInput").value);
@@ -1293,7 +1293,7 @@
   $("fuelQuick").onclick = (e) => { const b = e.target.closest("button"); if (b) $("fuelInput").value = (+b.dataset.f * tankNow()).toFixed(1); };
   $("btnFuelSave").onclick = () => {
     const tank = tankNow();
-    if (tank !== +S.tankGal) { S.tankGal = tank; saveS(); $("setTank").value = tank; }
+    if (tank !== +S.tankGal) { S.tankGal = tank; saveS(); $("setTank").value = tank; $("tankMain").value = tank; }
     setFuel(Math.min(tank, +$("fuelInput").value || 0)); $("fuelSheet").hidden = true;
   };
   $("btnFuelClose").onclick = () => ($("fuelSheet").hidden = true);
@@ -1308,8 +1308,10 @@
   };
   bind("setUnit", "unit"); bind("setClean", "cleanMins", 1); bind("setCoach", "coachHours", 1);
   bind("setMin", "minLevel", 1);
-  $("setTank").value = +S.tankGal;
-  $("setTank").onchange = () => setTankSize(+$("setTank").value); bind("setBatt", "batt");
+  $("setTank").value = +S.tankGal; $("tankMain").value = +S.tankGal;
+  $("setTank").onchange = () => setTankSize(+$("setTank").value);
+  $("tankMain").onchange = () => setTankSize(+$("tankMain").value);
+  $("btnFuelSet").onclick = () => $("fuelGauge").click(); bind("setBatt", "batt");
   bind("setBattV", "battV", 1); bind("setNative", "native"); bind("setProto", "proto");
   bind("setHUnit", "hUnit"); bind("setPin", "pin"); bind("setAll", "showAll"); bind("setRoom", "room");
   bind("setGUnit", "gUnit");
