@@ -127,7 +127,7 @@ Plug the heater into a **Govee Wi-Fi smart plug** to cut its power completely, o
 | **Power level** | Pick a fixed level 1–10 instead of the thermostat. |
 | **Turn off** | Choose a 1, 5, 10 or 20 min burn-off at full power, or Off now. |
 | **Fan only** | When the heater is off, run just the blower (no heat, no fuel). New in v1.24: if it doesn't work on your heater, send the log. |
-| **Fuel** | A classic E–F gauge. Tap it to enter a custom amount, or tap **Filled up**. Shows hours left at every level, worked out from the amount you set. |
+| **Fuel** | A classic E–F gauge. Tap it to enter a custom amount and your **tank size** (any size, e.g. 10 gal), or tap **Filled up**. Shows hours left at every level, worked out from the amount you set. |
 | **Schedule** | Folded away until you tap it. Turn on Morning, Midday or Evening and set start, stop and which button to use. It turns on at the start time and off (with your burn-off) at the stop time. Overnight windows work too. Keep Ember open on the device by the heater. |
 | **Carbon health** | Counts hours on low and suggests a 15-min clean burn when it's due. |
 | **Settings** | Room gauge (heater or Govee), units, tank size, battery guard, home gateway, heater PIN, and **Copy log** for help. |

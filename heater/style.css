@@ -469,3 +469,6 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .overlay { background: rgba(8, 8, 10, .975); }
 .sbar[data-state="stale"] { --tone: #6f6b66; opacity: .75; border-style: dashed; }
 .sbar[data-state="stale"] .sb-segs i.on { background: var(--surface-2); }
+.tank-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 0 6px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); font-size: 14px; }
+.tank-in { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
+.tank-in input { width: 84px; text-align: center; font-size: 17px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 7px 8px; color: var(--text); color-scheme: dark; }

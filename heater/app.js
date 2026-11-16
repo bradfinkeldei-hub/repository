@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.33"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.34"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1269,16 +1269,33 @@
     stats.sinceFillL = (S.tankGal - gal) * GAL; saveStats(); render();
     toast(gal >= S.tankGal - 0.01 ? "Tank set to full" : `Fuel set to ${gal.toFixed(1)} gal`);
   }
+  // Tank size: any size you like. Changing it keeps the fuel you already have.
+  const clampTank = (n) => Math.max(0.5, Math.min(200, Math.round((+n || S.tankGal) * 10) / 10));
+  function setTankSize(n) {
+    n = clampTank(n);
+    if (n === +S.tankGal) return ($("setTank").value = n);
+    const gal = Math.min(fuelGalNow(), n);
+    S.tankGal = n; saveS();
+    stats.sinceFillL = Math.max(0, (n - gal) * GAL); saveStats();
+    $("setTank").value = n; render();
+    toast(`Tank size set to ${n} gal`);
+  }
+  const tankNow = () => clampTank($("tankInput").value);
   $("fuelGauge").onclick = () => {
-    $("fuelInput").value = fuelGalNow().toFixed(1); $("fuelInput").max = S.tankGal;
-    $("fuelCapNote").textContent = `gallons · tank holds ${+S.tankGal} gal (change in Settings)`;
+    $("fuelInput").value = fuelGalNow().toFixed(1);
+    $("tankInput").value = +S.tankGal;
     $("fuelSheet").hidden = false;
   };
-  const nudgeFuel = (d) => { $("fuelInput").value = Math.max(0, Math.min(S.tankGal, (+$("fuelInput").value || 0) + d)).toFixed(1); };
+  $("tankInput").oninput = () => { if (+$("fuelInput").value > tankNow()) $("fuelInput").value = tankNow().toFixed(1); };
+  const nudgeFuel = (d) => { $("fuelInput").value = Math.max(0, Math.min(tankNow(), (+$("fuelInput").value || 0) + d)).toFixed(1); };
   $("fuelMinus").onclick = () => nudgeFuel(-0.1);
   $("fuelPlus").onclick = () => nudgeFuel(0.1);
-  $("fuelQuick").onclick = (e) => { const b = e.target.closest("button"); if (b) $("fuelInput").value = (+b.dataset.f * S.tankGal).toFixed(1); };
-  $("btnFuelSave").onclick = () => { setFuel(+$("fuelInput").value || 0); $("fuelSheet").hidden = true; };
+  $("fuelQuick").onclick = (e) => { const b = e.target.closest("button"); if (b) $("fuelInput").value = (+b.dataset.f * tankNow()).toFixed(1); };
+  $("btnFuelSave").onclick = () => {
+    const tank = tankNow();
+    if (tank !== +S.tankGal) { S.tankGal = tank; saveS(); $("setTank").value = tank; }
+    setFuel(Math.min(tank, +$("fuelInput").value || 0)); $("fuelSheet").hidden = true;
+  };
   $("btnFuelClose").onclick = () => ($("fuelSheet").hidden = true);
   $("fuelSheet").addEventListener("click", (e) => { if (e.target.id === "fuelSheet") $("fuelSheet").hidden = true; });
   $("btnFuelFull").onclick = () => setFuel(S.tankGal);
@@ -1290,7 +1307,9 @@
     el.onchange = () => { S[key] = el.type === "checkbox" ? el.checked : num ? +el.value : el.value; saveS(); renderPresets(); render(); };
   };
   bind("setUnit", "unit"); bind("setClean", "cleanMins", 1); bind("setCoach", "coachHours", 1);
-  bind("setTank", "tankGal", 1); bind("setMin", "minLevel", 1); bind("setBatt", "batt");
+  bind("setMin", "minLevel", 1);
+  $("setTank").value = +S.tankGal;
+  $("setTank").onchange = () => setTankSize(+$("setTank").value); bind("setBatt", "batt");
   bind("setBattV", "battV", 1); bind("setNative", "native"); bind("setProto", "proto");
   bind("setHUnit", "hUnit"); bind("setPin", "pin"); bind("setAll", "showAll"); bind("setRoom", "room");
   bind("setGUnit", "gUnit");
