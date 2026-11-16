@@ -205,7 +205,10 @@
         fault: null,
         auto: x[23] === 1,
       };
-      if (state === 0xf) { s.power = "error"; s.fault = value; return s; }
+      if (state === 0xf) {
+        // TB2S: the code is usually in byte 22; some firmwares put it in the low nibble of byte 20 or in byte 23.
+        s.power = "error"; s.fault = value || step || (x[23] > 2 ? x[23] : 0) || null; return s;
+      }
       s.power = state === 0x4 ? "cooling" : state === 0xc ? "fan" : state === 0x8 ? (step === 3 ? "starting" : "running") : "off";
       if (s.power !== "off" && s.power !== "cooling") {
         if (mode === 1) s.setpoint = value; else if (mode === 2 || mode === 3) s.level = value; // mode 3 = fan speed

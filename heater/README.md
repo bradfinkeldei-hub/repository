@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.39 | Fault codes: reads the code from every byte the TB2S may use, shows E-? (never E-00) when none is sent, and logs the raw fault frame. |
 | v1.38 | Higher-contrast text and outlines everywhere; light and dark themes (Settings → Appearance: Auto, Light, Dark). |
 | v1.37 | Connecting: retries the Bluetooth device list in simpler forms when the browser rejects it, explains bare Bluefy errors, and ignores repeated taps. |
 | v1.36 | Settings, Manual tune, How it heats and the Govee screens open as normal pages, so scrolling never gets stuck on iPad/iPhone. |

@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.38"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.39"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -537,7 +537,9 @@
   document.addEventListener("visibilitychange", () => { if (!document.hidden && heater) { keepAwake(); tick(); } });
 
   /* ---------------- Status updates ---------------- */
+  let faultLogged = "";
   function onStatus(s) {
+    if (s && s.power === "error" && s.raw !== faultLogged) { faultLogged = s.raw; log("· fault frame (code " + (s.fault || "?") + "): " + s.raw); }
     if (clean) renderClean();
     account(s);
     batteryGuard(s);
@@ -911,9 +913,9 @@
 
     // Fault
     const faults = (heater && heater.proto && heater.proto.faults) || P.FAULTS;
-    const f = s && s.power === "error" ? faults[s.fault] || ["Heater fault", "Check the heater's display for details."] : null;
+    const f = s && s.power === "error" ? faults[s.fault] || (s.fault ? ["Heater fault", "Code E-" + String(s.fault).padStart(2, "0") + ". Check the heater's display for details."] : ["Heater fault", "The heater didn't send a code. Its own display shows the E- number."]) : null;
     $("fault").hidden = !f;
-    if (f) { $("faultCode").textContent = "E-" + String(s.fault || 0).padStart(2, "0"); $("faultTitle").textContent = f[0]; $("faultText").textContent = f[1]; }
+    if (f) { $("faultCode").textContent = s.fault ? "E-" + String(s.fault).padStart(2, "0") : "E-?"; $("faultTitle").textContent = f[0]; $("faultText").textContent = f[1]; }
 
     // Power button
     const btn = $("btnPower");
@@ -1457,7 +1459,8 @@
       power: s ? s.power : null, level: s ? s.level : null, setpoint: s ? s.setpoint : null, max: maxLevel(),
       fault: s ? s.fault : null, volts: s ? s.volts : null,
       noRetry: coFault(s),
-      faultText: s && s.power === "error" ? ((heater.proto.faults || P.FAULTS)[s.fault] || ["Heater fault", "Check the heater's display."]).join(": ") : null,
+      faultText: s && s.power === "error" ? ((heater.proto.faults || P.FAULTS)[s.fault] || [s.fault ? "Heater fault E-" + String(s.fault).padStart(2, "0") : "Heater fault", "Check the heater's display."]).join(": ") : null,
+      raw: s && s.power === "error" ? s.raw : undefined,
       mode: S.mode, targetC: S.targetC, roomC: ambientC(), roomSrc: useGovee() ? "Govee" : "heater",
       tuneId: tune().id, tuneName: tune().name, hold: tune().hold, top: Math.min(maxLevel(), tune().max),
       tunes: S.tunes.map((t) => ({ id: t.id, name: t.name, targetC: t.targetC })),
