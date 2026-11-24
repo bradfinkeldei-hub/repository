@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.46"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.47"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -354,7 +354,12 @@
   /* ---------------- Govee room gauge ---------------- */
   // Two ways in: Wi-Fi (Govee cloud API, works on iPhone) or Bluetooth (Android Chrome).
   let govee = null;
-  const onGovee = (r) => { govee = r; render(); };
+  const onGovee = (r) => {
+    // A new room reading that changes what you see: let the thermostat react now
+    // instead of waiting for its next 45-second check.
+    const moved = !govee || Math.round(govee.tempC * 2) !== Math.round(r.tempC * 2);
+    govee = r; if (moved) lastThermo = 0; render();
+  };
   const gsensor = new window.EmberGovee.GoveeSensor(onGovee, log);
   const gcloud = new window.EmberGovee.GoveeCloud(onGovee, log);
   if (S.goveeId === "demo") S.goveeId = null; // older versions saved the demo pairing
@@ -602,16 +607,29 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
       return;
     }
     // Smooth heat: ease power down as the room approaches the target.
-    if (Date.now() - lastThermo < 45000 / FAST) return;
+    const want = thermoWant();
+    if (want == null) return;
+    // Normally re-check every 45 s; if the heater ignored the last change, retry after 10 s.
+    const retry = thermoLast && thermoLast.want === want && heater.status.level === thermoLast.from;
+    if (Date.now() - lastThermo < (retry ? 10000 : 45000) / FAST) return;
+    if (s.mode !== "gear") await heater.ensureMode("gear");
+    if (heater.status.level !== want) {
+      log(`· thermostat: room ${show(ambientC())}° target ${show(S.targetC)}° → level ${want} (was ${heater.status.level})${retry ? " (retry)" : ""}`);
+      thermoLast = { want, from: heater.status.level };
+      lastThermo = Date.now(); heater.stepTo(want);
+    } else thermoLast = null;
+  }
+  // The level the thermostat wants now. Uses the same rounded numbers you see on
+  // screen, so "72° room, 72° target" always means the hold level.
+  let thermoLast = null;
+  function thermoWant() {
     const room = ambientC();
-    if (room == null) return;
+    if (room == null || !heater || !heater.proto) return null;
     const T = tune();
     const hi = Math.min(heater.proto.maxLevel, T.max);
     const lo = Math.min(hi, Math.max(heater.proto.minLevel, T.hold));
-    const band = T.bandC, gap = S.targetC - room;
-    const want = gap >= band ? hi : gap <= 0 ? lo : Math.max(lo, Math.min(hi, lo + Math.round((hi - lo) * gap / band)));
-    if (s.mode !== "gear") await heater.ensureMode("gear");
-    if (heater.status.level !== want) { lastThermo = Date.now(); heater.stepTo(want); }
+    const band = T.bandC, gap = show(room) >= show(S.targetC) ? 0 : S.targetC - room;
+    return gap >= band ? hi : gap <= 0 ? lo : Math.max(lo, Math.min(hi, lo + Math.round((hi - lo) * gap / band)));
   }
 
   /* ---------------- Clean burn ---------------- */
@@ -840,7 +858,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     const r = show(room);
     if (r >= t) return `At ${t}${u}: holding at level ${lo}. It stays on (it won't shut off by itself) and steps back up if the room cools.`;
     if (r <= near) return `Heating up at level ${Math.min(maxLevel(), T.max)}. It starts easing down at ${near}${u}.`;
-    return `Getting close (${t - r}${u} to go): easing the power down to save fuel and avoid overshooting.`;
+    return `Getting close (${t - r}${u} to go): easing down to level ${thermoWant() ?? "—"} to save fuel and avoid overshooting.`;
   }
 
   function renderHow() {
