@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.41"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.42"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -22,6 +22,9 @@
   const stats = Object.assign({ runSec: 0, lowSec: 0, sinceFillL: 0, days: {} }, store.get("stats", {}));
   if (S.mode !== "thermo" && S.mode !== "manual") S.mode = "thermo";
   const saveS = () => store.set("settings", S);
+  // Outside temperature (see "Outside temperature" below).
+  const out = Object.assign({ c: null, at: 0 }, store.get("outside", {}));
+  const outFresh = () => out.c != null && Date.now() - out.at < 3 * 3600e3;
   // Heating styles ("tunes"): Standard is built in; custom ones are saved on this phone.
   const STD = () => ({ id: "std", name: "Standard", max: 10, bandC: 3, hold: S.minLevel || 2, clean: S.cleanMins });
   const tune = () => S.tunes.find((t) => t.id === S.tuneId) || STD();
@@ -779,6 +782,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
       const [rx, ry] = pt(A0 + SWEEP * frac(show(room)));
       $("roomDot").style.display = ""; $("roomDot").setAttribute("cx", rx); $("roomDot").setAttribute("cy", ry);
     }
+    renderOutside();
     markPresets();
   }
 
@@ -1480,7 +1484,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
         return { faultText: fcode(s.fault) + " " + f[0] + ": " + f[1], faultTitle: fcode(s.fault) + " · " + f[0], faultInfo: f[1], faultSteps: f[2] || [] };
       })(),
       raw: s && s.power === "error" ? s.raw : undefined,
-      mode: S.mode, targetC: S.targetC, roomC: ambientC(), roomSrc: useGovee() ? "Govee" : "heater",
+      mode: S.mode, targetC: S.targetC, roomC: ambientC(), outC: outFresh() ? out.c : null, roomSrc: useGovee() ? "Govee" : "heater",
       tuneId: tune().id, tuneName: tune().name, hold: tune().hold, top: Math.min(maxLevel(), tune().max),
       tunes: S.tunes.map((t) => ({ id: t.id, name: t.name, targetC: t.targetC })),
       manualLevel: S.level || null, leftL: left, schedNext: schedNext(),
@@ -1698,6 +1702,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     // Controls
     if (awTarget == null) $("awTarget").textContent = show(st.targetC) + "°";
     $("awRoom").textContent = st.roomC != null ? `Room ${show(st.roomC)}° (${st.roomSrc})` : "Room —";
+    $("awOut").textContent = st.outC != null ? `Outside ${show(st.outC)}°` : "";
     const esc = (x) => String(x).replace(/[<&"]/g, (m) => ({ "<": "&lt;", "&": "&amp;", '"': "&quot;" }[m]));
     $("awPresets").innerHTML = st.tunes.map((t) => `<button class="preset${t.id === st.tuneId && st.mode !== "manual" ? " on" : ""}" data-tune="${t.id}"><b>${show(t.targetC ?? st.targetC)}°</b><span>${esc(t.name)}</span></button>`).join("");
     // Thermostat / Power level view
@@ -1845,6 +1850,55 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     const light = t === "light" || (t === "auto" && matchMedia("(prefers-color-scheme: light)").matches);
     document.querySelector('meta[name="theme-color"]').setAttribute("content", light ? "#f5f2ed" : "#0b0b0d");
   }
+  /* ---------------- Outside temperature ----------------
+   * From the phone's location (rounded to about 1 km) or a city/ZIP, using the
+   * free Open-Meteo weather service (no key). Updates every 15 minutes. */
+  function renderOutside() {
+    const el = $("dOut"); if (!el) return;
+    el.textContent = !S.outside ? "Outside · tap to set" : outFresh() ? "Outside " + show(out.c) + "°" : "Outside —";
+    $("outStatus").textContent = !S.outside ? "Not set" : S.outside.name + (outFresh() ? " · " + show(out.c) + "°" : "");
+  }
+  async function outsideFetch() {
+    if (!S.outside) return;
+    try {
+      const u = `https://api.open-meteo.com/v1/forecast?latitude=${S.outside.lat}&longitude=${S.outside.lon}&current=temperature_2m`;
+      const j = await (await fetch(u, { cache: "no-store" })).json();
+      const c = j && j.current && j.current.temperature_2m;
+      if (typeof c === "number") { out.c = c; out.at = Date.now(); store.set("outside", out); renderOutside(); }
+    } catch (e) { log("✗ outside temp: " + e.message); }
+  }
+  let outTimer = null;
+  function outsideStart() {
+    clearInterval(outTimer); renderOutside();
+    if (!S.outside) return;
+    outsideFetch(); outTimer = setInterval(outsideFetch, 15 * 60000);
+  }
+  const r2 = (n) => Math.round(n * 100) / 100;
+  function outUseLocation() {
+    if (!navigator.geolocation) { toast("This browser can't share location. Use City / ZIP in Settings.", 6000); return; }
+    toast("Finding your location…");
+    navigator.geolocation.getCurrentPosition((p) => {
+      S.outside = { lat: r2(p.coords.latitude), lon: r2(p.coords.longitude), name: "Your location" }; saveS();
+      outsideStart(); toast("Outside temperature set");
+    }, () => toast("Location wasn't allowed. Use City / ZIP in Settings instead.", 7000), { timeout: 15000, maximumAge: 3600e3 });
+  }
+  async function outUseCity() {
+    const q = (prompt("City or ZIP code for the outside temperature:", "") || "").trim();
+    if (!q) return;
+    try {
+      const zip = /^\d{5}$/.test(q);
+      const j = await (await fetch("https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name=" + encodeURIComponent(q) + (zip ? "&countryCode=US" : ""))).json();
+      const g = j && j.results && j.results[0];
+      if (!g) { toast("Couldn't find that place. Try a city name.", 6000); return; }
+      S.outside = { lat: r2(g.latitude), lon: r2(g.longitude), name: g.name + (g.admin1 ? ", " + g.admin1 : "") }; saveS();
+      outsideStart(); toast("Outside temperature: " + S.outside.name);
+    } catch { toast("Couldn't reach the weather service. Check the internet connection.", 6000); }
+  }
+  $("btnOutLoc").onclick = outUseLocation;
+  $("btnOutCity").onclick = outUseCity;
+  $("dOut").addEventListener("pointerdown", (e) => e.stopPropagation());
+  $("dOut").addEventListener("click", (e) => { e.stopPropagation(); if (!S.outside) outUseLocation(); else outsideFetch(); });
+
   $("themePick").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; S.theme = b.dataset.t; saveS(); applyTheme(); });
   matchMedia("(prefers-color-scheme: light)").addEventListener?.("change", applyTheme);
   applyTheme();
@@ -1854,6 +1908,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
   renderPresets();
   render();
   plugRefresh();
+  outsideStart();
   if (params.has("demo")) connect(true);
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 })();
