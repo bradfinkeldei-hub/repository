@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.49 | Fixes Ember silently freezing: a Bluetooth message that never gets an answer now times out after 3 s, and if the heater stops replying for 20 s Ember resets and reconnects on its own (this could leave the power stuck while the screen looked fine). |
 | v1.48 | Send log: Settings → Send log uploads a troubleshooting snapshot to your own Cloudflare storage (no keys or PINs). Also sent automatically on a fault and every 15 minutes when something new happened. The thermostat logs why it is waiting. |
 | v1.47 | Thermostat: when the room shows the target temperature it always eases to the hold level (on-screen text and power now agree), retries after 10 s if the heater ignores a change, logs every power decision, and reacts right away to a new Govee reading. |
 | v1.46 | Changing the temperature no longer changes the power right away: the dial shows "SETTING…" and waits 2.5 seconds after your last change, then adjusts the power if needed. |

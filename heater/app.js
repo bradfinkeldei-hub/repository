@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.48"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.49"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -169,7 +169,7 @@
       }
       const s = p.parse(x);
       if (!s) return;
-      this.status = s;
+      this.status = s; this.statusAt = Date.now();
       this.waiters.splice(0).forEach((w) => w(s));
       this.onStatus(s);
     }
@@ -179,7 +179,12 @@
         const wait = this.lastSend + 550 - Date.now();
         if (wait > 0) await sleep(wait);
         this.log("▶ " + P.hex(bytes));
-        try { await this.link.write(bytes); } catch (e) { this.log("✗ " + errText(e)); }
+        // Never wait forever on one message: a write that hangs would freeze every
+        // later command (and the thermostat) while the screen still looks fine.
+        try {
+          await Promise.race([this.link.write(bytes), sleep(3000).then(() => { throw new Error("no answer from the heater (write timed out)"); })]);
+          this.writeFails = 0;
+        } catch (e) { this.log("✗ " + errText(e)); this.writeFails = (this.writeFails || 0) + 1; }
         this.lastSend = Date.now();
       });
       return this.chain;
@@ -507,6 +512,17 @@
     }
   }
 
+  // Watchdog: if the heater hasn't answered for 20 s (or writes keep failing) while
+  // we think we're connected, reset the command queue and reconnect.
+  setInterval(() => {
+    if (!heater || !heater.proto || !link || reconnecting || params.has("demo")) return;
+    const quiet = Date.now() - (heater.statusAt || Date.now()) > 20000;
+    if (!quiet && (heater.writeFails || 0) < 3) return;
+    log(`· watchdog: ${quiet ? "no reply for " + Math.round((Date.now() - heater.statusAt) / 1000) + " s" : "writes failing"}; resetting and reconnecting`);
+    heater.chain = Promise.resolve(); heater.busy = 0; heater.writeFails = 0; heater.statusAt = Date.now();
+    heater.waiters.splice(0).forEach((w) => w(null));
+    onDrop();
+  }, 5000);
   async function onDrop() {
     if (reconnecting) return;
     reconnecting = true;
