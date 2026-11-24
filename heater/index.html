@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b0b0d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Ember Heater v1.45</title>
+<title>Ember Heater v1.46</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-512.png">
@@ -25,7 +25,7 @@
       <defs><linearGradient id="mg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff5a1f"/><stop offset="1" stop-color="#ffc06a"/></linearGradient></defs>
       <path fill="url(#mg)" d="M32 4c2 10 14 16 14 32a14 14 0 0 1-28 0c0-7 3-11 6-14 0 5 2 8 5 9-1-10 1-19 3-27z"/>
     </svg>
-    <h1>Ember <span class="ver" data-version>v1.45</span></h1>
+    <h1>Ember <span class="ver" data-version>v1.46</span></h1>
     <p class="sub">Smarter control for your Hcalory heater</p>
     <button id="btnConnect" class="btn primary wide">Connect heater</button>
     <button id="btnAll" class="btn ghost wide">Don't see it? Show all devices</button>
@@ -40,7 +40,7 @@
 <!-- Main -->
 <section id="main" class="screen" hidden>
   <header class="top">
-    <div class="brand">Ember <span class="ver" data-version>v1.45</span></div>
+    <div class="brand">Ember <span class="ver" data-version>v1.46</span></div>
     <div class="pill" id="pill"><span class="dot"></span><span id="pillText">Connected</span></div>
     <button class="icon-btn" id="btnSettings" aria-label="Settings">
       <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
@@ -90,7 +90,7 @@
         <path id="arc" class="arc" d=""/>
         <circle id="roomDot" class="room-dot" r="4"/>
         <circle id="knob" class="knob" r="11"/>
-        <text x="150" y="112" class="d-label">SET TO</text>
+        <text x="150" y="112" class="d-label" id="dLabel">SET TO</text>
         <text x="150" y="172" class="d-temp" id="dTemp">70°</text>
         <text x="150" y="205" class="d-room" id="dRoom">Room —</text>
         <text x="150" y="228" class="d-out" id="dOut"></text>
@@ -445,7 +445,7 @@
     </div>
 
     <button class="btn ghost wide" id="btnDisconnect">Disconnect</button>
-    <p class="fine center"><span data-version>v1.45</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
+    <p class="fine center"><span data-version>v1.46</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
   </div>
 </div>
 

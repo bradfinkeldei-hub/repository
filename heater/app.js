@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.45"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.46"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -334,7 +334,7 @@
   /* ---------------- App state ---------------- */
   let link = null, heater = null, demo = false;
   let clean = store.get("clean", null); // { kind, endAt, total }
-  let lastAcct = 0, lowVSince = null, lastThermo = 0, wakeLock = null, maxRunSec = 0;
+  let lastAcct = 0, lowVSince = null, lastThermo = 0, settleUntil = 0, drag = null, wakeLock = null, maxRunSec = 0;
   let reconnecting = false;
 
   const logLines = [];
@@ -593,6 +593,8 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
   async function thermostat() {
     const s = heater && heater.status;
     if (!s || s.power !== "running" || S.mode !== "thermo" || clean || heater.busy) return;
+    // Wait until the new temperature has settled (finger off the dial, no taps for a moment).
+    if (drag || Date.now() < settleUntil) return;
     if (S.native && heater.proto.hasThermostat && S.room !== "govee") {
       await heater.ensureMode("thermostat");
       const want = Math.round(heaterUnit() === "F" ? cToF(S.targetC) : S.targetC);
@@ -740,6 +742,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
       }
     }
     schedule();
+    if (!drag && Date.now() >= settleUntil && $("dLabel").textContent !== "SET TO") renderDial();
     thermostat();
     if (fanWhenOff && heater.status && heater.status.power === "off" && !recovering) {
       fanWhenOff = false; heater.fan(); toast("Cool-down done. Fan only now.");
@@ -773,6 +776,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     const [kx, ky] = pt(a);
     $("knob").setAttribute("cx", kx); $("knob").setAttribute("cy", ky);
     $("dTemp").textContent = v + "°";
+    $("dLabel").textContent = drag || Date.now() < settleUntil ? "SETTING…" : "SET TO";
     $("dial").setAttribute("aria-valuenow", v);
     const room = ambientC();
     if (room == null) { $("dRoom").textContent = "Room —"; $("roomDot").style.display = "none"; }
@@ -1023,17 +1027,18 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
   }
 
   /* ---------------- Input ---------------- */
+  const SETTLE_MS = 2500; // pause after a temperature change before the power level follows
   function setTarget(displayValue) {
     const [lo, hi] = range();
     const v = Math.max(lo, Math.min(hi, Math.round(displayValue)));
-    S.targetC = fromShow(v); saveS(); lastThermo = 0; renderDial();
+    S.targetC = fromShow(v); saveS(); lastThermo = 0;
+    settleUntil = Date.now() + SETTLE_MS; renderDial();
   }
 
   const dial = $("dial");
   // Relative, slowed-down dragging: the value moves by how far you turn, at half
   // speed. A tap doesn't jump it, and tiny touches (under ~10 px) are ignored.
   const DIAL_SPEED = 0.5, DEADZONE = 10;
-  let drag = null;
   const angleAt = (e) => {
     const r = dial.getBoundingClientRect();
     const x = ((e.clientX - r.left) / r.width) * 300 - CX, y = ((e.clientY - r.top) / r.height) * 300 - CY;
@@ -1056,7 +1061,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     drag.v = Math.max(lo, Math.min(hi, drag.v + ((hi - lo) * d / SWEEP) * DIAL_SPEED));
     if (Math.round(drag.v) !== show(S.targetC)) setTarget(drag.v);
   });
-  const endDrag = () => (drag = null);
+  const endDrag = () => { if (drag && drag.live) settleUntil = Date.now() + SETTLE_MS; drag = null; renderDial(); };
   dial.addEventListener("pointerup", endDrag);
   dial.addEventListener("pointercancel", endDrag);
   dial.addEventListener("keydown", (e) => {
