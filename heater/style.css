@@ -545,7 +545,7 @@ html.sheet-page .overlay.as-page .sheet-head { position: sticky; top: 0; z-index
 .fault-steps:empty { display: none; }
 .aw-fault b { display: block; color: var(--bad); }
 
-.d-out { fill: var(--muted); font-size: 13px; text-anchor: middle; cursor: pointer; }
+.d-out { fill: var(--muted); font-size: 13px; text-anchor: middle; }
 .aw-out { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
 .aw-out:empty { display: none; }
 .row-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }

@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.43"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.44"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1851,13 +1851,14 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     document.querySelector('meta[name="theme-color"]').setAttribute("content", light ? "#f5f2ed" : "#0b0b0d");
   }
   /* ---------------- Outside temperature ----------------
-   * From the phone's location (rounded to about 1 km) or a city/ZIP, using the
-   * free Open-Meteo weather service (no key). Updates every 15 minutes. */
+   * Automatic: finds where this device is (location if allowed, otherwise a
+   * rough internet-based guess), then shows the local outside temperature and
+   * town. Free Open-Meteo weather + BigDataCloud place names, no keys.
+   * Location is rounded to about 1 km. Weather every 15 min, location every 6 h. */
   function renderOutside() {
     const el = $("dOut"); if (!el) return;
-    const city = S.outside ? (S.outside.city || S.outside.name || "").slice(0, 18) : "";
-    el.textContent = !S.outside ? "Outside · tap to set" : (outFresh() ? "Outside " + show(out.c) + "°" : "Outside —") + (city && city !== "Your location" ? " · " + city : "");
-    $("outStatus").textContent = !S.outside ? "Not set" : S.outside.name + (outFresh() ? " · " + show(out.c) + "°" : "");
+    const city = S.outside && S.outside.city ? " · " + S.outside.city.slice(0, 18) : "";
+    el.textContent = outFresh() ? "Outside " + show(out.c) + "°" + city : "";
   }
   async function outsideFetch() {
     if (!S.outside) return;
@@ -1868,50 +1869,31 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
       if (typeof c === "number") { out.c = c; out.at = Date.now(); store.set("outside", out); renderOutside(); }
     } catch (e) { log("✗ outside temp: " + e.message); }
   }
+  const r2 = (n) => Math.round(n * 100) / 100;
+  const gps = () => new Promise((ok) => {
+    if (!navigator.geolocation) return ok(null);
+    navigator.geolocation.getCurrentPosition((p) => ok({ lat: p.coords.latitude, lon: p.coords.longitude }), () => ok(null), { timeout: 15000, maximumAge: 3600e3 });
+  });
+  // Town for a location; with no location, BigDataCloud guesses from the internet connection.
+  async function place(loc) {
+    try {
+      const q = loc ? `latitude=${loc.lat}&longitude=${loc.lon}&` : "";
+      const j = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?${q}localityLanguage=en`)).json();
+      const lat = loc ? loc.lat : j.latitude, lon = loc ? loc.lon : j.longitude;
+      if (typeof lat !== "number" || typeof lon !== "number") return null;
+      return { lat: r2(lat), lon: r2(lon), city: j.city || j.locality || "" };
+    } catch { return null; }
+  }
+  async function locate() {
+    const p = await place(await gps());
+    if (p) { S.outside = Object.assign(p, { at: Date.now() }); saveS(); outsideFetch(); }
+  }
   let outTimer = null;
   function outsideStart() {
     clearInterval(outTimer); renderOutside();
-    if (!S.outside) return;
-    if (!S.outside.city) placeName(S.outside).then((pl) => { if (pl) { Object.assign(S.outside, pl); saveS(); renderOutside(); } });
-    outsideFetch(); outTimer = setInterval(outsideFetch, 15 * 60000);
+    if (!S.outside || !S.outside.at || Date.now() - S.outside.at > 6 * 3600e3) locate(); else outsideFetch();
+    outTimer = setInterval(() => (Date.now() - ((S.outside && S.outside.at) || 0) > 6 * 3600e3 ? locate() : outsideFetch()), 15 * 60000);
   }
-  const r2 = (n) => Math.round(n * 100) / 100;
-  function outUseLocation() {
-    if (!navigator.geolocation) { toast("This browser can't share location. Use City / ZIP in Settings.", 6000); return; }
-    toast("Finding your location…");
-    navigator.geolocation.getCurrentPosition((p) => {
-      S.outside = { lat: r2(p.coords.latitude), lon: r2(p.coords.longitude), name: "Your location" }; saveS();
-      outsideStart();
-      placeName(S.outside).then((pl) => {
-        if (pl) { Object.assign(S.outside, pl); saveS(); renderOutside(); }
-        toast("Outside temperature: " + S.outside.name);
-      });
-    }, () => toast("Location wasn't allowed. Use City / ZIP in Settings instead.", 7000), { timeout: 15000, maximumAge: 3600e3 });
-  }
-  // Town name for a location (free BigDataCloud lookup, no key). Null if it can't be found.
-  async function placeName(loc) {
-    try {
-      const j = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${loc.lat}&longitude=${loc.lon}&localityLanguage=en`)).json();
-      const city = j.city || j.locality; if (!city) return null;
-      return { city, name: city + (j.principalSubdivision ? ", " + j.principalSubdivision : "") };
-    } catch { return null; }
-  }
-  async function outUseCity() {
-    const q = (prompt("City or ZIP code for the outside temperature:", "") || "").trim();
-    if (!q) return;
-    try {
-      const zip = /^\d{5}$/.test(q);
-      const j = await (await fetch("https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name=" + encodeURIComponent(q) + (zip ? "&countryCode=US" : ""))).json();
-      const g = j && j.results && j.results[0];
-      if (!g) { toast("Couldn't find that place. Try a city name.", 6000); return; }
-      S.outside = { lat: r2(g.latitude), lon: r2(g.longitude), city: g.name, name: g.name + (g.admin1 ? ", " + g.admin1 : "") }; saveS();
-      outsideStart(); toast("Outside temperature: " + S.outside.name);
-    } catch { toast("Couldn't reach the weather service. Check the internet connection.", 6000); }
-  }
-  $("btnOutLoc").onclick = outUseLocation;
-  $("btnOutCity").onclick = outUseCity;
-  $("dOut").addEventListener("pointerdown", (e) => e.stopPropagation());
-  $("dOut").addEventListener("click", (e) => { e.stopPropagation(); if (!S.outside) outUseLocation(); else outsideFetch(); });
 
   $("themePick").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; S.theme = b.dataset.t; saveS(); applyTheme(); });
   matchMedia("(prefers-color-scheme: light)").addEventListener?.("change", applyTheme);

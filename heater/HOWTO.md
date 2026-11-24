@@ -141,7 +141,7 @@ Plug the heater into a **Govee Wi-Fi smart plug** to cut its power completely, o
 </p>
 
 
-**Outside temperature:** tap "Outside · tap to set" under the room temperature on the dial and allow location (or Settings → Outside temperature → City / ZIP). It shows the outside temperature and your town, and updates every 15 minutes.
+**Outside temperature:** shown automatically under the room temperature, with the town it came from. Allow location for the most accurate reading; otherwise Ember estimates your area from your internet connection. Updates every 15 minutes.
 
 ## Good to know
 
