@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.49"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.50"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -630,7 +630,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     }
     // Smooth heat: ease power down as the room approaches the target.
     const want = thermoWant();
-    if (want == null) return;
+    if (want == null) return thermoSkip(awaitingGovee() ? "first Govee reading" : "");
     // Normally re-check every 45 s; if the heater ignored the last change, retry after 10 s.
     const retry = thermoLast && thermoLast.want === want && heater.status.level === thermoLast.from;
     if (Date.now() - lastThermo < (retry ? 10000 : 45000) / FAST) return;
@@ -644,7 +644,12 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
   // The level the thermostat wants now. Uses the same rounded numbers you see on
   // screen, so "72° room, 72° target" always means the hold level.
   let thermoLast = null;
+  const appStart = Date.now();
+  // Govee chosen but its first reading hasn't arrived yet (first ~3 min after opening):
+  // wait for it rather than acting on the heater's own sensor, which reads the cold intake air.
+  const awaitingGovee = () => S.room === "govee" && !govee && Date.now() - appStart < 180000;
   function thermoWant() {
+    if (awaitingGovee()) return null;
     const room = ambientC();
     if (room == null || !heater || !heater.proto) return null;
     const T = tune();
@@ -876,7 +881,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     if (s.power === "starting") return "Igniting: the glow plug lights the fuel. This takes 1 to 3 minutes.";
     if (S.mode === "manual") return `Fixed at level ${s.level ?? "—"}. The thermostat is paused until you switch back.`;
     if (S.native && heater.proto.hasThermostat && S.room !== "govee") return `The heater's own thermostat is holding ${t}${u}. It may turn itself off and on.`;
-    if (room == null) return "Waiting for a room temperature reading…";
+    if (room == null || awaitingGovee()) return "Waiting for a room temperature reading…";
     const r = show(room);
     if (r >= t) return `At ${t}${u}: holding at level ${lo}. It stays on (it won't shut off by itself) and steps back up if the room cools.`;
     if (r <= near) return `Heating up at level ${Math.min(maxLevel(), T.max)}. It starts easing down at ${near}${u}.`;
