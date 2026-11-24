@@ -140,6 +140,9 @@ Plug the heater into a **Govee Wi-Fi smart plug** to cut its power completely, o
 <img src="docs/08-schedule.png" width="260" alt="Schedule with Morning, Midday and Evening windows">
 </p>
 
+
+**Outside temperature:** tap "Outside · tap to set" under the room temperature on the dial and allow location (or Settings → Outside temperature → City / ZIP). It shows the outside temperature and your town, and updates every 15 minutes.
+
 ## Good to know
 
 - **Keep the app open and your screen unlocked** during a clean shutdown or a scheduled start. On iPhone, set **Settings → Display & Brightness → Auto-Lock → Never** while you're using the heater.

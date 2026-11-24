@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.43 | Shows the town next to the outside temperature (e.g. "Outside 26° · Minneapolis"). |
 | v1.42 | Outside temperature under the room temperature (dial and away screen), from your location or a city/ZIP. Free Open-Meteo weather, updates every 15 minutes. |
 | v1.41 | Fan only is always available: during a fault it clears the fault and runs the fan; while heating it cools down, then switches to fan only. Home and away. |
 | v1.40 | Fault codes now match the heater (TB2S sends the code in byte 21; e.g. E-11). Every fault shows what it means and step-by-step fixes, at home and away. |

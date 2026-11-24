@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.42"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.43"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1484,7 +1484,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
         return { faultText: fcode(s.fault) + " " + f[0] + ": " + f[1], faultTitle: fcode(s.fault) + " · " + f[0], faultInfo: f[1], faultSteps: f[2] || [] };
       })(),
       raw: s && s.power === "error" ? s.raw : undefined,
-      mode: S.mode, targetC: S.targetC, roomC: ambientC(), outC: outFresh() ? out.c : null, roomSrc: useGovee() ? "Govee" : "heater",
+      mode: S.mode, targetC: S.targetC, roomC: ambientC(), outC: outFresh() ? out.c : null, outCity: S.outside ? S.outside.city || null : null, roomSrc: useGovee() ? "Govee" : "heater",
       tuneId: tune().id, tuneName: tune().name, hold: tune().hold, top: Math.min(maxLevel(), tune().max),
       tunes: S.tunes.map((t) => ({ id: t.id, name: t.name, targetC: t.targetC })),
       manualLevel: S.level || null, leftL: left, schedNext: schedNext(),
@@ -1702,7 +1702,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     // Controls
     if (awTarget == null) $("awTarget").textContent = show(st.targetC) + "°";
     $("awRoom").textContent = st.roomC != null ? `Room ${show(st.roomC)}° (${st.roomSrc})` : "Room —";
-    $("awOut").textContent = st.outC != null ? `Outside ${show(st.outC)}°` : "";
+    $("awOut").textContent = st.outC != null ? `Outside ${show(st.outC)}°` + (st.outCity ? ` · ${st.outCity}` : "") : "";
     const esc = (x) => String(x).replace(/[<&"]/g, (m) => ({ "<": "&lt;", "&": "&amp;", '"': "&quot;" }[m]));
     $("awPresets").innerHTML = st.tunes.map((t) => `<button class="preset${t.id === st.tuneId && st.mode !== "manual" ? " on" : ""}" data-tune="${t.id}"><b>${show(t.targetC ?? st.targetC)}°</b><span>${esc(t.name)}</span></button>`).join("");
     // Thermostat / Power level view
@@ -1855,7 +1855,8 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
    * free Open-Meteo weather service (no key). Updates every 15 minutes. */
   function renderOutside() {
     const el = $("dOut"); if (!el) return;
-    el.textContent = !S.outside ? "Outside · tap to set" : outFresh() ? "Outside " + show(out.c) + "°" : "Outside —";
+    const city = S.outside ? (S.outside.city || S.outside.name || "").slice(0, 18) : "";
+    el.textContent = !S.outside ? "Outside · tap to set" : (outFresh() ? "Outside " + show(out.c) + "°" : "Outside —") + (city && city !== "Your location" ? " · " + city : "");
     $("outStatus").textContent = !S.outside ? "Not set" : S.outside.name + (outFresh() ? " · " + show(out.c) + "°" : "");
   }
   async function outsideFetch() {
@@ -1871,6 +1872,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
   function outsideStart() {
     clearInterval(outTimer); renderOutside();
     if (!S.outside) return;
+    if (!S.outside.city) placeName(S.outside).then((pl) => { if (pl) { Object.assign(S.outside, pl); saveS(); renderOutside(); } });
     outsideFetch(); outTimer = setInterval(outsideFetch, 15 * 60000);
   }
   const r2 = (n) => Math.round(n * 100) / 100;
@@ -1879,8 +1881,20 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     toast("Finding your location…");
     navigator.geolocation.getCurrentPosition((p) => {
       S.outside = { lat: r2(p.coords.latitude), lon: r2(p.coords.longitude), name: "Your location" }; saveS();
-      outsideStart(); toast("Outside temperature set");
+      outsideStart();
+      placeName(S.outside).then((pl) => {
+        if (pl) { Object.assign(S.outside, pl); saveS(); renderOutside(); }
+        toast("Outside temperature: " + S.outside.name);
+      });
     }, () => toast("Location wasn't allowed. Use City / ZIP in Settings instead.", 7000), { timeout: 15000, maximumAge: 3600e3 });
+  }
+  // Town name for a location (free BigDataCloud lookup, no key). Null if it can't be found.
+  async function placeName(loc) {
+    try {
+      const j = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${loc.lat}&longitude=${loc.lon}&localityLanguage=en`)).json();
+      const city = j.city || j.locality; if (!city) return null;
+      return { city, name: city + (j.principalSubdivision ? ", " + j.principalSubdivision : "") };
+    } catch { return null; }
   }
   async function outUseCity() {
     const q = (prompt("City or ZIP code for the outside temperature:", "") || "").trim();
@@ -1890,7 +1904,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
       const j = await (await fetch("https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name=" + encodeURIComponent(q) + (zip ? "&countryCode=US" : ""))).json();
       const g = j && j.results && j.results[0];
       if (!g) { toast("Couldn't find that place. Try a city name.", 6000); return; }
-      S.outside = { lat: r2(g.latitude), lon: r2(g.longitude), name: g.name + (g.admin1 ? ", " + g.admin1 : "") }; saveS();
+      S.outside = { lat: r2(g.latitude), lon: r2(g.longitude), city: g.name, name: g.name + (g.admin1 ? ", " + g.admin1 : "") }; saveS();
       outsideStart(); toast("Outside temperature: " + S.outside.name);
     } catch { toast("Couldn't reach the weather service. Check the internet connection.", 6000); }
   }
