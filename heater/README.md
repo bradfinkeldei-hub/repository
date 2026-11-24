@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.45 | Thermostat dial is less sensitive: it turns at half speed from where you start, a tap no longer jumps the temperature, and tiny touches are ignored. The − and + buttons still step 1°. |
 | v1.44 | Outside temperature is fully automatic: no setup. Uses location if allowed, otherwise your area from the internet connection, and shows the town. |
 | v1.43 | Shows the town next to the outside temperature (e.g. "Outside 26° · Minneapolis"). |
 | v1.42 | Outside temperature under the room temperature (dial and away screen), from your location or a city/ZIP. Free Open-Meteo weather, updates every 15 minutes. |

@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.44"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.45"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1030,20 +1030,35 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
   }
 
   const dial = $("dial");
-  let dragging = false;
-  const fromPointer = (e) => {
+  // Relative, slowed-down dragging: the value moves by how far you turn, at half
+  // speed. A tap doesn't jump it, and tiny touches (under ~10 px) are ignored.
+  const DIAL_SPEED = 0.5, DEADZONE = 10;
+  let drag = null;
+  const angleAt = (e) => {
     const r = dial.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * 300 - CX;
-    const y = ((e.clientY - r.top) / r.height) * 300 - CY;
-    let deg = (Math.atan2(y, x) * 180) / Math.PI;
-    let rel = (deg - A0 + 720) % 360;
-    if (rel > SWEEP) rel = rel - SWEEP < (360 - SWEEP) / 2 ? SWEEP : 0;
-    const [lo, hi] = range();
-    setTarget(lo + (hi - lo) * (rel / SWEEP));
+    const x = ((e.clientX - r.left) / r.width) * 300 - CX, y = ((e.clientY - r.top) / r.height) * 300 - CY;
+    return (Math.atan2(y, x) * 180) / Math.PI;
   };
-  dial.addEventListener("pointerdown", (e) => { dragging = true; dial.setPointerCapture(e.pointerId); fromPointer(e); });
-  dial.addEventListener("pointermove", (e) => dragging && fromPointer(e));
-  dial.addEventListener("pointerup", () => (dragging = false));
+  dial.addEventListener("pointerdown", (e) => {
+    dial.setPointerCapture(e.pointerId);
+    drag = { x: e.clientX, y: e.clientY, a: angleAt(e), v: show(S.targetC), live: false };
+  });
+  dial.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    if (!drag.live) {
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < DEADZONE) return;
+      drag.live = true; drag.a = angleAt(e); // start counting from here
+    }
+    const a = angleAt(e);
+    let d = a - drag.a; if (d > 180) d -= 360; if (d < -180) d += 360;
+    drag.a = a;
+    const [lo, hi] = range();
+    drag.v = Math.max(lo, Math.min(hi, drag.v + ((hi - lo) * d / SWEEP) * DIAL_SPEED));
+    if (Math.round(drag.v) !== show(S.targetC)) setTarget(drag.v);
+  });
+  const endDrag = () => (drag = null);
+  dial.addEventListener("pointerup", endDrag);
+  dial.addEventListener("pointercancel", endDrag);
   dial.addEventListener("keydown", (e) => {
     if (e.key === "ArrowUp" || e.key === "ArrowRight") setTarget(show(S.targetC) + 1);
     if (e.key === "ArrowDown" || e.key === "ArrowLeft") setTarget(show(S.targetC) - 1);
