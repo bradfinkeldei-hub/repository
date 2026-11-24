@@ -105,6 +105,18 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/remote/")) return remote(request, env, url.pathname.slice("/remote/".length));
+    // Troubleshooting logs: write-only from the app (read via the Cloudflare dashboard/API, never from the site).
+    if (url.pathname === "/diag" && request.method === "POST") {
+      if (!env.EMBER) return json(503, { code: 503, message: "NOT_SET_UP" });
+      try {
+        const b = await readBody(request, 300000);
+        const id = String(b.id || "").replace(/[^a-z0-9]/g, "").slice(0, 12);
+        if (!id || typeof b.text !== "string") return json(400, { code: 400, message: "Bad request" });
+        await env.EMBER.put("diag:" + id, b.text.slice(0, 250000), { expirationTtl: 60 * 60 * 24 * 14 });
+        await env.EMBER.put("diag:last", id, { expirationTtl: 60 * 60 * 24 * 14 });
+        return json(200, { code: 200 });
+      } catch { return json(400, { code: 400, message: "Bad request" }); }
+    }
     if (url.pathname.startsWith("/govee/")) {
       const path = url.pathname.slice("/govee/".length);
       if (ALLOWED[path] !== request.method) return json(404, { code: 404, message: "Not allowed" });

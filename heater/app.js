@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.47"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.48"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -337,11 +337,12 @@
   let lastAcct = 0, lowVSince = null, lastThermo = 0, settleUntil = 0, drag = null, wakeLock = null, maxRunSec = 0;
   let reconnecting = false;
 
-  const logLines = [];
+  const logLines = [], events = []; // events: decisions and errors only (no raw radio traffic), kept longer
   function log(line) {
     const t = new Date().toLocaleTimeString([], { hour12: false });
     logLines.push(t + "  " + line);
     if (logLines.length > 300) logLines.shift();
+    if (!/^[▶◀]/.test(line)) { events.push(new Date().toISOString().slice(5, 19).replace("T", " ") + "  " + line); if (events.length > 600) events.shift(); diagDirty = true; }
     const el = $("log");
     if (el && !$("settings").hidden && $("logBox").open) { el.textContent = logLines.slice(-80).join("\n"); el.scrollTop = el.scrollHeight; }
   }
@@ -549,7 +550,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
   const steps = (el, list) => { el.replaceChildren(...(list || []).map((t) => Object.assign(document.createElement("li"), { textContent: t }))); };
   let faultLogged = "";
   function onStatus(s) {
-    if (s && s.power === "error" && s.raw !== faultLogged) { faultLogged = s.raw; log("· fault frame (code " + (s.fault || "?") + "): " + s.raw); }
+    if (s && s.power === "error" && s.raw !== faultLogged) { faultLogged = s.raw; log("· fault frame (code " + (s.fault || "?") + "): " + s.raw); setTimeout(() => sendDiag("fault"), 3000); }
     if (clean) renderClean();
     account(s);
     batteryGuard(s);
@@ -595,9 +596,14 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
   }
 
   /* ---------------- Thermostat ---------------- */
+  let thermoWhy = "";
+  const thermoSkip = (why) => { if (why !== thermoWhy) { thermoWhy = why; if (why) log("· thermostat waiting: " + why); } };
   async function thermostat() {
     const s = heater && heater.status;
-    if (!s || s.power !== "running" || S.mode !== "thermo" || clean || heater.busy) return;
+    if (!s || s.power !== "running" || S.mode !== "thermo") return thermoSkip("");
+    if (clean) return thermoSkip("clean burn running");
+    if (heater.busy) return thermoSkip("heater busy with another command");
+    thermoSkip("");
     // Wait until the new temperature has settled (finger off the dial, no taps for a moment).
     if (drag || Date.now() < settleUntil) return;
     if (S.native && heater.proto.hasThermostat && S.room !== "govee") {
@@ -1459,6 +1465,37 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
   $("btnClose").onclick = () => ($("settings").hidden = true);
   $("settings").addEventListener("click", (e) => { if (e.target.id === "settings") $("settings").hidden = true; });
   $("btnCopyLog2").onclick = () => $("btnCopyLog").onclick();
+  /* ---------------- Send log (troubleshooting) ----------------
+   * Uploads a snapshot to this site's own storage (Cloudflare KV) so it can be
+   * read for troubleshooting. No API keys or PINs are included. Sent when you
+   * tap "Send log", on a fault, and every 15 minutes while something new happened. */
+  let diagDirty = false, diagLastAuto = 0;
+  const diagId = store.get("diagId", null) || (() => { const id = Math.random().toString(36).slice(2, 8); store.set("diagId", id); return id; })();
+  function diagText(reason) {
+    const s = heater && heater.status;
+    const safe = { unit: S.unit, targetC: S.targetC, mode: S.mode, tuneId: S.tuneId, minLevel: S.minLevel, room: S.room, native: S.native,
+      proto: S.proto, hUnit: S.hUnit, tankGal: S.tankGal, tunes: S.tunes, gUnit: S.gUnit, govee: S.gwifi ? S.gwifi.sku : S.goveeId ? "bluetooth" : null, outside: S.outside && S.outside.city };
+    const state = { reason, version: VERSION, at: new Date().toString(), ua: navigator.userAgent, device: link ? link.name : null, format: heater && heater.proto ? heater.proto.id : null,
+      hidden: document.hidden, heater: s ? { power: s.power, mode: s.mode, level: s.level, setpoint: s.setpoint, ambient: s.ambient, unit: s.unit, fault: s.fault, volts: s.volts, raw: s.raw } : null,
+      busy: heater ? heater.busy : null, clean, drag: !!drag, settleIn: settleUntil - Date.now(), roomC: ambientC(), roomShown: ambientC() == null ? null : show(ambientC()),
+      govee: govee ? { tempC: govee.tempC, hum: govee.hum, via: govee.via, ageS: Math.round((Date.now() - govee.at) / 1000) } : null, goveeUsed: useGovee(),
+      thermo: { want: heater ? thermoWant() : null, sinceLastS: Math.round((Date.now() - lastThermo) / 1000), last: thermoLast }, settings: safe };
+    return JSON.stringify(state, null, 1) + "\n\n--- events ---\n" + events.join("\n").replace(/PIN \d+/g, "PIN ****") + "\n\n--- recent radio ---\n" + logLines.slice(-60).join("\n");
+  }
+  async function sendDiag(reason) {
+    try {
+      const r = await fetch("diag", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: diagId, text: diagText(reason) }) });
+      if (r.ok) { diagDirty = false; return true; }
+    } catch {}
+    return false;
+  }
+  setInterval(() => { if (diagDirty && heater && Date.now() - diagLastAuto > 15 * 60000) { diagLastAuto = Date.now(); sendDiag("auto"); } }, 60000);
+  $("btnSendLog").onclick = async () => {
+    $("btnSendLog").disabled = true;
+    const ok = await sendDiag("button");
+    $("btnSendLog").disabled = false;
+    toast(ok ? `Log sent (ID ${diagId}). Tell Claude it's sent.` : "Couldn't send the log. Check the internet connection, or use Copy log.", 7000);
+  };
   $("btnCopyLog").onclick = async () => {
     const text = `Ember log · ${navigator.userAgent}\nDevice: ${link ? link.name : "-"} · format ${heater && heater.proto ? heater.proto.id : "?"}\n` + logLines.join("\n");
     try { await navigator.clipboard.writeText(text); toast("Log copied"); } catch { toast("Couldn't copy"); }

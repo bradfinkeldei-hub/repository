@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.48 | Send log: Settings → Send log uploads a troubleshooting snapshot to your own Cloudflare storage (no keys or PINs). Also sent automatically on a fault and every 15 minutes when something new happened. The thermostat logs why it is waiting. |
 | v1.47 | Thermostat: when the room shows the target temperature it always eases to the hold level (on-screen text and power now agree), retries after 10 s if the heater ignores a change, logs every power decision, and reacts right away to a new Govee reading. |
 | v1.46 | Changing the temperature no longer changes the power right away: the dial shows "SETTING…" and waits 2.5 seconds after your last change, then adjusts the power if needed. |
 | v1.45 | Thermostat dial is less sensitive: it turns at half speed from where you start, a tap no longer jumps the temperature, and tiny touches are ignored. The − and + buttons still step 1°. |
