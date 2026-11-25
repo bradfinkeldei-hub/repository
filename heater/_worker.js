@@ -256,6 +256,7 @@ const assistant = (() => {
           more.push(["mode", "thermo"], ["target", c]); what += ` at ${cToF(c)}°F`;
         }
         const on = st && (st.power === "running" || st.power === "starting");
+        if (on && !more.length) return "The heater is already on.\n\nCurrent status:\n" + describe(st).text;
         const r = on ? (more.length ? await queue(env, more[0][0], more[0][1], more.slice(1)) : { cmd: true })
           : more.length ? await queue(env, more[0][0], more[0][1], [...more.slice(1), ["start", null]]) : await queue(env, "start", null);
         if (r.error) return "Couldn't send: " + r.error;
@@ -403,21 +404,56 @@ const assistant = (() => {
   const rpc = (id, result, error) => new Response(JSON.stringify(error ? { jsonrpc: "2.0", id, error } : { jsonrpc: "2.0", id, result }),
     { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...cors() } });
 
-  // Plain web API for Siri Shortcuts, Home Assistant, scripts.
-  //   GET  /api/status            POST /api/on   {preset?, temperature?, unit?}
-  //   POST /api/off {burn_off_minutes?}   POST /api/temperature {temperature, unit?}
-  //   POST /api/level {level}     POST /api/fan {speed?}
+  // Short, speakable summary for voice assistants (Siri "Speak Text", smart speakers).
+  function summary(st) {
+    if (!st) return "Ember's home gateway isn't reporting yet.";
+    const x = st.x || {}, age = Date.now() - (st.serverAt || st.at || 0);
+    const f = (c) => (c == null ? null : cToF(c));
+    const out = [];
+    const p = { off: "off", starting: "igniting", running: "heating", cooling: "cooling down", fan: "on fan only", error: "stopped with a fault" }[st.power] || "in an unknown state";
+    out.push(`The heater is ${p}${(st.power === "running" || st.power === "fan") && st.level != null ? ` at level ${st.level}` : ""}.`);
+    if (st.power === "error" && st.faultTitle) out.push(st.faultTitle.replace("·", ":") + ".");
+    if (st.clean) out.push(`A ${st.clean.kind === "burn" ? "clean burn" : "burn-off"} is running, about ${x.cleanLeftMin ?? "a few"} minutes left.`);
+    const t = [st.roomC != null && `room ${f(st.roomC)}`, st.mode === "thermo" && st.targetC != null && `set to ${f(st.targetC)}`, st.outC != null && `outside ${f(st.outC)}`].filter(Boolean);
+    if (t.length) out.push(t.join(", ").replace(/^./, (c) => c.toUpperCase()) + " degrees.");
+    if (st.leftL != null) out.push(`About ${(st.leftL / 3.785).toFixed(1)} gallons left${x.hoursLeft && x.hoursLeft.now ? `, roughly ${Math.round(x.hoursLeft.now)} hours at this level` : ""}.`);
+    if (x.todayH != null) out.push(`It has run ${x.todayH} hours today.`);
+    if (!st.connected) out.push("The home device isn't connected to the heater right now.");
+    if (age > 600e3) out.push(`This is from ${ago(age)} ago; the home device may be offline.`);
+    return out.join(" ");
+  }
+
+  // Plain web API for Siri Shortcuts, Home Assistant, scripts. Authorization: Bearer <key>.
+  //   GET  /api/status   full report      GET /api/summary   short, speakable
+  //   POST /api/on {preset?|temperature?, unit?}   /api/off {burn_off_minutes?}
+  //   POST /api/temperature {temperature, unit?}  /api/level {level}  /api/preset {preset}
+  //   POST /api/fan {speed?}  /api/fanspeed {speed}  /api/clean  /api/cleanstop
+  //   POST /api/plug {action: on|off|power_cycle}  /api/fault {restart?}
+  //   POST /api/fuel {full?|gallons?}  /api/schedule {slot, enabled}
+  // Any tool name also works (POST /api/start_clean_burn …). Add ?text=1 (or
+  // "Accept: text/plain") for a plain-text reply that Siri can speak.
+  const ROUTES = { status: "get_heater_status", on: "turn_on_heater", off: "turn_off_heater", temperature: "set_temperature", level: "set_power_level",
+    fan: "fan_only", fanspeed: "set_fan_speed", preset: "choose_preset", clean: "start_clean_burn", cleanstop: "stop_clean_burn",
+    plug: "smart_plug", fault: "clear_fault", fuel: "log_fuel", schedule: "set_schedule" };
   async function api(request, env, url) {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors() });
-    const key = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    const key = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "") || url.searchParams.get("key") || "";
     if (!(await keyOk(env, key))) return json(401, { code: 401, message: "Invalid or missing access key (Authorization: Bearer emb_…)" });
-    const route = { "GET status": "get_heater_status", "POST on": "turn_on_heater", "POST off": "turn_off_heater", "POST temperature": "set_temperature", "POST level": "set_power_level", "POST fan": "fan_only" }[request.method + " " + url.pathname.slice(5)];
-    if (!route) return json(404, { code: 404, message: "Not found" });
+    const name = url.pathname.slice(5).replace(/\.txt$/, "");
+    const wantText = url.searchParams.has("text") || url.pathname.endsWith(".txt") || /text\/plain/.test(request.headers.get("Accept") || "") && !/json/.test(request.headers.get("Accept") || "");
+    const reply = (text, st) => wantText
+      ? new Response(text, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", ...cors() } })
+      : new Response(JSON.stringify({ code: 200, message: text, state: st }), { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...cors() } });
+    if (name === "summary") { const st = await state(env); return reply(summary(st), st); }
+    const tool = ROUTES[name] || (TOOLS[name] ? name : null);
+    if (!tool) return json(404, { code: 404, message: "Not found. Try /api/status, /api/summary, /api/on, /api/off …" });
+    if (tool !== "get_heater_status" && request.method !== "POST") return json(405, { code: 405, message: "Use POST for commands." });
     let args = {};
     if (request.method === "POST") { try { args = await readBody(request, 2000); } catch { args = {}; } }
-    const text = await call(env, route, args);
-    const st = await state(env);
-    return new Response(JSON.stringify({ code: 200, message: text, state: st }), { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...cors() } });
+    for (const [k, v] of url.searchParams) if (k !== "key" && k !== "text" && args[k] == null) args[k] = /^-?\d+(\.\d+)?$/.test(v) ? +v : v === "true" ? true : v === "false" ? false : v;
+    let text = await call(env, tool, args);
+    if (wantText && tool !== "get_heater_status") text = text.split("\n\nCurrent status")[0]; // short spoken confirmation
+    return reply(text, await state(env));
   }
 
   return { mcp, api, TOOLS };

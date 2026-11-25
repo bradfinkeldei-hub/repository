@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.53"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.54"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1683,13 +1683,17 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
       steps: ["On chatgpt.com (paid plans), open Settings → Apps & Connectors → Advanced settings and turn on Developer mode.", "Back in Apps & Connectors, tap Create. Name: Ember Heater. MCP server URL: paste the URL below. Authentication: No authentication. Tap Create.", "In a new chat, open the + menu, turn on Developer mode and pick Ember Heater. Then say \"turn on the heater\"."],
       fields: [["MCP server URL", u.mcp]] }) },
     siri: { name: "Siri", make: (u) => ({
-      steps: ["Open the Shortcuts app → + → Add Action → Get Contents of URL.", "Paste the Heater on URL. Tap the arrow to show more: Method POST. Under Headers add Authorization with the header value below.", "Optional: Request Body JSON, add preset = Comfort (or temperature = 72).", "Rename the shortcut \"Heater on\". Now say \"Hey Siri, heater on\".", "Make a second shortcut the same way with the Heater off URL, named \"Heater off\"."],
-      fields: [["Heater on URL", u.api + "on"], ["Heater off URL", u.api + "off"], ["Authorization header value", "Bearer " + u.key]] }) },
+      steps: ["Open the Shortcuts app → + → Add Action → Get Contents of URL. Paste the Heater status URL. Then add the action Speak Text. Name the shortcut \"Heater status\".",
+        "New shortcut → Get Contents of URL → paste the Heater on URL → tap the arrow and set Method to POST. Name it \"Heater on\". (Optional: add Speak Text to hear the confirmation.)",
+        "Same again with the Heater off URL, named \"Heater off\".",
+        "Now say \"Hey Siri, heater status\", \"Hey Siri, heater on\" or \"Hey Siri, heater off\".",
+        "More: copy the On URL and swap \"on\" for clean, cleanstop, fan, preset?preset=Sleep, temperature?temperature=72, level?level=4, fanspeed?speed=6 or fuel?full=true (all POST)."],
+      fields: [["Heater status URL (GET)", u.api + "summary?text=1&key=" + u.key], ["Heater on URL (POST)", u.api + "on?text=1&key=" + u.key], ["Heater off URL (POST)", u.api + "off?text=1&key=" + u.key]] }) },
     ha: { name: "Home Assistant", make: (u) => ({
-      steps: ["Add this to configuration.yaml and restart Home Assistant.", "Use script/automation actions rest_command.heater_on and rest_command.heater_off, or expose them to your voice assistant."],
-      fields: [["configuration.yaml", `rest_command:\n  heater_on:\n    url: "${u.api}on"\n    method: post\n    headers:\n      authorization: "Bearer ${u.key}"\n    content_type: "application/json"\n    payload: '{"preset": "Comfort"}'\n  heater_off:\n    url: "${u.api}off"\n    method: post\n    headers:\n      authorization: "Bearer ${u.key}"\n    content_type: "application/json"\n    payload: '{}'`]] }) },
+      steps: ["Add this to configuration.yaml and restart Home Assistant.", "You get a Heater sensor (spoken summary) and actions rest_command.heater_on, heater_off and heater_clean_burn. Expose them to Assist, Alexa or Google through Home Assistant."],
+      fields: [["configuration.yaml", `sensor:\n  - platform: rest\n    name: Heater\n    resource: "${u.api}summary?text=1"\n    headers:\n      authorization: "Bearer ${u.key}"\n    value_template: "{{ value[:250] }}"\n    scan_interval: 120\nrest_command:\n  heater_on:\n    url: "${u.api}on"\n    method: post\n    headers:\n      authorization: "Bearer ${u.key}"\n    content_type: "application/json"\n    payload: '{"preset": "Comfort"}'\n  heater_off:\n    url: "${u.api}off"\n    method: post\n    headers:\n      authorization: "Bearer ${u.key}"\n  heater_clean_burn:\n    url: "${u.api}clean"\n    method: post\n    headers:\n      authorization: "Bearer ${u.key}"`]] }) },
     other: { name: "Other", make: (u) => ({
-      steps: ["AI apps that support MCP: use the MCP URL.", "Anything else: call the web API with the header below. GET status · POST on, off, temperature, level, fan (details in the setup guide on GitHub)."],
+      steps: ["AI apps that support MCP (ChatGPT, Claude, others): use the MCP URL. They get every command and the full status.", "Anything else: call the web API with the header below. GET status or summary (add ?text=1 for plain text) · POST on, off, temperature, level, preset, fan, fanspeed, clean, cleanstop, plug, fault, fuel, schedule. Details in the setup guide on GitHub."],
       fields: [["MCP URL", u.mcp], ["Web API", u.api], ["Authorization header value", "Bearer " + u.key]] }) },
   };
   function aiRenderSub() {

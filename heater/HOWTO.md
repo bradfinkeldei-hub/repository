@@ -129,21 +129,29 @@ Needs the home gateway (above). In Ember, open **Settings → Voice & AI assista
 
 **Claude:** in Claude, go to **Settings → Connectors → Add custom connector** and paste the connector URL. Then just ask: "turn on my heater to Comfort", "set it to 72", "what's the heater doing?", "turn it off without the burn-off".
 
-**Siri (Shortcuts app):** new shortcut → **Get Contents of URL**:
-- URL: `https://YOUR-SITE.pages.dev/api/on` · Method **POST** · Header `Authorization` = `Bearer YOUR-KEY`
-- Optional JSON body: `{"preset": "Comfort"}` or `{"temperature": 72}`
-- Name it "Heater on". Say "Hey Siri, heater on". Make a second one with `/api/off`.
+**Siri (Shortcuts app):** pick Siri in the list and Ember gives you three links: **Heater status**, **Heater on** and **Heater off**. Each one becomes a shortcut ("Get Contents of URL", plus "Speak Text" for status), so you can say "Hey Siri, heater status" and hear: *"The heater is heating at level 3. Room 71, set to 72, outside 28 degrees. About 3.7 gallons left, roughly 52 hours at this level."* Every other command works the same way (clean, preset, fanspeed, fuel…).
+
+**ChatGPT** gets the same commands and full status as Claude (it connects the same way).
 
 **Anything else** (Home Assistant `rest_command`, scripts): send `Authorization: Bearer YOUR-KEY` to:
 
 | Request | Does |
 |---|---|
-| `GET /api/status` | Status: on/off, level, set temperature, room, outside, fuel, presets |
+| `GET /api/status` | Full report (everything the app knows) |
+| `GET /api/summary` | Short, speakable summary |
 | `POST /api/on` `{"preset"}` or `{"temperature","unit"}` | Turn on (optionally with a preset or temperature) |
 | `POST /api/off` `{"burn_off_minutes": 0, 1, 5, 10 or 20}` | Turn off (default: your burn-off, 0 = now) |
 | `POST /api/temperature` `{"temperature","unit"}` | Set the thermostat |
 | `POST /api/level` `{"level": 1-10}` | Fixed power level |
 | `POST /api/fan` `{"speed": 1-10}` | Fan only |
+| `POST /api/fanspeed` `{"speed"}` · `/api/preset` `{"preset"}` | Fan speed · switch preset |
+| `POST /api/clean` · `/api/cleanstop` | Start / stop a 15-min clean burn |
+| `POST /api/plug` `{"action": "on", "off" or "power_cycle"}` | Smart plug |
+| `POST /api/fault` `{"restart": true/false}` | Clear a fault |
+| `POST /api/fuel` `{"full": true}` or `{"gallons"}` | Log a fill-up |
+| `POST /api/schedule` `{"slot": "Evening", "enabled": true}` | Schedule on/off |
+
+Add `?text=1` for a plain-text reply (Siri can speak it). Values can also go in the URL (`/api/level?level=4`), and the key can go in the URL as `key=` instead of the header.
 
 Commands go through the same path as away control, so the home device carries them out in about 5–10 seconds, with the same safety rules (for example, it never restarts after a carbon monoxide fault). Temperatures default to °F.
 

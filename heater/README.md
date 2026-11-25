@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.54 | Siri, ChatGPT and other assistants get everything Claude has: full status, a short spoken summary ("Hey Siri, heater status"), and every command (clean burn, presets, fan speed, plug, faults, fuel, schedule) through the web API. |
 | v1.53 | Assistants can now see everything (body temp, voltage, humidity, fuel burn rate and hours left, run hours today/7 days/total, hours since clean burn, schedule, plug, faults with fixes) and control more: start/stop a clean burn, fan speed, presets, smart plug, clear faults, log a fill-up, schedule on/off. |
 | v1.52 | Settings → Voice & AI assistants: pick Claude, ChatGPT, Siri, Home Assistant or Other and get step-by-step setup with the link and key ready to copy. Disconnect any time. |
 | v1.51 | Assistants & services: connect Claude (custom connector), Siri Shortcuts, Home Assistant or scripts to the home gateway with revocable access keys. Say "turn on my heater to Comfort" to Claude. |
