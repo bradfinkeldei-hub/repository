@@ -214,9 +214,10 @@ const assistant = (() => {
     if (st.clean) L.push(`${st.clean.kind === "burn" ? "Clean burn (carbon clean, keeps heating after)" : "Shutdown burn-off (turns off after)"} running at full power, about ${x.cleanLeftMin ?? "?"} min left.`);
     if (st.mode === "thermo") L.push(`Mode: thermostat, set to ${T(st.targetC)}${st.tuneName ? `, preset "${st.tuneName}"` : ""}. Runs between level ${st.hold ?? x.minLevel ?? 2} and ${st.top ?? 10}.`);
     if (st.mode === "manual") L.push(`Mode: fixed power level ${st.manualLevel ?? "—"}.`);
-    L.push(`TEMPERATURES: room ${T(st.roomC)} (${st.roomSrc || "sensor"}${x.hum != null ? `, ${x.hum}% humidity` : ""}); outside ${st.outC != null ? T(st.outC) + (st.outCity ? " in " + st.outCity : "") : "—"}; heater body ${T(x.bodyC)}; heater intake sensor ${T(x.heaterRoomC)}.`);
+    L.push(`TEMPERATURES: room ${T(st.roomC)} (${st.roomSrc || "sensor"}${x.hum != null ? `, ${x.hum}% humidity` : ""}); outside ${st.outC != null ? T(st.outC) + (st.outCity ? " in " + st.outCity : "") : "—"}${x.bodyC != null ? `; heater body ${T(x.bodyC)}` : ""}${x.heaterRoomC != null ? `; heater intake sensor ${T(x.heaterRoomC)}` : ""}.`);
+    if (!st.x) L.push("(The home device runs an older Ember: reload Ember there for run hours, burn rate, body temperature and schedule.)");
     if (st.volts) L.push(`Battery/supply: ${st.volts.toFixed ? st.volts.toFixed(1) : st.volts} V.`);
-    if (st.leftL != null) L.push(`FUEL: about ${gal(st.leftL)} left of a ${x.tankGal ?? "?"} gal tank${x.rateLph ? `; burning ${gal(x.rateLph)}/h now (≈ ${x.hoursLeft.now} h left at this level)` : ""}; ≈ ${x.hoursLeft ? x.hoursLeft.low : "?"} h at level ${x.minLevel ?? 2}, ≈ ${x.hoursLeft ? x.hoursLeft.max : "?"} h at level 10.`);
+    if (st.leftL != null) L.push(`FUEL: about ${gal(st.leftL)} left${x.tankGal ? ` of a ${x.tankGal} gal tank` : ""}${x.rateLph ? `; burning ${gal(x.rateLph)}/h now (≈ ${x.hoursLeft.now} h left at this level)` : ""}${x.hoursLeft ? `; ≈ ${x.hoursLeft.low} h at level ${x.minLevel ?? 2}, ≈ ${x.hoursLeft.max} h at level 10` : ""}.`);
     if (x.runH != null) L.push(`RUN TIME: today ${x.todayH} h (${gal(x.todayL * 1)}), last 7 days ${x.weekH} h (${gal(x.weekL * 1)}), total ${x.runH} h. Low-level running since the last clean burn: ${x.lowH} h (a clean burn is suggested every ${x.coachH} h).`);
     if (x.cleanMins != null) L.push(`Default shutdown burn-off: ${x.cleanMins} min.`);
     if (st.tunes && st.tunes.length) L.push(`Presets: ${st.tunes.map((t) => `${t.name} ${cToF(t.targetC)}°F`).join(", ")}.`);
