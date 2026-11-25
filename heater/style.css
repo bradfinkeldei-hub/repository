@@ -550,7 +550,6 @@ html.sheet-page .overlay.as-page .sheet-head { position: sticky; top: 0; z-index
 .aw-out:empty { display: none; }
 .row-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 
-.ai-box { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .ai-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .ai-head small, .ai-new label small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; margin-top: 2px; }
 .ai-key { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; font-size: 14px; }
@@ -561,3 +560,11 @@ html.sheet-page .overlay.as-page .sheet-head { position: sticky; top: 0; z-index
 .ai-copy { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
 .ai-copy code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-size: 12px; padding: 8px 10px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
 #btnAiDone { margin-top: 12px; }
+.ai-pick { padding: 4px 0 12px; }
+.ai-q { margin: 0 0 8px; font-size: 14px; color: var(--muted); }
+.ai-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ai-title { margin: 0 0 4px; font-weight: 600; font-size: 16px; }
+.ai-steps { margin: 10px 0 4px; padding-left: 20px; font-size: 14px; line-height: 1.45; }
+.ai-steps li + li { margin-top: 4px; }
+.ai-field { margin-top: 10px; font-size: 13px; color: var(--muted); }
+.ai-copy pre { flex: 1 1 auto; min-width: 0; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; padding: 8px 10px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }

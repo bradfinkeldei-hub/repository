@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.51"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.52"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1644,43 +1644,77 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     finally { gwBusy = false; renderGateway(); }
   }
   setInterval(gatewayTick, GW_EVERY);
-  /* ----- Assistants & services: access keys for Claude / Siri / Home Assistant ----- */
+  /* ----- Voice & AI assistants: Claude, ChatGPT, Siri, Home Assistant, other ----- *
+   * Each connection gets its own access key (managed with the gateway PIN, so it
+   * works from the home device or your phone). Commands run on the home gateway. */
+  const aiPin = () => S.homePin || S.awayPin;
+  const SERVICES = {
+    claude: { name: "Claude", make: (u) => ({
+      steps: ["In Claude, open Settings → Connectors.", "Tap Add custom connector. Name it Ember Heater and paste the connector URL below.", "Tap Add. Then just ask Claude: \"turn on my heater to Comfort\", \"set it to 72\", or \"what's the heater doing?\""],
+      fields: [["Connector URL", u.mcp]] }) },
+    chatgpt: { name: "ChatGPT", make: (u) => ({
+      steps: ["On chatgpt.com (paid plans), open Settings → Apps & Connectors → Advanced settings and turn on Developer mode.", "Back in Apps & Connectors, tap Create. Name: Ember Heater. MCP server URL: paste the URL below. Authentication: No authentication. Tap Create.", "In a new chat, open the + menu, turn on Developer mode and pick Ember Heater. Then say \"turn on the heater\"."],
+      fields: [["MCP server URL", u.mcp]] }) },
+    siri: { name: "Siri", make: (u) => ({
+      steps: ["Open the Shortcuts app → + → Add Action → Get Contents of URL.", "Paste the Heater on URL. Tap the arrow to show more: Method POST. Under Headers add Authorization with the header value below.", "Optional: Request Body JSON, add preset = Comfort (or temperature = 72).", "Rename the shortcut \"Heater on\". Now say \"Hey Siri, heater on\".", "Make a second shortcut the same way with the Heater off URL, named \"Heater off\"."],
+      fields: [["Heater on URL", u.api + "on"], ["Heater off URL", u.api + "off"], ["Authorization header value", "Bearer " + u.key]] }) },
+    ha: { name: "Home Assistant", make: (u) => ({
+      steps: ["Add this to configuration.yaml and restart Home Assistant.", "Use script/automation actions rest_command.heater_on and rest_command.heater_off, or expose them to your voice assistant."],
+      fields: [["configuration.yaml", `rest_command:\n  heater_on:\n    url: "${u.api}on"\n    method: post\n    headers:\n      authorization: "Bearer ${u.key}"\n    content_type: "application/json"\n    payload: '{"preset": "Comfort"}'\n  heater_off:\n    url: "${u.api}off"\n    method: post\n    headers:\n      authorization: "Bearer ${u.key}"\n    content_type: "application/json"\n    payload: '{}'`]] }) },
+    other: { name: "Other", make: (u) => ({
+      steps: ["AI apps that support MCP: use the MCP URL.", "Anything else: call the web API with the header below. GET status · POST on, off, temperature, level, fan (details in the setup guide on GitHub)."],
+      fields: [["MCP URL", u.mcp], ["Web API", u.api], ["Authorization header value", "Bearer " + u.key]] }) },
+  };
+  function aiRenderSub() {
+    $("aiSub").textContent = aiPin() ? 'Tell Claude, ChatGPT or Siri "turn on the heater".' : "Needs the Home gateway turned on (on the device next to the heater) or Control from away set up on this phone.";
+  }
   async function aiLoad() {
-    if (!S.gateway || !S.homePin) { $("aiKeys").innerHTML = ""; return; }
+    aiRenderSub();
+    if (!aiPin()) { $("aiKeys").innerHTML = ""; return; }
     try {
-      const { keys = [] } = await rcall("GET", "keys", null, S.homePin);
-      $("aiKeys").innerHTML = keys.length ? "" : '<p class="fine">None yet.</p>';
+      const { keys = [] } = await rcall("GET", "keys", null, aiPin());
+      $("aiKeys").innerHTML = "";
       for (const k of keys) {
         const row = document.createElement("div"); row.className = "ai-key";
         const name = document.createElement("span"); name.textContent = k.name;
         const when = document.createElement("small"); when.textContent = k.used ? "used " + new Date(k.used).toLocaleDateString() : "not used yet";
         name.append(when);
-        const del = document.createElement("button"); del.className = "btn small"; del.textContent = "Remove";
+        const del = document.createElement("button"); del.className = "btn small"; del.textContent = "Disconnect";
         del.onclick = async () => {
-          if (!confirm(`Remove "${k.name}"? It will stop working right away.`)) return;
-          try { await rcall("DELETE", "keys/" + k.id, null, S.homePin); toast("Removed"); } catch (e) { toast(remoteMsg(e), 7000); }
+          if (!confirm(`Disconnect "${k.name}"? It stops working right away.`)) return;
+          try { await rcall("DELETE", "keys/" + k.id, null, aiPin()); toast("Disconnected"); } catch (e) { toast(remoteMsg(e), 7000); }
           aiLoad();
         };
         row.append(name, del); $("aiKeys").append(row);
       }
     } catch (e) { $("aiKeys").innerHTML = ""; }
   }
-  $("btnAiAdd").onclick = async () => {
-    if (!S.gateway || !S.homePin) { toast("Turn on Home gateway first.", 6000); return; }
-    const name = (prompt("Name this connection (e.g. Claude, Siri, Home Assistant):", "Claude") || "").trim();
-    if (!name) return;
-    try {
-      const j = await rcall("POST", "keys", { name }, S.homePin);
-      $("aiUrl").textContent = location.origin + "/mcp/" + j.key;
-      $("aiKey").textContent = j.key;
-      $("aiApi").textContent = location.origin + "/api/";
-      $("aiNew").hidden = false; aiLoad();
-    } catch (e) { toast(remoteMsg(e), 7000); }
+  $("btnAiAdd").onclick = () => {
+    if (!aiPin()) { toast("Turn on Home gateway on the device next to the heater first (or set up Control from away on this phone).", 8000); return; }
+    $("aiNew").hidden = true; $("aiPick").hidden = !$("aiPick").hidden;
   };
-  $("btnAiDone").onclick = () => { $("aiNew").hidden = true; $("aiUrl").textContent = ""; $("aiKey").textContent = ""; };
-  document.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = async () => {
-    try { await navigator.clipboard.writeText($(b.dataset.copy).textContent); toast("Copied"); } catch { toast("Couldn't copy. Press and hold the text to copy it."); }
-  }));
+  $("aiPick").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-svc]"); if (!b) return;
+    const svc = SERVICES[b.dataset.svc];
+    try {
+      const j = await rcall("POST", "keys", { name: svc.name }, aiPin());
+      const u = { key: j.key, mcp: location.origin + "/mcp/" + j.key, api: location.origin + "/api/" };
+      const g = svc.make(u);
+      $("aiTitle").textContent = "Connect " + svc.name;
+      $("aiSteps").replaceChildren(...g.steps.map((t) => Object.assign(document.createElement("li"), { textContent: t })));
+      $("aiFields").replaceChildren(...g.fields.map(([label, value]) => {
+        const wrap = document.createElement("div");
+        const l = Object.assign(document.createElement("p"), { className: "ai-field", textContent: label });
+        const row = Object.assign(document.createElement("div"), { className: "ai-copy" });
+        const code = Object.assign(document.createElement("pre"), { textContent: value });
+        const btn = Object.assign(document.createElement("button"), { className: "btn small", textContent: "Copy" });
+        btn.onclick = async () => { try { await navigator.clipboard.writeText(value); toast("Copied"); } catch { toast("Couldn't copy. Press and hold the text to copy it."); } };
+        row.append(code, btn); wrap.append(l, row); return wrap;
+      }));
+      $("aiPick").hidden = true; $("aiNew").hidden = false; aiLoad();
+    } catch (err) { toast(remoteMsg(err), 7000); }
+  });
+  $("btnAiDone").onclick = () => { $("aiNew").hidden = true; $("aiFields").replaceChildren(); };
 
   function renderGateway() {
     $("setGateway").checked = !!S.gateway;
