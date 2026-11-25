@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Ember Heater v1.54</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script>try { var t = (JSON.parse(localStorage.getItem("ember.settings") || "{}").theme); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Connect -->
+<section id="connect" class="screen">
+  <div class="connect-inner">
+    <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+      <defs><linearGradient id="mg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff5a1f"/><stop offset="1" stop-color="#ffc06a"/></linearGradient></defs>
+      <path fill="url(#mg)" d="M32 4c2 10 14 16 14 32a14 14 0 0 1-28 0c0-7 3-11 6-14 0 5 2 8 5 9-1-10 1-19 3-27z"/>
+    </svg>
+    <h1>Ember <span class="ver" data-version>v1.54</span></h1>
+    <p class="sub">Smarter control for your Hcalory heater</p>
+    <button id="btnConnect" class="btn primary wide">Connect heater</button>
+    <button id="btnAll" class="btn ghost wide">Don't see it? Show all devices</button>
+    <button id="btnDemo" class="btn ghost wide">Try the demo</button>
+    <button id="btnAway" class="btn ghost wide away-btn">🏠 Control from away</button>
+    <p id="btNote" class="note" hidden></p>
+    <p id="connectMsg" class="note" role="status"></p>
+    <button id="btnCopyLog2" class="btn small" hidden>Copy details for Claude</button>
+  </div>
+</section>
+
+<!-- Main -->
+<section id="main" class="screen" hidden>
+  <header class="top">
+    <div class="brand">Ember <span class="ver" data-version>v1.54</span></div>
+    <div class="pill" id="pill"><span class="dot"></span><span id="pillText">Connected</span></div>
+    <button class="icon-btn" id="btnSettings" aria-label="Settings">
+      <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+    </button>
+  </header>
+
+  <div class="gw-badge" id="gwBadge" hidden><i></i><span id="gwBadgeText">Home gateway on</span></div>
+
+  <!-- At-a-glance status: stays at the top while you scroll -->
+  <section class="sbar" id="sbar" data-state="off" aria-live="polite">
+    <div class="sb-top">
+      <span class="sb-state"><i class="sb-dot"></i><b id="sbState">Off</b></span>
+      <span class="sb-level" id="sbLevel"></span>
+    </div>
+    <div class="sb-segs" id="sbSegs" aria-hidden="true"></div>
+    <div class="sb-row">
+      <span class="sb-setting" id="sbSetting"></span>
+      <span class="sb-fuel" id="sbFuel"></span>
+    </div>
+  </section>
+
+  <div id="fault" class="fault" hidden>
+    <div class="fault-code" id="faultCode">E-08</div>
+    <div><div class="fault-title" id="faultTitle"></div><div class="fault-text" id="faultText"></div>
+      <ol class="fault-steps" id="faultSteps"></ol>
+      <div class="fault-actions"><button class="btn small" id="btnRetry">Try again</button><button class="btn small" id="btnReset">Reset</button></div></div>
+  </div>
+
+  <div class="seg" role="tablist">
+    <button class="seg-btn on" data-mode="thermo">Thermostat</button>
+    <button class="seg-btn" data-mode="manual">Power level</button>
+  </div>
+
+  <!-- Thermostat dial -->
+  <div id="thermoView">
+    <div class="dial-wrap">
+      <button class="step" id="minus" aria-label="Cooler">−</button>
+      <svg id="dial" class="dial" viewBox="0 0 300 300" role="slider" aria-label="Target temperature" tabindex="0">
+        <defs>
+          <linearGradient id="ember" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stop-color="#ff4d1a"/><stop offset=".6" stop-color="#ff8a2a"/><stop offset="1" stop-color="#ffc472"/>
+          </linearGradient>
+          <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="6"/></filter>
+        </defs>
+        <path id="track" class="track" d=""/>
+        <path id="arcGlow" class="arc-glow" d="" filter="url(#glow)"/>
+        <path id="arc" class="arc" d=""/>
+        <circle id="roomDot" class="room-dot" r="4"/>
+        <circle id="knob" class="knob" r="11"/>
+        <text x="150" y="112" class="d-label" id="dLabel">SET TO</text>
+        <text x="150" y="172" class="d-temp" id="dTemp">70°</text>
+        <text x="150" y="205" class="d-room" id="dRoom">Room —</text>
+        <text x="150" y="228" class="d-out" id="dOut"></text>
+      </svg>
+      <button class="step" id="plus" aria-label="Warmer">+</button>
+    </div>
+    <button id="btnGovee" class="chip" hidden>Connect Govee thermometer</button>
+  </div>
+
+  <!-- Manual -->
+  <div id="manualView" hidden>
+    <div class="level-big"><span id="levelNum">3</span><small>of <span id="levelMax">6</span></small></div>
+    <div class="bars" id="bars"></div>
+    <p class="hint">You pick a fixed heat output. The thermostat is paused.<br>Higher levels burn cleaner. Level 10 is full power.</p>
+  </div>
+
+  <button id="btnPower" class="btn primary wide big">Start heating</button>
+  <button id="btnFan" class="btn ghost wide fan-btn" hidden>Fan only (no heat)</button>
+  <div class="fan-speed" id="fanBox" hidden><p class="burn-label">Fan speed</p><div class="bars fan-bars" id="fanBoxBars"></div></div>
+
+  <div id="presetBox">
+    <div class="presets" id="presets"></div>
+    <p class="preset-hint">Tap a button to use it. Tap it again to change it.</p>
+    <div class="links"><button id="btnHow" class="link">How it heats</button><button id="btnTune" class="link">Tune it</button></div>
+  </div>
+
+  <div class="statusline" id="statusLine">Off</div>
+  <p class="teach" id="teach"></p>
+
+  <div class="cards">
+    <div class="card" id="coachCard">
+      <div class="card-head"><span>Carbon health</span><span class="muted" id="coachPct">Good</span></div>
+      <div class="meter"><i id="coachBar"></i></div>
+      <div class="card-row">
+        <span class="muted" id="coachText">Hours on low since last clean burn</span>
+        <button class="btn small" id="btnBurn">Clean burn</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span>Fuel</span><span class="muted" id="fuelLeft">—</span></div>
+      <button class="fuel-gauge" id="fuelGauge" aria-label="Fuel gauge. Tap to set the fuel in the tank.">
+        <svg viewBox="0 0 220 170" aria-hidden="true">
+          <defs><linearGradient id="fuelArc" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff5d5d"/><stop offset=".25" stop-color="#ffb547"/><stop offset="1" stop-color="#ffc472"/></linearGradient></defs>
+          <path class="fg-track" d="M20 110 A90 90 0 0 1 200 110"/>
+          <path class="fg-arc" id="fgArc" d="M20 110 A90 90 0 0 1 200 110" pathLength="100"/>
+          <g id="fgTicks"></g>
+          <text x="20" y="126" class="fg-end">E</text><text x="200" y="126" class="fg-end">F</text>
+          <line id="fgNeedle" x1="110" y1="110" x2="110" y2="36" class="fg-needle"/>
+          <circle cx="110" cy="110" r="7" class="fg-hub"/>
+          <text x="110" y="150" class="fg-val" id="fgVal">5.0</text>
+          <text x="110" y="166" class="fg-unit" id="fgUnit">gal of 5</text>
+        </svg>
+      </button>
+      <div class="fuel-main">
+        <label class="tank-row">Tank size <span class="tank-in"><input id="tankMain" type="number" inputmode="decimal" min="0.5" max="200" step="0.5" aria-label="Tank size in gallons"> gal</span></label>
+        <div class="card-row fuel-actions"><button class="btn small" id="btnFuelSet">Set fuel</button><button class="btn small" id="btnFuelFull">Filled up</button></div>
+      </div>
+      <div class="card-row"><span class="muted" id="fuelText">Today 0 h · 0.00 gal</span></div>
+      <div class="rt-head"><span>Hours left at each level</span><span class="muted" id="rtNow"></span></div>
+      <div class="runtime" id="runtime" role="img" aria-label="Hours of fuel left at each power level"></div>
+    </div>
+
+    <div class="card" id="plugCard" hidden>
+      <div class="card-head"><span>Power plug <span class="muted" id="plugName"></span></span><span class="plug-state" id="plugState">—</span></div>
+      <p class="gal-hint" id="plugHint">Cuts power only after the heater is off and cooled down.</p>
+      <div class="plug-btns">
+        <button class="btn small" id="btnPlugOn">Turn on</button>
+        <button class="btn small" id="btnPlugOff">Turn off safely</button>
+        <button class="btn small" id="btnPlugCycle">Power-cycle</button>
+      </div>
+    </div>
+
+    <div class="card" id="schedCard">
+      <button class="card-head sched-toggle" id="schedToggle" aria-expanded="false"><span>Schedule</span><span class="muted"><span id="schedNext">Off</span> <i class="chev">▾</i></span></button>
+      <div id="schedBody" hidden>
+      <p class="gal-hint">Turns the heater on at the start time and off at the stop time (with your burn-off). Keep Ember open on this device.</p>
+      <div class="slot" data-slot="morning">
+        <div class="slot-top"><b>Morning</b><span class="muted slot-sum"></span><label class="switch"><input type="checkbox" class="slot-on"><i></i></label></div>
+        <div class="slot-row"><input type="time" class="time slot-start" aria-label="Morning start"><span class="arrow">→</span><input type="time" class="time slot-stop" aria-label="Morning stop"><select class="slot-tune" aria-label="Morning setting"></select></div>
+      </div>
+      <div class="slot" data-slot="midday">
+        <div class="slot-top"><b>Midday</b><span class="muted slot-sum"></span><label class="switch"><input type="checkbox" class="slot-on"><i></i></label></div>
+        <div class="slot-row"><input type="time" class="time slot-start" aria-label="Midday start"><span class="arrow">→</span><input type="time" class="time slot-stop" aria-label="Midday stop"><select class="slot-tune" aria-label="Midday setting"></select></div>
+      </div>
+      <div class="slot" data-slot="evening">
+        <div class="slot-top"><b>Evening</b><span class="muted slot-sum"></span><label class="switch"><input type="checkbox" class="slot-on"><i></i></label></div>
+        <div class="slot-row"><input type="time" class="time slot-start" aria-label="Evening start"><span class="arrow">→</span><input type="time" class="time slot-stop" aria-label="Evening stop"><select class="slot-tune" aria-label="Evening setting"></select></div>
+      </div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div><b id="sVolts">—</b><span>Battery</span></div>
+      <div><b id="sBody">—</b><span>Heater</span></div>
+      <div><b id="sHours">—</b><span>Total hours</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- Away: control the heater through the home device -->
+<section id="away" class="screen" hidden>
+  <header class="top">
+    <div class="brand">Ember <span class="ver" data-version>v</span></div>
+    <div class="pill" id="awPill"><span class="dot"></span><span id="awPillText">Away</span></div>
+    <button class="icon-btn" id="btnAwayExit" aria-label="Back">✕</button>
+  </header>
+  <div class="conn" id="awConn" aria-live="polite">
+    <div class="conn-steps">
+      <div class="conn-step" id="cnSite"><i></i><span>Internet</span></div><b class="conn-line"></b>
+      <div class="conn-step" id="cnHome"><i></i><span>Home app</span></div><b class="conn-line"></b>
+      <div class="conn-step" id="cnHeater"><i></i><span>Heater</span></div>
+    </div>
+    <p class="conn-text" id="cnText">Establishing connection to home app…</p>
+  </div>
+  <section class="sbar" id="awBar" data-state="off">
+    <div class="sb-top"><span class="sb-state"><i class="sb-dot"></i><b id="awState">Checking home…</b></span><span class="sb-level" id="awLevel"></span></div>
+    <div class="sb-segs" id="awSegs" aria-hidden="true"></div>
+    <div class="sb-row"><span class="sb-setting" id="awSetting"></span><span class="sb-fuel" id="awFuel"></span></div>
+  </section>
+  <p class="aw-fresh" id="awFresh"></p>
+  <div class="aw-fault" id="awFault" hidden><b id="awFaultTitle"></b><span id="awFaultText"></span><ol class="fault-steps" id="awFaultSteps"></ol></div>
+  <div class="seg aw-seg" role="tablist">
+    <button class="seg-btn" data-awmode="thermo">Thermostat</button>
+    <button class="seg-btn" data-awmode="manual">Power level</button>
+  </div>
+  <div id="awThermo">
+    <div class="aw-temp">
+      <button class="step" id="awMinus" aria-label="Cooler">−</button>
+      <div class="aw-target"><span>SET TO</span><b id="awTarget">—</b><small id="awRoom">Room —</small><small class="aw-out" id="awOut"></small></div>
+      <button class="step" id="awPlus" aria-label="Warmer">+</button>
+    </div>
+    <div class="presets" id="awPresets"></div>
+  </div>
+  <div id="awManual" hidden>
+    <div class="level-big"><span id="awLvl">—</span><small>of <span id="awMax">10</span></small></div>
+    <div class="bars" id="awBars"></div>
+    <p class="hint">Tap a level. Higher burns cleaner.</p>
+  </div>
+  <button id="awPower" class="btn primary wide big" disabled>Start heating</button>
+  <button id="awFan" class="btn ghost wide fan-btn" hidden>Fan only (no heat)</button>
+  <div class="fan-speed" id="awFanBox" hidden><p class="burn-label">Fan speed</p><div class="bars fan-bars" id="awFanBoxBars"></div></div>
+  <button id="awReset" class="btn ghost wide" hidden>Reset (clear the fault, stay off)</button>
+  <div class="card aw-plug" id="awPlug" hidden>
+    <div class="card-head"><span>Power plug</span><span class="plug-state" id="awPlugState">—</span></div>
+    <div class="plug-btns">
+      <button class="btn small" id="awPlugOn">Turn on</button>
+      <button class="btn small" id="awPlugOff">Turn off safely</button>
+      <button class="btn small" id="awPlugCycle">Power-cycle</button>
+    </div>
+  </div>
+  <div class="aw-off" id="awOff" hidden>
+    <div id="awClean"><p class="burn-label">Shut down with a burn-off at full power</p><div class="burn-pick" id="awBurn"><button type="button" data-min="1">1 min</button><button type="button" data-min="5">5 min</button><button type="button" data-min="10">10 min</button><button type="button" data-min="20">20 min</button></div></div>
+    <button id="awOffNow" class="btn ghost wide">Off now</button>
+    <p class="fine center">Pick a burn-off: it runs at full power for that long, then turns off by itself. Off now skips it.</p>
+  </div>
+  <p class="aw-msg" id="awMsg"></p>
+  <button class="btn text wide" id="awUndo" hidden>Undo</button>
+  <p class="fine center">Commands go to the device at home and usually reach the heater within a minute.</p>
+  <button class="btn text wide" id="btnAwayForget">Use a different PIN</button>
+</section>
+
+<!-- Away: enter the home code -->
+<div id="awaySetup" class="overlay sheet" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2 id="pinTitle">Control from away</h2><button class="icon-btn" id="btnAwsClose" aria-label="Close">✕</button></div>
+    <p class="fine" id="pinText"></p>
+    <input id="awCode" class="code-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="PIN" autocomplete="off">
+    <input id="awCode2" class="code-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="New PIN" autocomplete="off" hidden>
+    <p class="gs-msg" id="awsMsg"></p>
+    <button class="btn primary wide" id="btnAwsGo">Connect</button>
+  </div>
+</div>
+
+<!-- Turn off: choose the burn-off -->
+<div id="offSheet" class="overlay sheet" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2>Turn off</h2><button class="icon-btn" id="btnOffClose" aria-label="Close">✕</button></div>
+    <p class="fine">Burn off carbon at full power first, then it shuts down by itself. Longer is cleaner.</p>
+    <div class="burn-pick big" id="offBurn"><button type="button" data-min="1">1 min</button><button type="button" data-min="5">5 min</button><button type="button" data-min="10">10 min</button><button type="button" data-min="20">20 min</button></div>
+    <button class="btn ghost wide" id="btnOffNow">Off now (no burn-off)</button>
+  </div>
+</div>
+
+<!-- Clean burn overlay -->
+<div id="clean" class="overlay" hidden>
+  <div class="clean-inner">
+    <div class="eyebrow" id="cleanEyebrow">CLEAN SHUTDOWN</div>
+    <svg viewBox="0 0 240 240" class="ring">
+      <defs><linearGradient id="ember2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#ff4d1a"/><stop offset=".6" stop-color="#ff8a2a"/><stop offset="1" stop-color="#ffc472"/></linearGradient></defs>
+      <circle cx="120" cy="120" r="104" class="ring-track"/>
+      <circle cx="120" cy="120" r="104" class="ring-fill" id="ringFill" stroke="url(#ember2)"/>
+      <text x="120" y="128" class="ring-time" id="ringTime">10:00</text>
+      <text x="120" y="158" class="ring-sub" id="ringSub">full power</text>
+    </svg>
+    <div class="clean-status" id="cleanStatus"><span class="cs-dot"></span><b id="csState">Ramping up</b><span id="csLevel">Level — / 10</span></div>
+    <div class="sb-segs clean-segs" id="cleanSegs" aria-hidden="true"></div>
+    <p class="clean-text" id="cleanText">Burning off carbon at full power. The heater turns itself off when the timer ends.</p>
+    <p class="clean-warn" id="cleanWarn">Keep Ember open and your screen unlocked until the timer ends. If the phone locks, the countdown pauses.</p>
+    <button class="btn ghost wide" id="btnSkip">Turn off now</button>
+    <button class="btn text wide" id="btnKeep">Keep heating</button>
+  </div>
+</div>
+
+<!-- How it heats -->
+<div id="how" class="overlay sheet as-page" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2>How it heats</h2><button class="icon-btn" id="btnHowClose" aria-label="Close">✕</button></div>
+    <ol class="how" id="howSteps"></ol>
+    <p class="fine" id="howFoot"></p>
+  </div>
+</div>
+
+<!-- Manual tune -->
+<div id="tuner" class="overlay sheet as-page" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2>Manual tune</h2><button class="icon-btn" id="btnTunerClose" aria-label="Close">✕</button></div>
+    <label class="name-row">Name <input id="tuneName" maxlength="16" placeholder="e.g. Night"></label>
+    <ol class="how tune-steps">
+      <li class="temp-step"><b><i>°</i>Your temperature</b><span>What this button heats the room to</span><div class="stepper" data-k="temp"><button type="button" data-d="-1" aria-label="Less">−</button><output></output><button type="button" data-d="1" aria-label="More">+</button></div></li>
+      <li><b><i>1</i>Heating up</b><span>Power level while the room is cold</span><div class="stepper" data-k="max"><button type="button" data-d="-1" aria-label="Less">−</button><output></output><button type="button" data-d="1" aria-label="More">+</button></div></li>
+      <li><b><i>2</i>Getting close</b><span>Start easing down this many degrees below your temperature</span><div class="stepper" data-k="band"><button type="button" data-d="-1" aria-label="Less">−</button><output></output><button type="button" data-d="1" aria-label="More">+</button></div></li>
+      <li><b><i>3</i>At temperature</b><span>Level it holds at once the room is warm (it stays on)</span><div class="stepper" data-k="hold"><button type="button" data-d="-1" aria-label="Less">−</button><output></output><button type="button" data-d="1" aria-label="More">+</button></div></li>
+      <li><b><i>4</i>Turning off</b><span>Clean burn at full power before it shuts down</span>
+        <div class="seg mini" id="tuneClean"><button type="button" class="seg-btn" data-v="0">Off</button><button type="button" class="seg-btn" data-v="1">1 min</button><button type="button" class="seg-btn" data-v="5">5 min</button><button type="button" class="seg-btn" data-v="10">10 min</button><button type="button" class="seg-btn" data-v="20">20 min</button></div></li>
+    </ol>
+    <p class="tune-preview" id="tunePreview"></p>
+    <button class="btn primary wide" id="btnTuneSave">Save tune</button>
+    <button class="btn text wide" id="btnTuneDelete">Delete this tune</button>
+  </div>
+</div>
+
+<!-- Govee setup -->
+<div id="gsetup" class="overlay sheet as-page" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2>Connect your Govee</h2><button class="icon-btn" id="btnGsClose" aria-label="Close">✕</button></div>
+    <p class="fine">Use your Govee as the room gauge, so the heater aims for the temperature where you are.</p>
+
+    <div class="gs-opt">
+      <div class="gs-title">Wi-Fi <span class="tag">Works on iPhone</span></div>
+      <ol class="gs-steps">
+        <li>Open the <b>Govee Home</b> app → <b>Profile</b> → ⚙️ <b>Settings</b> → <b>Apply for API Key</b>. Govee emails you a key, usually within minutes.</li>
+        <li>Paste the key here and tap <b>Find</b>.</li>
+      </ol>
+      <div class="gs-row"><input id="gKey" placeholder="Paste your Govee API key" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn small" id="btnGFind">Find</button></div>
+      <p class="gs-msg" id="gMsg"></p>
+      <div class="gs-list" id="gList"></div>
+      <p class="fine">Updates about once a minute. Needs internet where the heater is.</p>
+    </div>
+
+    <div class="gs-opt">
+      <div class="gs-title">Bluetooth <span class="tag">Android Chrome</span></div>
+      <p class="fine" id="gBleNote">Reads the thermometer directly every few seconds. No internet needed.</p>
+      <button class="btn ghost wide" id="btnGBle">Pair over Bluetooth</button>
+    </div>
+
+    <button class="btn text wide" id="btnGForget" hidden>Disconnect thermometer</button>
+  </div>
+</div>
+
+<!-- Govee smart plug setup -->
+<div id="plugSheet" class="overlay sheet as-page" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2>Govee smart plug</h2><button class="icon-btn" id="btnPlugClose" aria-label="Close">✕</button></div>
+    <p class="fine">Plug the heater into a Govee Wi-Fi smart plug to cut its power completely, safely and from anywhere. Uses your free Govee API key (Govee Home → Profile → ⚙️ Settings → Apply for API Key).</p>
+    <div class="gs-row"><input id="pKey" placeholder="Paste your Govee API key" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn small" id="btnPFind">Find</button></div>
+    <p class="gs-msg" id="pMsg"></p>
+    <div class="gs-list" id="pList"></div>
+    <button class="btn text wide" id="btnPForget" hidden>Remove smart plug</button>
+  </div>
+</div>
+
+<!-- Set fuel -->
+<div id="fuelSheet" class="overlay sheet" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2>Fuel in tank</h2><button class="icon-btn" id="btnFuelClose" aria-label="Close">✕</button></div>
+    <p class="fine">Enter how much fuel is in the tank now. Ember counts down from here and the hours at each level update to match.</p>
+    <div class="fuel-entry"><button class="step" id="fuelMinus" aria-label="Less">−</button><input id="fuelInput" type="number" inputmode="decimal" min="0" step="0.1"><button class="step" id="fuelPlus" aria-label="More">+</button></div>
+    <p class="fine center" id="fuelCapNote">gallons in the tank now</p>
+    <label class="tank-row">Tank size <span class="tank-in"><input id="tankInput" type="number" inputmode="decimal" min="0.5" max="200" step="0.5" aria-label="Tank size in gallons"> gal</span></label>
+    <div class="fuel-quick" id="fuelQuick"><button data-f="0.25">¼</button><button data-f="0.5">½</button><button data-f="0.75">¾</button><button data-f="1">Full</button></div>
+    <button class="btn primary wide" id="btnFuelSave">Save</button>
+  </div>
+</div>
+
+<!-- Settings -->
+<div id="settings" class="overlay sheet as-page" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2>Settings</h2><button class="icon-btn" id="btnClose" aria-label="Close">✕</button></div>
+
+    <div class="group">
+      <div class="row"><span>Appearance<small>Auto follows your phone's light or dark setting.</small></span>
+        <span class="theme-pick" id="themePick"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></span></div>
+      <div class="row"><span>Preset buttons<small>Put Sleep, Comfort and Boost back to how they came. Your Custom button stays.</small></span>
+        <button class="btn small" id="btnResetPresets">Reset</button></div>
+      <label class="row"><span>Room gauge<small>Where the room temperature comes from.</small></span>
+        <select id="setRoom"><option value="heater">Heater sensor</option><option value="govee">Govee thermometer</option></select></label>
+      <div class="row"><span>Govee smart plug<small id="plugStatus">Not set up</small></span>
+        <button class="btn small" id="btnPlugSetup">Set up</button></div>
+      <div class="row"><span>Govee thermometer<small id="goveeStatus">Not set up</small></span>
+        <button class="btn small" id="btnPairGovee">Set up</button></div>
+    </div>
+
+    <div class="group">
+      <label class="row">Temperature
+        <select id="setUnit"><option value="F">°F</option><option value="C">°C</option></select></label>
+      <label class="row"><span>Clean shutdown length<small>When you turn off, it first runs at full power to burn off carbon.</small></span>
+        <select id="setClean"><option value="0">Off</option><option value="1">1 min</option><option value="5">5 min</option><option value="10">10 min</option><option value="20">20 min</option></select></label>
+      <label class="row"><span>Thermostat lowest level<small>At your temperature, the heater idles here instead of turning off.</small></span>
+        <select id="setMin"><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">Level 3</option><option value="4">Level 4</option></select></label>
+      <label class="row"><span>Remind clean burn after<small>Long runs on low build carbon. You'll get a reminder.</small></span>
+        <select id="setCoach"><option value="2">2 h on low</option><option value="4">4 h on low</option><option value="6">6 h on low</option></select></label>
+      <label class="row"><span>Tank size<small>Used for the fuel gauge and hours-left estimates.</small></span>
+        <span class="tank-in"><input id="setTank" type="number" inputmode="decimal" min="0.5" max="200" step="0.5" aria-label="Tank size in gallons"> gal</span></label>
+    </div>
+
+    <div class="group">
+      <label class="row"><span>Battery guard<small>Turns the heater off before your battery runs too low.</small></span>
+        <label class="switch"><input type="checkbox" id="setBatt"><i></i></label></label>
+      <label class="row">Turn off below
+        <select id="setBattV"><option value="11.2">11.2 V</option><option value="11.5">11.5 V</option><option value="11.8">11.8 V</option><option value="12.0">12.0 V</option></select></label>
+      <label class="row" id="nativeRow"><span>Use heater's own thermostat<small>The heater controls itself and works with your phone away, but may cycle off and on.</small></span>
+        <label class="switch"><input type="checkbox" id="setNative"><i></i></label></label>
+      <p class="fine">Battery levels are for 12 V. They double automatically on 24 V.</p>
+    </div>
+
+    <div class="group">
+      <label class="row"><span>Home gateway<small>Leave this device next to the heater with Ember open, so you can control it from your phone when you're away.</small></span>
+        <label class="switch"><input type="checkbox" id="setGateway"><i></i></label></label>
+      <div id="gwBox" hidden>
+        <div class="gw-code"><span>PIN</span><b id="gwCode">Not set</b>
+          <button class="btn small" id="btnGwNew">Change PIN</button></div>
+        <p class="gs-msg" id="gwStatus"></p>
+        <p class="fine">On your phone, open Ember → <b>Control from away</b> and enter this PIN. After 10 wrong tries, away control locks for 24 hours. Plug this device in and keep the screen on.</p>
+      </div>
+    </div>
+
+    <div class="group" id="aiGroup">
+      <div class="row"><span>Voice &amp; AI assistants<small id="aiSub">Tell Claude, ChatGPT or Siri "turn on the heater".</small></span>
+        <button class="btn small" id="btnAiAdd">Connect</button></div>
+      <div class="ai-pick" id="aiPick" hidden>
+        <p class="ai-q">Which one do you want to use?</p>
+        <div class="ai-chips">
+          <button class="chip" data-svc="claude">Claude</button><button class="chip" data-svc="chatgpt">ChatGPT</button><button class="chip" data-svc="siri">Siri</button><button class="chip" data-svc="ha">Home Assistant</button><button class="chip" data-svc="other">Other</button>
+        </div>
+      </div>
+      <div class="ai-new" id="aiNew" hidden>
+        <p class="ai-title" id="aiTitle"></p>
+        <p class="ai-warn">Copy what you need now. The key is shown only once.</p>
+        <ol class="ai-steps" id="aiSteps"></ol>
+        <div id="aiFields"></div>
+        <button class="btn small" id="btnAiDone">Done</button>
+      </div>
+      <div id="aiKeys"></div>
+    </div>
+
+    <div class="group">
+      <label class="row">Protocol
+        <select id="setProto"><option value="auto">Auto-detect</option><option value="B">Hcalory (B)</option><option value="A">AirHeater (A)</option></select></label>
+      <label class="row">Heater PIN
+        <input id="setPin" class="pin" inputmode="numeric" maxlength="4" autocomplete="off"></label>
+      <label class="row"><span>Govee reports in<small>Only for the Wi-Fi connection.</small></span>
+        <select id="setGUnit"><option value="F">°F</option><option value="C">°C</option></select></label>
+      <label class="row">Heater reports in
+        <select id="setHUnit"><option value="auto">Auto</option><option value="C">°C</option><option value="F">°F</option></select></label>
+      <label class="row">Show all Bluetooth devices
+        <label class="switch"><input type="checkbox" id="setAll"><i></i></label></label>
+      <div class="row"><span>Detected <span class="muted" id="protoName">—</span></span>
+        <span class="row-btns"><button class="btn small" id="btnSendLog">Send log</button><button class="btn small" id="btnCopyLog">Copy log</button></span></div>
+      <details id="logBox"><summary>Show log</summary><pre class="log" id="log"></pre></details>
+    </div>
+
+    <button class="btn ghost wide" id="btnDisconnect">Disconnect</button>
+    <p class="fine center"><span data-version>v1.54</span> · Unofficial app. Not made by or affiliated with Hcalory. The heater always runs its own safe cool-down.</p>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script src="protocol.js"></script>
+<script src="govee.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

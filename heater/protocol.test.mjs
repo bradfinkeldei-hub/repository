@@ -1,0 +1,129 @@
+// Run: node --test protocol.test.mjs
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+const P = createRequire(import.meta.url)("./protocol.js");
+const h = (s) => Uint8Array.from(s.split(" ").map((x) => parseInt(x, 16)));
+
+test("format A frames match the published captures", () => {
+  assert.equal(P.hex(P.A.poll()), "BA AB 04 CC 00 00 00 35");
+  assert.equal(P.hex(P.A.up()[0]), "BA AB 04 BB A2 00 00 C6");
+  assert.equal(P.hex(P.A.down()[0]), "BA AB 04 BB A3 00 00 C7");
+  assert.deepEqual(P.A.stop().map((f) => f[4]), [0xa4, 0xa1, 0xa4]);
+});
+
+test("format A status parses", () => {
+  const f = new Uint8Array(18);
+  f[4] = 1; f[5] = 1; f[6] = 4; f[9] = 128; f[10] = 0; f[11] = 51; f[12] = 0; f[13] = 180;
+  const s = P.A.parse(f);
+  assert.equal(s.power, "running"); assert.equal(s.level, 4);
+  assert.equal(s.volts, 12.8); assert.equal(s.ambient, 21); assert.equal(s.body, 180);
+  f[5] = 0xff; f[6] = 8;
+  assert.equal(P.A.parse(f).power, "error"); assert.equal(P.A.parse(f).fault, 8);
+});
+
+test("format B frames match hcalory-control", () => {
+  assert.equal(P.hex(P.B.start()[0]), "00 02 00 01 00 01 00 0E 04 00 00 09 00 00 00 00 00 00 00 00 02 0F");
+  assert.equal(P.hex(P.B.poll()).slice(-5), "00 0D");
+});
+
+test("format B status parses (thermostat, °F)", () => {
+  const f = new Uint8Array(39);
+  f[20] = 133; f[21] = 1; f[22] = 74; f[25] = 132;
+  f[27] = 0x08; f[28] = 0xd4; // 2260 -> 226
+  f[30] = 0x03; f[31] = 0x66; // 870 -> 87
+  const s = P.B.parse(f);
+  assert.equal(s.power, "running"); assert.equal(s.mode, "thermostat");
+  assert.equal(s.setpoint, 74); assert.equal(s.body, 226); assert.equal(s.ambient, 87); assert.equal(s.volts, 13.2);
+});
+
+test("simulator answers format A only", async () => {
+  const sim = new P.SimHeater(); await sim.connect();
+  let got = null; sim.onNotify((x) => (got = x));
+  await sim.write(P.B.poll()); await new Promise((r) => setTimeout(r, 100));
+  assert.equal(got, null);
+  await sim.write(P.A.poll()); await new Promise((r) => setTimeout(r, 100));
+  assert.ok(P.A.looksLike(got)); sim.disconnect();
+});
+
+const G = createRequire(import.meta.url)("./govee.js");
+test("Govee H5075 packed format", () => {
+  // 0x03 0x45 0x7B = 214395 -> 21.4°C, 39.5 %, battery 87
+  const r = G.decode(0xec88, [0x00, 0x03, 0x45, 0x7b, 87, 0x00], "GVH5075_1A2B");
+  assert.equal(r.tempC, 21.4); assert.equal(r.hum, 39.5); assert.equal(r.batt, 87); assert.equal(r.model, "H5075");
+});
+test("Govee negative temperature", () => {
+  const r = G.decode(0xec88, [0x00, 0x80 | 0x00, 0xc3, 0x50, 60, 0x00], "GVH5075"); // -5.0°C, 0 %
+  assert.equal(r.tempC, -5);
+});
+test("Govee H5101 / H5100 format", () => {
+  const r = G.decode(0x0001, [0x01, 0x01, 0x03, 0x45, 0x7b, 64], "GVH5101_AB12");
+  assert.equal(r.tempC, 21.4); assert.equal(r.batt, 64);
+});
+test("Govee H5074 and H5179 little-endian formats", () => {
+  const a = G.decode(0xec88, [0x00, 0x5c, 0x08, 0x10, 0x0e, 77, 0x02], "Govee_H5074_ABCD");
+  assert.equal(a.tempC, 21.4); assert.equal(a.hum, 36); assert.equal(a.batt, 77);
+  const b = G.decode(0x8801, [0, 0, 0, 0, 0x5c, 0x08, 0x10, 0x0e, 90], "Govee_H5179_ABCD");
+  assert.equal(b.tempC, 21.4); assert.equal(b.model, "H5179");
+});
+test("Govee ignores unrelated data", () => {
+  assert.equal(G.decode(0x004c, [1, 2, 3], "iPhone"), null);
+});
+test("Govee H5051 (ihoment name, 9-byte format)", () => {
+  // 0x085C = 2140 -> 21.40°C, 0x0E10 = 3600 -> 36.00 %, battery 95
+  const r = G.decode(0xec88, [0x00, 0x5c, 0x08, 0x10, 0x0e, 95, 0x00, 0x00, 0x00], "ihoment_H5051_C0FE");
+  assert.equal(r.model, "H5051"); assert.equal(r.tempC, 21.4); assert.equal(r.hum, 36); assert.equal(r.batt, 95);
+  // Same packet without a name still decodes (Android sometimes hides it)
+  assert.equal(G.decode(0xec88, [0x00, 0x5c, 0x08, 0x10, 0x0e, 95, 0, 0, 0], "").tempC, 21.4);
+});
+
+test("format H (TB2S / BD39) frames match diesel-heater-ble", () => {
+  assert.equal(P.hex(P.H.auth("0000")), "00 02 00 01 00 01 00 0A 0C 00 00 05 01 00 00 00 00 12");
+  assert.equal(P.hex(P.H.setTemp(20, false)[0]), "00 02 00 01 00 01 00 07 06 00 00 02 14 00 1C");
+  assert.equal(P.hex(P.H.start()[0]).slice(-5), "02 0F");
+  assert.equal(P.hex(P.H.stop()[0]).slice(-5), "01 0E");
+  const q = P.H.poll(new Date(2026, 10, 13, 13, 5, 9)); // Friday
+  assert.equal(P.hex(q), "00 02 00 01 00 01 00 0A 0A 00 00 05 0D 05 09 05 00 " + P.hex([(0x0a + 5 + 13 + 5 + 9 + 5) & 255]));
+  assert.equal(P.hex(P.H.setLevel(10)[0]), "00 02 00 01 00 01 00 06 07 00 00 01 0A 12");
+});
+
+test("format H status and auth parse via the TB2S simulator", async () => {
+  const sim = new P.SimHeaterH(); await sim.connect();
+  const got = []; sim.onNotify((x) => got.push(x));
+  const wait = () => new Promise((r) => setTimeout(r, 100));
+  await sim.write(P.H.poll()); await wait();
+  assert.equal(got.length, 0, "ignores commands before unlock");
+  await sim.write(P.H.auth("1234")); await wait();
+  assert.equal(P.H.authResult(got.pop()), false);
+  await sim.write(P.H.auth("0000")); await wait();
+  assert.equal(P.H.authResult(got.pop()), true);
+  await sim.write(P.H.start()[0]); await sim.write(P.H.poll()); await wait();
+  let s = P.H.parse(got.pop());
+  assert.equal(s.power, "starting"); assert.equal(s.volts, 12.9); assert.equal(s.unit, "C"); assert.equal(s.ambient, 9);
+  sim.step = 5; await sim.write(P.H.setLevel(7)[0]); await sim.write(P.H.poll()); await wait();
+  s = P.H.parse(got.pop());
+  assert.equal(s.power, "running"); assert.equal(s.level, 7);
+  // corrupted checksum is rejected
+  const bad = Uint8Array.from(P.H.poll()); assert.equal(P.H.parse(bad), null);
+  sim.disconnect();
+});
+
+test("fan only: H frame and simulator", async () => {
+  assert.equal(P.hex(P.H.fan()[0]).slice(-5), "08 15");
+  const sim = new P.SimHeaterH(); await sim.connect();
+  const got = []; sim.onNotify((x) => got.push(x));
+  const wait = () => new Promise((r) => setTimeout(r, 100));
+  await sim.write(P.H.auth("0000")); await wait();
+  await sim.write(P.H.fan()[0]); await sim.write(P.H.poll()); await wait();
+  let s = P.H.parse(got.pop()); assert.equal(s.power, "fan"); assert.equal(s.mode, "fan");
+  await sim.write(P.H.stop()[0]); await sim.write(P.H.poll()); await wait();
+  s = P.H.parse(got.pop()); assert.equal(s.power, "off");
+  sim.disconnect();
+});
+
+test("H: real TB2S fault frame reads E-11 (carbon monoxide shutdown)", () => {
+  const raw = "00 01 00 01 00 01 00 23 03 00 00 1E 00 00 01 F4 00 00 00 00 FF 0B 00 02 00 82 00 04 56 00 02 EE 00 07 08 00 00 01 00 00 00 00 FE";
+  const s = P.H.parse(Uint8Array.from(raw.split(" ").map((b) => parseInt(b, 16))));
+  assert.equal(s.power, "error"); assert.equal(s.fault, 11);
+  assert.equal(P.H_FAULTS[11][0], "Carbon monoxide shutdown"); assert.ok(P.H_FAULTS[11][2].length >= 3);
+});

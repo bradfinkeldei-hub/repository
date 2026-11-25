@@ -1,5 +1,7 @@
 # The Coaching Circle
 
+> **Looking for Ember, the Hcalory diesel heater app?** It lives in [`heater/`](heater/). See the [setup guide](heater/HOWTO.md).
+
 A group life coaching app. Members sign in, share their life wheel, what they're creating, what they're accountable to and their mission, and see only their own team. The coach sees every team (Monday, Tuesday, Wednesday, Thursday) from a left column, gets a Coaches actions list across all teams, invites and moves members, and offers one free call a month ($150 after).
 
 Built with Next.js, Supabase (database, sign-in and access rules) and Gmail for weekly reminder emails. It runs on Cloudflare Workers through the OpenNext adapter, on the free plan.

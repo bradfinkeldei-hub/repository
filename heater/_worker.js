@@ -1,0 +1,460 @@
+// Ember – Cloudflare Pages worker (advanced mode).
+//
+// 1. Serves the app files as usual.
+// 2. /govee/*  – relays two Govee API calls (browsers can't call Govee directly).
+//    The API key comes from the phone and is never stored here.
+// 3. /remote/* – "control from away": a home device (old phone/iPad next to the
+//    heater) posts status and picks up commands; your phone reads status and
+//    sends commands. Needs a KV namespace bound as EMBER (see HOWTO.md).
+//    Protected by a PIN you choose; only a salted hash of it is stored.
+const GOVEE = "https://openapi.api.govee.com/router/api/v1/";
+const ALLOWED = { "user/devices": "GET", "device/state": "POST", "device/control": "POST" };
+const ACTIONS = new Set(["start", "stop", "stopnow", "fan", "fanlevel", "retry", "reset", "plugon", "plugoff", "plugcycle", "tune", "target", "mode", "level", "clean", "cleanstop", "fuel", "fuelfull", "schedon", "schedoff"]);
+
+const json = (status, body) =>
+  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+
+// One home per site, protected by a PIN the owner picks (4–8 digits).
+// After 10 wrong PINs, away control locks for 24 hours (keeps guessing impractical).
+const MAX_FAILS = 10;
+const pinOf = (v) => String(v || "").replace(/\D/g, "");
+async function sha(text) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+async function checkPin(request, env) {
+  const fails = Number(await env.EMBER.get("fails")) || 0;
+  if (fails >= MAX_FAILS) return json(429, { code: 429, message: "LOCKED" });
+  const home = await env.EMBER.get("home", { type: "json" });
+  if (!home) return json(409, { code: 409, message: "NO_HOME" });
+  const pin = pinOf(request.headers.get("X-Ember-Pin"));
+  if (pin.length >= 4 && (await sha(home.salt + pin)) === home.hash) return null; // OK
+  await env.EMBER.put("fails", String(fails + 1), { expirationTtl: 86400 });
+  return json(401, { code: 401, message: "WRONG_PIN", left: MAX_FAILS - fails - 1 });
+}
+
+async function readBody(request, max = 6000) {
+  const text = await request.text();
+  if (text.length > max) throw new Error("too large");
+  return JSON.parse(text || "{}");
+}
+
+// Only sensible values get through to the heater.
+function valid(action, v) {
+  if (!ACTIONS.has(action)) return false;
+  return { start: v == null, stop: v == null || v === 1 || v === 5 || v === 10 || v === 20, stopnow: v == null, fan: v == null, fanlevel: Number.isInteger(v) && v >= 1 && v <= 10, retry: v == null, reset: v == null, plugon: v == null, plugoff: v == null, plugcycle: v == null,
+    tune: typeof v === "string" && /^[\w-]{1,40}$/.test(v),
+    target: typeof v === "number" && v >= 4 && v <= 32,
+    mode: v === "thermo" || v === "manual",
+    level: Number.isInteger(v) && v >= 1 && v <= 10,
+    clean: v == null, cleanstop: v == null, fuelfull: v == null,
+    fuel: typeof v === "number" && v >= 0 && v <= 200,
+    schedon: typeof v === "string" && /^[\w-]{1,20}$/.test(v), schedoff: typeof v === "string" && /^[\w-]{1,20}$/.test(v) }[action];
+}
+// Add commands to the queue the home device picks up (every few seconds).
+async function queue(env, action, value, more = []) {
+  const all = [[action, value], ...more];
+  for (const [a, v] of all) if (!valid(a, v ?? null)) return { error: ACTIONS.has(a) ? "Bad value" : "Unknown action" };
+  const list = (await env.EMBER.get("cmd", { type: "json" })) || [];
+  const base = Date.now() * 1000 + Math.floor(Math.random() * 500);
+  const cmds = all.map(([a, v], i) => ({ id: base + i, action: a, value: v ?? null, at: Date.now() }));
+  await env.EMBER.put("cmd", JSON.stringify([...list, ...cmds].slice(-10)), { expirationTtl: 60 * 60 * 24 });
+  await env.EMBER.put("watch", String(Date.now()), { expirationTtl: 600 }); // home device: report back quickly
+  return { cmd: cmds[cmds.length - 1] };
+}
+
+async function remote(request, env, path) {
+  if (!env.EMBER) return json(503, { code: 503, message: "NOT_SET_UP" });
+  try {
+    // Home device sets the PIN (first time), or changes it (needs the current PIN).
+    if (path === "register" && request.method === "POST") {
+      const pin = pinOf((await readBody(request, 200)).pin);
+      if (pin.length < 4 || pin.length > 8) return json(400, { code: 400, message: "PIN must be 4 to 8 digits" });
+      if (await env.EMBER.get("home")) { const denied = await checkPin(request, env); if (denied) return denied; }
+      const salt = crypto.randomUUID();
+      await env.EMBER.put("home", JSON.stringify({ salt, hash: await sha(salt + pin) }));
+      return json(200, { code: 200 });
+    }
+    const denied = await checkPin(request, env);
+    if (denied) return denied;
+
+    // Home device: publish status (only on change or every few minutes, to stay in the free tier).
+    if (path === "state" && request.method === "POST") {
+      const state = await readBody(request);
+      state.serverAt = Date.now();
+      await env.EMBER.put("st", JSON.stringify(state), { expirationTtl: 60 * 60 * 24 * 7 });
+      return json(200, { code: 200 });
+    }
+    // Your phone: read status.
+    if (path === "state" && request.method === "GET") {
+      return json(200, { code: 200, state: await env.EMBER.get("st", { type: "json" }), now: Date.now() });
+    }
+    // Your phone: send a command.
+    if (path === "cmd" && request.method === "POST") {
+      const c = await readBody(request, 500);
+      const r = await queue(env, c.action, c.value);
+      return r.error ? json(400, { code: 400, message: r.error }) : json(200, { code: 200, cmd: r.cmd });
+    }
+    // Access keys for assistants and other services (Claude, Siri Shortcuts, Home Assistant…).
+    // Managed with the home PIN. The key is shown once; only its hash is stored.
+    if (path === "keys" && request.method === "GET") {
+      const keys = (await env.EMBER.get("keys", { type: "json" })) || [];
+      return json(200, { code: 200, keys: keys.map(({ id, name, at, used }) => ({ id, name, at, used })) });
+    }
+    if (path === "keys" && request.method === "POST") {
+      const b = await readBody(request, 300);
+      const name = String(b.name || "Assistant").replace(/[^\w .'-]/g, "").slice(0, 40) || "Assistant";
+      const keys = (await env.EMBER.get("keys", { type: "json" })) || [];
+      if (keys.length >= 10) return json(400, { code: 400, message: "Up to 10 keys. Remove one first." });
+      const raw = [...crypto.getRandomValues(new Uint8Array(20))].map((x) => x.toString(16).padStart(2, "0")).join("");
+      const key = "emb_" + raw, id = raw.slice(0, 6);
+      keys.push({ id, name, hash: await sha(key), at: Date.now() });
+      await env.EMBER.put("keys", JSON.stringify(keys));
+      return json(200, { code: 200, id, name, key });
+    }
+    if (path.startsWith("keys/") && request.method === "DELETE") {
+      const id = path.slice(5);
+      const keys = (await env.EMBER.get("keys", { type: "json" })) || [];
+      await env.EMBER.put("keys", JSON.stringify(keys.filter((k) => k.id !== id)));
+      return json(200, { code: 200 });
+    }
+    // Home device: pick up commands newer than the last one it ran.
+    if (path === "cmd" && request.method === "GET") {
+      const after = Number(new URL(request.url).searchParams.get("after") || 0);
+      const list = (await env.EMBER.get("cmd", { type: "json" })) || [];
+      const watchAt = Number(await env.EMBER.get("watch")) || 0;
+      return json(200, { code: 200, cmds: list.filter((c) => c.id > after), watchAt, now: Date.now() });
+    }
+    // Your phone: "I'm watching" (about once a minute while the away screen is open),
+    // so the home device sends updates every few seconds instead of every few minutes.
+    if (path === "watch" && request.method === "POST") {
+      await env.EMBER.put("watch", String(Date.now()), { expirationTtl: 600 });
+      return json(200, { code: 200 });
+    }
+  } catch (e) {
+    return json(400, { code: 400, message: "Bad request" });
+  }
+  return json(404, { code: 404, message: "Not found" });
+}
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (url.pathname.startsWith("/remote/")) return remote(request, env, url.pathname.slice("/remote/".length));
+    if (url.pathname.startsWith("/mcp/") || url.pathname === "/mcp") return assistant.mcp(request, env, url);
+    if (url.pathname.startsWith("/api/")) return assistant.api(request, env, url);
+    // Troubleshooting logs: write-only from the app (read via the Cloudflare dashboard/API, never from the site).
+    if (url.pathname === "/diag" && request.method === "POST") {
+      if (!env.EMBER) return json(503, { code: 503, message: "NOT_SET_UP" });
+      try {
+        const b = await readBody(request, 300000);
+        const id = String(b.id || "").replace(/[^a-z0-9]/g, "").slice(0, 12);
+        if (!id || typeof b.text !== "string") return json(400, { code: 400, message: "Bad request" });
+        await env.EMBER.put("diag:" + id, b.text.slice(0, 250000), { expirationTtl: 60 * 60 * 24 * 14 });
+        await env.EMBER.put("diag:last", id, { expirationTtl: 60 * 60 * 24 * 14 });
+        return json(200, { code: 200 });
+      } catch { return json(400, { code: 400, message: "Bad request" }); }
+    }
+    if (url.pathname.startsWith("/govee/")) {
+      const path = url.pathname.slice("/govee/".length);
+      if (ALLOWED[path] !== request.method) return json(404, { code: 404, message: "Not allowed" });
+      const key = request.headers.get("Govee-API-Key");
+      if (!key) return json(400, { code: 400, message: "Missing Govee API key" });
+      const init = { method: request.method, headers: { "Govee-API-Key": key, "Content-Type": "application/json" } };
+      if (request.method === "POST") init.body = await request.text();
+      // device/control: only switching a device's power on or off is allowed.
+      if (path === "device/control") {
+        let c = null; try { c = JSON.parse(init.body).payload.capability; } catch {}
+        if (!c || c.type !== "devices.capabilities.on_off" || c.instance !== "powerSwitch" || (c.value !== 0 && c.value !== 1))
+          return json(400, { code: 400, message: "Only power on/off is allowed" });
+      }
+      try {
+        const r = await fetch(GOVEE + path, init);
+        return new Response(r.body, { status: r.status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+      } catch (e) {
+        return json(502, { code: 502, message: "Couldn't reach Govee" });
+      }
+    }
+    return env.ASSETS.fetch(request);
+  },
+};
+
+/* ---------------- Assistants and other services ----------------
+ * Claude (and any MCP client) connects to  /mcp/<access key>
+ * Anything else (Siri Shortcuts, Home Assistant, scripts) uses  /api/*  with
+ * "Authorization: Bearer <access key>". Keys are created in Ember on the home
+ * device (Settings → Home gateway → Assistants & services). Commands go into the
+ * same queue as away control, so the home device carries them out within seconds,
+ * with the same safety rules (e.g. no restart after a carbon monoxide fault).
+ */
+const assistant = (() => {
+  const cToF = (c) => Math.round(c * 9 / 5 + 32);
+  const toC = (t, unit) => (String(unit || "F").toUpperCase().startsWith("C") ? +t : (+t - 32) * 5 / 9);
+
+  async function keyOk(env, key) {
+    if (!env.EMBER || !key || !/^emb_[0-9a-f]{40}$/.test(key)) return false;
+    const keys = (await env.EMBER.get("keys", { type: "json" })) || [];
+    const h = await sha(key);
+    const k = keys.find((x) => x.hash === h);
+    if (!k) return false;
+    if (!k.used || Date.now() - k.used > 3600e3) { k.used = Date.now(); await env.EMBER.put("keys", JSON.stringify(keys)); }
+    return true;
+  }
+
+  const ago = (ms) => (ms < 90e3 ? Math.round(ms / 1000) + " seconds" : ms < 5400e3 ? Math.round(ms / 60e3) + " minutes" : Math.round(ms / 3600e3) + " hours");
+  function describe(st) {
+    if (!st) return { text: "No status yet. Ember isn't running as the home gateway (Settings → Home gateway on the device next to the heater).", ok: false };
+    const x = st.x || {}, age = Date.now() - (st.serverAt || st.at || 0);
+    const T = (c) => (c == null ? "—" : `${cToF(c)}°F (${Math.round(c)}°C)`);
+    const gal = (l) => (l / 3.785).toFixed(1) + " gal";
+    const L = [];
+    const power = { off: "Off", starting: "Igniting", running: "Heating", cooling: "Cooling down", fan: "Fan only", error: "Fault" }[st.power] || "Unknown";
+    L.push(`HEATER: ${power}${(st.power === "running" || st.power === "fan") && st.level != null ? `, level ${st.level} of ${st.max || 10}` : ""}.`);
+    if (st.power === "error" && st.faultText) L.push(`Fault: ${st.faultText}${st.faultSteps && st.faultSteps.length ? " Fix: " + st.faultSteps.join(" ") : ""}${st.noRetry ? " (Ember will not restart it automatically.)" : ""}`);
+    if (st.clean) L.push(`${st.clean.kind === "burn" ? "Clean burn (carbon clean, keeps heating after)" : "Shutdown burn-off (turns off after)"} running at full power, about ${x.cleanLeftMin ?? "?"} min left.`);
+    if (st.mode === "thermo") L.push(`Mode: thermostat, set to ${T(st.targetC)}${st.tuneName ? `, preset "${st.tuneName}"` : ""}. Runs between level ${st.hold ?? x.minLevel ?? 2} and ${st.top ?? 10}.`);
+    if (st.mode === "manual") L.push(`Mode: fixed power level ${st.manualLevel ?? "—"}.`);
+    L.push(`TEMPERATURES: room ${T(st.roomC)} (${st.roomSrc || "sensor"}${x.hum != null ? `, ${x.hum}% humidity` : ""}); outside ${st.outC != null ? T(st.outC) + (st.outCity ? " in " + st.outCity : "") : "—"}${x.bodyC != null ? `; heater body ${T(x.bodyC)}` : ""}${x.heaterRoomC != null ? `; heater intake sensor ${T(x.heaterRoomC)}` : ""}.`);
+    if (!st.x) L.push("(The home device runs an older Ember: reload Ember there for run hours, burn rate, body temperature and schedule.)");
+    if (st.volts) L.push(`Battery/supply: ${st.volts.toFixed ? st.volts.toFixed(1) : st.volts} V.`);
+    if (st.leftL != null) L.push(`FUEL: about ${gal(st.leftL)} left${x.tankGal ? ` of a ${x.tankGal} gal tank` : ""}${x.rateLph ? `; burning ${gal(x.rateLph)}/h now (≈ ${x.hoursLeft.now} h left at this level)` : ""}${x.hoursLeft ? `; ≈ ${x.hoursLeft.low} h at level ${x.minLevel ?? 2}, ≈ ${x.hoursLeft.max} h at level 10` : ""}.`);
+    if (x.runH != null) L.push(`RUN TIME: today ${x.todayH} h (${gal(x.todayL * 1)}), last 7 days ${x.weekH} h (${gal(x.weekL * 1)}), total ${x.runH} h. Low-level running since the last clean burn: ${x.lowH} h (a clean burn is suggested every ${x.coachH} h).`);
+    if (x.cleanMins != null) L.push(`Default shutdown burn-off: ${x.cleanMins} min.`);
+    if (st.tunes && st.tunes.length) L.push(`Presets: ${st.tunes.map((t) => `${t.name} ${cToF(t.targetC)}°F`).join(", ")}.`);
+    if (x.sched) L.push(`Schedule: ${x.sched.map((s) => `${s.name} ${s.on ? `on ${s.start}–${s.stop}` : "off"}`).join(", ")}${st.schedNext ? ` (next: ${st.schedNext})` : ""}.`);
+    if (st.plug) L.push(`Smart plug "${st.plug.name}": ${st.plug.busy || (st.plug.on == null ? "unknown" : st.plug.on ? "on" : "off")}.`);
+    if (!st.connected) L.push("WARNING: the home device is NOT connected to the heater right now; commands wait until it reconnects.");
+    L.push(age > 600e3 ? `WARNING: last update ${ago(age)} ago. The home device may be offline (screen locked, Bluefy closed, or no Wi-Fi).` : `Updated ${ago(age)} ago${x.version ? ` · Ember v${x.version}` : ""}.`);
+    return { text: L.join("\n"), ok: age <= 600e3 && !!st.connected };
+  }
+  const state = (env) => env.EMBER.get("st", { type: "json" });
+  const sent = async (env, what) => `${what} Sent to the home device; it acts within about 5–10 seconds.\n\nCurrent status (before the change):\n${describe(await state(env)).text}`;
+
+  // Each tool: input schema + handler returning text. Shared by MCP and the plain API.
+  const TOOLS = {
+    get_heater_status: {
+      description: "Everything about the heater and the Ember app: on/off, power level, mode and thermostat setting, room/outside/heater body temperatures, humidity, voltage, fuel left and burn rate with hours remaining, run hours (today, 7 days, total), hours since the last clean burn, any fault with fix steps, clean-burn progress, presets, schedule, smart plug, and whether the home device is online.",
+      schema: { type: "object", properties: {} },
+      run: async (env) => describe(await state(env)).text,
+    },
+    turn_on_heater: {
+      description: "Turn the heater on (or change what it's doing if it's already on). Optionally pick a saved preset by name (e.g. Sleep, Comfort, Boost) or a thermostat temperature. With neither, it uses the last setting.",
+      schema: { type: "object", properties: {
+        preset: { type: "string", description: "Name of a saved preset, e.g. Comfort" },
+        temperature: { type: "number", description: "Thermostat target temperature" },
+        unit: { type: "string", enum: ["F", "C"], description: "Unit for temperature (default F)" } } },
+      run: async (env, a) => {
+        const st = await state(env), more = [];
+        let what = "Turning the heater on";
+        if (a.preset) {
+          const t = (st && st.tunes || []).find((x) => x.name.toLowerCase() === String(a.preset).toLowerCase().trim());
+          if (!t) return `No preset called "${a.preset}". Saved presets: ${(st && st.tunes || []).map((x) => x.name).join(", ") || "none reported"}.`;
+          more.push(["tune", t.id]); what += ` with preset ${t.name} (${cToF(t.targetC)}°F)`;
+        } else if (a.temperature != null) {
+          const c = Math.round(toC(a.temperature, a.unit) * 10) / 10;
+          if (!(c >= 4 && c <= 32)) return "That temperature is out of range (40–90°F / 4–32°C).";
+          more.push(["mode", "thermo"], ["target", c]); what += ` at ${cToF(c)}°F`;
+        }
+        const on = st && (st.power === "running" || st.power === "starting");
+        if (on && !more.length) return "The heater is already on.\n\nCurrent status:\n" + describe(st).text;
+        const r = on ? (more.length ? await queue(env, more[0][0], more[0][1], more.slice(1)) : { cmd: true })
+          : more.length ? await queue(env, more[0][0], more[0][1], [...more.slice(1), ["start", null]]) : await queue(env, "start", null);
+        if (r.error) return "Couldn't send: " + r.error;
+        return sent(env, on ? what.replace("Turning the heater on", "The heater is already on; changing it") + "." : what + ".");
+      },
+    },
+    turn_off_heater: {
+      description: "Turn the heater off. By default it does the clean burn-off at high power first (the user's chosen length), then shuts down. Set burn_off_minutes to 0 to turn off right away, or 1, 5, 10 or 20.",
+      schema: { type: "object", properties: { burn_off_minutes: { type: "integer", enum: [0, 1, 5, 10, 20], description: "Clean burn-off length before shutdown; 0 = off now" } } },
+      run: async (env, a) => {
+        const m = a.burn_off_minutes;
+        const r = m === 0 ? await queue(env, "stopnow", null) : await queue(env, "stop", m == null ? null : m);
+        if (r.error) return "Couldn't send: " + r.error;
+        return sent(env, m === 0 ? "Turning off now (no burn-off)." : `Turning off after a ${m == null ? "clean" : m + "-minute"} burn-off.`);
+      },
+    },
+    set_temperature: {
+      description: "Set the thermostat target temperature (switches to thermostat mode). Doesn't turn the heater on by itself.",
+      schema: { type: "object", required: ["temperature"], properties: { temperature: { type: "number" }, unit: { type: "string", enum: ["F", "C"], description: "Default F" } } },
+      run: async (env, a) => {
+        const c = Math.round(toC(a.temperature, a.unit) * 10) / 10;
+        if (!(c >= 4 && c <= 32)) return "That temperature is out of range (40–90°F / 4–32°C).";
+        const r = await queue(env, "mode", "thermo", [["target", c]]);
+        return r.error ? "Couldn't send: " + r.error : sent(env, `Thermostat set to ${cToF(c)}°F.`);
+      },
+    },
+    set_power_level: {
+      description: "Run at a fixed power level from 1 (lowest) to 10 (highest), instead of the thermostat.",
+      schema: { type: "object", required: ["level"], properties: { level: { type: "integer", minimum: 1, maximum: 10 } } },
+      run: async (env, a) => {
+        const r = await queue(env, "mode", "manual", [["level", Math.round(a.level)]]);
+        return r.error ? "Couldn't send: " + r.error : sent(env, `Power level set to ${Math.round(a.level)}.`);
+      },
+    },
+    fan_only: {
+      description: "Run the blower fan only (no heat, no fuel). Optional speed 1–10. If the heater is heating, it cools down first.",
+      schema: { type: "object", properties: { speed: { type: "integer", minimum: 1, maximum: 10 } } },
+      run: async (env, a) => {
+        const r = a.speed ? await queue(env, "fan", null, [["fanlevel", Math.round(a.speed)]]) : await queue(env, "fan", null);
+        return r.error ? "Couldn't send: " + r.error : sent(env, "Switching to fan only.");
+      },
+    },
+    start_clean_burn: {
+      description: "Start a 15-minute carbon clean burn at full power while the heater keeps running (it goes back to normal afterwards). Only works while it is heating.",
+      schema: { type: "object", properties: {} },
+      run: async (env) => {
+        const st = await state(env);
+        if (st && st.power !== "running") return "The heater has to be heating to start a clean burn. Turn it on first.\n\n" + describe(st).text;
+        const r = await queue(env, "clean", null);
+        return r.error ? "Couldn't send: " + r.error : sent(env, "Starting a 15-minute clean burn at full power.");
+      },
+    },
+    stop_clean_burn: {
+      description: "End a running clean burn early and go back to normal heating. If a shutdown burn-off is running, this turns the heater off now instead.",
+      schema: { type: "object", properties: {} },
+      run: async (env) => { const r = await queue(env, "cleanstop", null); return r.error ? "Couldn't send: " + r.error : sent(env, "Ending the burn."); },
+    },
+    set_fan_speed: {
+      description: "Change the fan speed (1–10) while in fan-only mode.",
+      schema: { type: "object", required: ["speed"], properties: { speed: { type: "integer", minimum: 1, maximum: 10 } } },
+      run: async (env, a) => { const r = await queue(env, "fanlevel", Math.round(a.speed)); return r.error ? "Couldn't send: " + r.error : sent(env, `Fan speed ${Math.round(a.speed)}.`); },
+    },
+    choose_preset: {
+      description: "Switch to a saved preset (e.g. Sleep, Comfort, Boost or the user's custom one) without turning the heater on or off.",
+      schema: { type: "object", required: ["preset"], properties: { preset: { type: "string" } } },
+      run: async (env, a) => {
+        const st = await state(env);
+        const t = (st && st.tunes || []).find((x) => x.name.toLowerCase() === String(a.preset).toLowerCase().trim());
+        if (!t) return `No preset called "${a.preset}". Saved presets: ${(st && st.tunes || []).map((x) => x.name).join(", ") || "none reported"}.`;
+        const r = await queue(env, "tune", t.id);
+        return r.error ? "Couldn't send: " + r.error : sent(env, `Preset ${t.name} (${cToF(t.targetC)}°F).`);
+      },
+    },
+    smart_plug: {
+      description: "Control the Govee smart plug the heater is plugged into: on, off (safely waits for cool-down), or power_cycle (off 30 s, then on; clears stubborn faults).",
+      schema: { type: "object", required: ["action"], properties: { action: { type: "string", enum: ["on", "off", "power_cycle"] } } },
+      run: async (env, a) => {
+        const act = { on: "plugon", off: "plugoff", power_cycle: "plugcycle" }[a.action];
+        if (!act) return "Use on, off or power_cycle.";
+        const r = await queue(env, act, null);
+        return r.error ? "Couldn't send: " + r.error : sent(env, `Smart plug: ${a.action.replace("_", " ")}.`);
+      },
+    },
+    clear_fault: {
+      description: "Clear a heater fault. restart=true clears it and tries to start again; restart=false (default) clears it and leaves the heater off. Carbon monoxide faults are never restarted automatically.",
+      schema: { type: "object", properties: { restart: { type: "boolean" } } },
+      run: async (env, a) => { const r = await queue(env, a.restart ? "retry" : "reset", null); return r.error ? "Couldn't send: " + r.error : sent(env, a.restart ? "Clearing the fault and trying again." : "Clearing the fault; the heater stays off."); },
+    },
+    log_fuel: {
+      description: "Update the fuel gauge after filling up: full=true for a full tank, or gallons for the amount now in the tank.",
+      schema: { type: "object", properties: { full: { type: "boolean" }, gallons: { type: "number", minimum: 0 } } },
+      run: async (env, a) => {
+        const r = a.full || a.gallons == null ? await queue(env, "fuelfull", null) : await queue(env, "fuel", Math.round(a.gallons * 10) / 10);
+        return r.error ? "Couldn't send: " + r.error : sent(env, a.full || a.gallons == null ? "Fuel gauge set to a full tank." : `Fuel gauge set to ${a.gallons} gal.`);
+      },
+    },
+    set_schedule: {
+      description: "Turn a schedule slot on or off: Morning, Midday or Evening (their start/stop times are set in the app).",
+      schema: { type: "object", required: ["slot", "enabled"], properties: { slot: { type: "string", enum: ["Morning", "Midday", "Evening"] }, enabled: { type: "boolean" } } },
+      run: async (env, a) => {
+        const id = String(a.slot || "").toLowerCase();
+        const r = await queue(env, a.enabled ? "schedon" : "schedoff", id);
+        return r.error ? "Couldn't send: " + r.error : sent(env, `${a.slot} schedule ${a.enabled ? "on" : "off"}.`);
+      },
+    },
+  };
+
+  async function call(env, name, args) {
+    const t = TOOLS[name];
+    if (!t) throw new Error("Unknown tool " + name);
+    return t.run(env, args || {});
+  }
+
+  // Minimal MCP server (Streamable HTTP, JSON responses).
+  async function mcp(request, env, url) {
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors() });
+    const key = url.pathname.split("/")[2] || (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    if (!(await keyOk(env, key))) return json(401, { code: 401, message: "Invalid or missing access key" });
+    if (request.method !== "POST") return new Response("Method not allowed", { status: 405, headers: { Allow: "POST", ...cors() } });
+    let msg;
+    try { msg = await readBody(request, 20000); } catch { return rpc(null, null, { code: -32700, message: "Parse error" }); }
+    if (Array.isArray(msg)) return rpc(null, null, { code: -32600, message: "Batches not supported" });
+    const { id, method, params } = msg;
+    if (id === undefined || id === null) return new Response(null, { status: 202, headers: cors() }); // notification
+    try {
+      if (method === "initialize") {
+        const want = params && params.protocolVersion;
+        const known = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
+        return rpc(id, { protocolVersion: known.includes(want) ? want : "2025-06-18", capabilities: { tools: {} },
+          serverInfo: { name: "ember-heater", version: "1.0" },
+          instructions: "Controls the user's diesel heater through their Ember home gateway. Check get_heater_status when unsure. Commands are queued and carried out by the home device within about 5–10 seconds; call get_heater_status afterwards to confirm. Temperatures default to Fahrenheit." });
+      }
+      if (method === "ping") return rpc(id, {});
+      if (method === "tools/list") return rpc(id, { tools: Object.entries(TOOLS).map(([name, t]) => ({ name, description: t.description, inputSchema: t.schema })) });
+      if (method === "tools/call") {
+        const text = await call(env, params && params.name, params && params.arguments);
+        return rpc(id, { content: [{ type: "text", text }] });
+      }
+      return rpc(id, null, { code: -32601, message: "Method not found" });
+    } catch (e) {
+      return rpc(id, { content: [{ type: "text", text: "Error: " + e.message }], isError: true });
+    }
+  }
+  const cors = () => ({ "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type, Authorization, Mcp-Session-Id, Mcp-Protocol-Version", "Access-Control-Allow-Methods": "POST, GET, OPTIONS" });
+  const rpc = (id, result, error) => new Response(JSON.stringify(error ? { jsonrpc: "2.0", id, error } : { jsonrpc: "2.0", id, result }),
+    { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...cors() } });
+
+  // Short, speakable summary for voice assistants (Siri "Speak Text", smart speakers).
+  function summary(st) {
+    if (!st) return "Ember's home gateway isn't reporting yet.";
+    const x = st.x || {}, age = Date.now() - (st.serverAt || st.at || 0);
+    const f = (c) => (c == null ? null : cToF(c));
+    const out = [];
+    const p = { off: "off", starting: "igniting", running: "heating", cooling: "cooling down", fan: "on fan only", error: "stopped with a fault" }[st.power] || "in an unknown state";
+    out.push(`The heater is ${p}${(st.power === "running" || st.power === "fan") && st.level != null ? ` at level ${st.level}` : ""}.`);
+    if (st.power === "error" && st.faultTitle) out.push(st.faultTitle.replace("·", ":") + ".");
+    if (st.clean) out.push(`A ${st.clean.kind === "burn" ? "clean burn" : "burn-off"} is running, about ${x.cleanLeftMin ?? "a few"} minutes left.`);
+    const t = [st.roomC != null && `room ${f(st.roomC)}`, st.mode === "thermo" && st.targetC != null && `set to ${f(st.targetC)}`, st.outC != null && `outside ${f(st.outC)}`].filter(Boolean);
+    if (t.length) out.push(t.join(", ").replace(/^./, (c) => c.toUpperCase()) + " degrees.");
+    if (st.leftL != null) out.push(`About ${(st.leftL / 3.785).toFixed(1)} gallons left${x.hoursLeft && x.hoursLeft.now ? `, roughly ${Math.round(x.hoursLeft.now)} hours at this level` : ""}.`);
+    if (x.todayH != null) out.push(`It has run ${x.todayH} hours today.`);
+    if (!st.connected) out.push("The home device isn't connected to the heater right now.");
+    if (age > 600e3) out.push(`This is from ${ago(age)} ago; the home device may be offline.`);
+    return out.join(" ");
+  }
+
+  // Plain web API for Siri Shortcuts, Home Assistant, scripts. Authorization: Bearer <key>.
+  //   GET  /api/status   full report      GET /api/summary   short, speakable
+  //   POST /api/on {preset?|temperature?, unit?}   /api/off {burn_off_minutes?}
+  //   POST /api/temperature {temperature, unit?}  /api/level {level}  /api/preset {preset}
+  //   POST /api/fan {speed?}  /api/fanspeed {speed}  /api/clean  /api/cleanstop
+  //   POST /api/plug {action: on|off|power_cycle}  /api/fault {restart?}
+  //   POST /api/fuel {full?|gallons?}  /api/schedule {slot, enabled}
+  // Any tool name also works (POST /api/start_clean_burn …). Add ?text=1 (or
+  // "Accept: text/plain") for a plain-text reply that Siri can speak.
+  const ROUTES = { status: "get_heater_status", on: "turn_on_heater", off: "turn_off_heater", temperature: "set_temperature", level: "set_power_level",
+    fan: "fan_only", fanspeed: "set_fan_speed", preset: "choose_preset", clean: "start_clean_burn", cleanstop: "stop_clean_burn",
+    plug: "smart_plug", fault: "clear_fault", fuel: "log_fuel", schedule: "set_schedule" };
+  async function api(request, env, url) {
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors() });
+    const key = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "") || url.searchParams.get("key") || "";
+    if (!(await keyOk(env, key))) return json(401, { code: 401, message: "Invalid or missing access key (Authorization: Bearer emb_…)" });
+    const name = url.pathname.slice(5).replace(/\.txt$/, "");
+    const wantText = url.searchParams.has("text") || url.pathname.endsWith(".txt") || /text\/plain/.test(request.headers.get("Accept") || "") && !/json/.test(request.headers.get("Accept") || "");
+    const reply = (text, st) => wantText
+      ? new Response(text, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", ...cors() } })
+      : new Response(JSON.stringify({ code: 200, message: text, state: st }), { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...cors() } });
+    if (name === "summary") { const st = await state(env); return reply(summary(st), st); }
+    const tool = ROUTES[name] || (TOOLS[name] ? name : null);
+    if (!tool) return json(404, { code: 404, message: "Not found. Try /api/status, /api/summary, /api/on, /api/off …" });
+    if (tool !== "get_heater_status" && request.method !== "POST") return json(405, { code: 405, message: "Use POST for commands." });
+    let args = {};
+    if (request.method === "POST") { try { args = await readBody(request, 2000); } catch { args = {}; } }
+    for (const [k, v] of url.searchParams) if (k !== "key" && k !== "text" && args[k] == null) args[k] = /^-?\d+(\.\d+)?$/.test(v) ? +v : v === "true" ? true : v === "false" ? false : v;
+    let text = await call(env, tool, args);
+    if (wantText && tool !== "get_heater_status") text = text.split("\n\nCurrent status")[0]; // short spoken confirmation
+    return reply(text, await state(env));
+  }
+
+  return { mcp, api, TOOLS };
+})();

@@ -1,0 +1,103 @@
+# Ember – Hcalory heater app
+
+> **New here? Start with the [step-by-step setup guide](HOWTO.md)** · [⬇ Download the latest version](ember-heater-latest.zip?raw=true) · [Share it: Reddit post](REDDIT_POST.md)
+
+A web app that controls Hcalory diesel heaters (built for the TB2S) over Bluetooth.
+It has no app store listing and needs no developer account. Open the link in Chrome on Android.
+
+**Features:** clean shutdown (10 min at full power, then off), one-dial thermostat with presets,
+smooth heat, carbon health with a 15-min clean burn, fuel tracker, warm-by start,
+battery guard, plain-English faults, a Govee thermometer as the room gauge and a demo heater.
+
+## Put it online (free, about 2 minutes)
+Web Bluetooth only works over https, so the folder has to be hosted:
+1. Cloudflare dashboard → **Workers & Pages → Create → Pages → Upload assets**.
+2. Name it `ember`, drag in this `heater` folder (or `ember-heater-vX.Y.zip`), then **Deploy**.
+3. Open `https://ember-xxxx.pages.dev` in **Chrome on Android**. Tap ⋮ → **Add to Home screen**.
+
+## First connect
+- Turn the heater's power on. **Close the Hcalory app.** A heater takes one phone at a time.
+- Tap **Connect heater** and pick the device (usually `HCALORY…` or `TY…`).
+- If it isn't listed: Settings → **Show all Bluetooth devices**.
+- If it connects but shows "No reply": Settings → **Copy log** and send it over.
+
+## Govee thermometer as the room gauge
+**On iPhone use Wi-Fi:** in the Govee Home app go to Profile → Settings → Apply for API Key. Then in Ember open Settings → Govee thermometer → Set up,
+paste the key and tap Find. This needs `_worker.js` from the zip on your Cloudflare site. It relays two Govee calls and stores nothing.
+
+Settings → **Room gauge → Govee thermometer** opens the picker. Choose your `GVH5…` / `Govee_H5…` device.
+The app only listens to the thermometer's broadcasts, so the heater stays connected.
+The dial then shows the Govee temperature and humidity, and the thermostat aims for that reading.
+If the readings stop for 3 minutes, the app falls back to the heater's own sensor.
+- Supported: H5072, H5074, H5075, H5100–H5110, H5174, H5177, H5179, H5051/52/71, H5178.
+- If Chrome says it needs a setting: open `chrome://flags`, turn on **Experimental Web Platform features** and restart Chrome.
+
+## Versions
+The version shows next to the name in the app (and in the browser tab). To release: bump `VERSION` in `app.js`
+and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`.
+
+| Version | Changes |
+| --- | --- |
+| v1.54 | Siri, ChatGPT and other assistants get everything Claude has: full status, a short spoken summary ("Hey Siri, heater status"), and every command (clean burn, presets, fan speed, plug, faults, fuel, schedule) through the web API. |
+| v1.53 | Assistants can now see everything (body temp, voltage, humidity, fuel burn rate and hours left, run hours today/7 days/total, hours since clean burn, schedule, plug, faults with fixes) and control more: start/stop a clean burn, fan speed, presets, smart plug, clear faults, log a fill-up, schedule on/off. |
+| v1.52 | Settings → Voice & AI assistants: pick Claude, ChatGPT, Siri, Home Assistant or Other and get step-by-step setup with the link and key ready to copy. Disconnect any time. |
+| v1.51 | Assistants & services: connect Claude (custom connector), Siri Shortcuts, Home Assistant or scripts to the home gateway with revocable access keys. Say "turn on my heater to Comfort" to Claude. |
+| v1.50 | When the Govee is the room gauge, the thermostat waits for its first reading after opening instead of briefly acting on the heater's own (cold intake) sensor. |
+| v1.49 | Fixes Ember silently freezing: a Bluetooth message that never gets an answer now times out after 3 s, and if the heater stops replying for 20 s Ember resets and reconnects on its own (this could leave the power stuck while the screen looked fine). |
+| v1.48 | Send log: Settings → Send log uploads a troubleshooting snapshot to your own Cloudflare storage (no keys or PINs). Also sent automatically on a fault and every 15 minutes when something new happened. The thermostat logs why it is waiting. |
+| v1.47 | Thermostat: when the room shows the target temperature it always eases to the hold level (on-screen text and power now agree), retries after 10 s if the heater ignores a change, logs every power decision, and reacts right away to a new Govee reading. |
+| v1.46 | Changing the temperature no longer changes the power right away: the dial shows "SETTING…" and waits 2.5 seconds after your last change, then adjusts the power if needed. |
+| v1.45 | Thermostat dial is less sensitive: it turns at half speed from where you start, a tap no longer jumps the temperature, and tiny touches are ignored. The − and + buttons still step 1°. |
+| v1.44 | Outside temperature is fully automatic: no setup. Uses location if allowed, otherwise your area from the internet connection, and shows the town. |
+| v1.43 | Shows the town next to the outside temperature (e.g. "Outside 26° · Minneapolis"). |
+| v1.42 | Outside temperature under the room temperature (dial and away screen), from your location or a city/ZIP. Free Open-Meteo weather, updates every 15 minutes. |
+| v1.41 | Fan only is always available: during a fault it clears the fault and runs the fan; while heating it cools down, then switches to fan only. Home and away. |
+| v1.40 | Fault codes now match the heater (TB2S sends the code in byte 21; e.g. E-11). Every fault shows what it means and step-by-step fixes, at home and away. |
+| v1.39 | Fault codes: reads the code from every byte the TB2S may use, shows E-? (never E-00) when none is sent, and logs the raw fault frame. |
+| v1.38 | Higher-contrast text and outlines everywhere; light and dark themes (Settings → Appearance: Auto, Light, Dark). |
+| v1.37 | Connecting: retries the Bluetooth device list in simpler forms when the browser rejects it, explains bare Bluefy errors, and ignores repeated taps. |
+| v1.36 | Settings, Manual tune, How it heats and the Govee screens open as normal pages, so scrolling never gets stuck on iPad/iPhone. |
+| v1.35 | Tank size box on the Fuel card; Settings and other sheets fit the screen on iPad. |
+| v1.34 | Set any tank size (e.g. 10 or 7.5 gal) from the fuel gauge or Settings; your current fuel is kept. |
+| v1.33 | Away screen: connection strip, status bar and badge always agree ("Last known: …" when the home app is offline); fewer false "not connected" alarms. |
+| v1.32 | Away connection indicator; classic fuel gauge with custom amount; schedule folds away; Start under the dial; 20-min burn-off; shutdown shows status and level; smoother Settings scrolling. |
+| v1.31 | Start from away is one tap (with Undo), and starting waits longer for the heater to confirm instead of sending Off then On. |
+| v1.30 | Govee smart plug: turn the heater's power on, off (safely, after cool-down) or power-cycle it, at home and from away. |
+| v1.29 | Status bar scrolls with the page instead of sticking over content; it shows the level the heater actually reports. |
+| v1.28 | Schedule: Morning, Midday and Evening windows, each with start and stop times and a setting. Replaces Warm by. |
+| v1.27 | Fan speed 1–10 while in fan-only mode, at home and from away. |
+| v1.26 | Start heating works during cool-down (like the remote) and is checked: if the heater doesn't start, it sends Off then On once more. |
+| v1.25 | Fault recovery: Try again and Reset when the heater shows a fault, at home and from away. 3-try safety limit; never restarts after a carbon monoxide fault. |
+| v1.24 | Fan only (no heat): run the blower without burning fuel, at home and from away. |
+| v1.23 | Choose a 1, 5 or 10 min burn-off (or off now) every time you turn off, at home and from away. |
+| v1.22 | Away control adds power levels (1–10), Clean shutdown or Off now, and refreshes every few seconds while you watch. |
+| v1.21 | Away control uses a simple PIN you choose (4–8 digits). 10 wrong tries lock it for 24 hours. |
+| v1.20 | Control from away: an old phone or iPad at home acts as the gateway; your phone sends start/stop, presets and temperature through your Cloudflare site. |
+| v1.19 | Fuel is five tappable bars, one per gallon: tap a bar to set the tank (last bar = full). |
+| v1.18 | Set the fuel in the tank by hand (slider, ¼ ½ ¾ Full). Just three temperature buttons (Sleep, Comfort, Boost) plus one Custom. |
+| v1.17 | Status bar at the top (on/off, level, setting, fuel left at that level) that stays visible while scrolling. Fixes sideways overflow on iPhone. |
+| v1.16 | Govee setup screen: connect over Wi-Fi with a Govee API key (works on iPhone, via the included _worker.js relay) or Bluetooth (Android Chrome). Fixes the "Re-pair" label. |
+| v1.15 | Every preset button (Frost, Sleep, Comfort, Boost and your own) can be edited: temperature, name, levels, clean burn. Reset in Settings. |
+| v1.14 | Custom tunes include their own temperature and appear as one-tap buttons next to the presets. |
+| v1.13 | Turning off is confirmed and retried (re-sends the PIN if needed); re-unlocks after a Bluetooth reconnect; warns to keep the screen unlocked during clean shutdown. |
+| v1.12 | Manual tune: save your own heating styles (heat-up level, ease-down point, hold level, clean-burn length) and switch with one tap. |
+| v1.11 | Teaches how it heats: a live explanation under the status, a "How it heats" guide and help text in Settings. |
+| v1.10 | Thermostat never goes below level 2 (adjustable in Settings). |
+| v1.9 | Fuel card shows hours left at every power level, with the current level highlighted. |
+| v1.8 | Fuel shown in gallons; tank size in gallons (default 5 gal). |
+| v1.7 | Clean shutdown checks the heater really reaches full power (switches to level mode, confirms, retries, re-sends PIN). Acknowledged Bluetooth writes. |
+| v1.6 | Supports the TB2S (newer Hcalory BD39 controllers): PIN unlock, power levels 1–10, direct temperature. Version shown in the app. |
+| v1.5 | Finds heaters named "hcalory…" |
+| v1.4 | "Show all devices" on the first screen |
+| v1.3 | Clear error messages, Bluefy fixes |
+| v1.2 | Govee thermometer as the room gauge |
+| v1.1 | Clean shutdown, thermostat, carbon health, fuel, warm-by, battery guard |
+
+## Notes
+- Keep the screen open during a clean shutdown or warm-by start. The app keeps the screen awake.
+- iPhone/iPad: Safari has no Bluetooth for web pages. Use the free **Bluefy** browser.
+- Testing: add `?demo` to the URL to start the demo heater, or `?demo&fast` to run time 30× faster.
+- Protocol tests: `node --test protocol.test.mjs`
+- Heater formats: **H** = newer Hcalory controllers such as the TB2S (service BD39, unlocked with PIN 0000; change it in Settings).
+  **B** and **A** = older FFF0 controllers. The app picks the right one automatically.
+- Protocol credits: Spettacolo83/homeassistant-diesel-heater (diesel-heater-ble), mSoftMS/AirHeater-BLE, evanfoster/hcalory-control and govee-ble. Unofficial. Not affiliated with Hcalory.
