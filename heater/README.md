@@ -38,6 +38,7 @@ and `CACHE` in `sw.js`, then run `./release.sh` to build `ember-heater-vX.Y.zip`
 
 | Version | Changes |
 | --- | --- |
+| v1.51 | Assistants & services: connect Claude (custom connector), Siri Shortcuts, Home Assistant or scripts to the home gateway with revocable access keys. Say "turn on my heater to Comfort" to Claude. |
 | v1.50 | When the Govee is the room gauge, the thermostat waits for its first reading after opening instead of briefly acting on the heater's own (cold intake) sensor. |
 | v1.49 | Fixes Ember silently freezing: a Bluetooth message that never gets an answer now times out after 3 s, and if the heater stops replying for 20 s Ember resets and reconnects on its own (this could leave the power stuck while the screen looked fine). |
 | v1.48 | Send log: Settings → Send log uploads a troubleshooting snapshot to your own Cloudflare storage (no keys or PINs). Also sent automatically on a fault and every 15 minutes when something new happened. The thermostat logs why it is waiting. |

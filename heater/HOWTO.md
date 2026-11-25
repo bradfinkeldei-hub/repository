@@ -119,6 +119,30 @@ Plug the heater into a **Govee Wi-Fi smart plug** to cut its power completely, o
 
 **Safety:** Ember never cuts power while the heater is burning or cooling down. If it's on, Ember turns it off first, waits for the cool-down to finish, then switches the plug off. The relay on your Cloudflare site only allows switching a plug on or off.
 
+## Talk to it: Claude, Siri, Home Assistant
+
+Needs the home gateway (above). On the home device: **Settings → Home gateway → Assistants & services → Add**. Name it (for example "Claude"). Ember shows a connector URL and an access key **once**, so copy them right away. Remove a connection there any time and it stops working immediately.
+
+**Claude:** in Claude, go to **Settings → Connectors → Add custom connector** and paste the connector URL. Then just ask: "turn on my heater to Comfort", "set it to 72", "what's the heater doing?", "turn it off without the burn-off".
+
+**Siri (Shortcuts app):** new shortcut → **Get Contents of URL**:
+- URL: `https://YOUR-SITE.pages.dev/api/on` · Method **POST** · Header `Authorization` = `Bearer YOUR-KEY`
+- Optional JSON body: `{"preset": "Comfort"}` or `{"temperature": 72}`
+- Name it "Heater on". Say "Hey Siri, heater on". Make a second one with `/api/off`.
+
+**Anything else** (Home Assistant `rest_command`, scripts): send `Authorization: Bearer YOUR-KEY` to:
+
+| Request | Does |
+|---|---|
+| `GET /api/status` | Status: on/off, level, set temperature, room, outside, fuel, presets |
+| `POST /api/on` `{"preset"}` or `{"temperature","unit"}` | Turn on (optionally with a preset or temperature) |
+| `POST /api/off` `{"burn_off_minutes": 0, 1, 5, 10 or 20}` | Turn off (default: your burn-off, 0 = now) |
+| `POST /api/temperature` `{"temperature","unit"}` | Set the thermostat |
+| `POST /api/level` `{"level": 1-10}` | Fixed power level |
+| `POST /api/fan` `{"speed": 1-10}` | Fan only |
+
+Commands go through the same path as away control, so the home device carries them out in about 5–10 seconds, with the same safety rules (for example, it never restarts after a carbon monoxide fault). Temperatures default to °F.
+
 ## Quick tour
 
 | | |

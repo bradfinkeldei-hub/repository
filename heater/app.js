@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.50"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.51"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1482,7 +1482,7 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
   $("btnHow").onclick = () => { renderHow(); $("how").hidden = false; };
   $("btnHowClose").onclick = () => ($("how").hidden = true);
   $("how").addEventListener("click", (e) => { if (e.target.id === "how") $("how").hidden = true; });
-  $("btnSettings").onclick = () => { $("settings").hidden = false; log("· settings opened"); };
+  $("btnSettings").onclick = () => { $("settings").hidden = false; log("· settings opened"); aiLoad(); };
   $("btnClose").onclick = () => ($("settings").hidden = true);
   $("settings").addEventListener("click", (e) => { if (e.target.id === "settings") $("settings").hidden = true; });
   $("btnCopyLog2").onclick = () => $("btnCopyLog").onclick();
@@ -1644,6 +1644,44 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
     finally { gwBusy = false; renderGateway(); }
   }
   setInterval(gatewayTick, GW_EVERY);
+  /* ----- Assistants & services: access keys for Claude / Siri / Home Assistant ----- */
+  async function aiLoad() {
+    if (!S.gateway || !S.homePin) { $("aiKeys").innerHTML = ""; return; }
+    try {
+      const { keys = [] } = await rcall("GET", "keys", null, S.homePin);
+      $("aiKeys").innerHTML = keys.length ? "" : '<p class="fine">None yet.</p>';
+      for (const k of keys) {
+        const row = document.createElement("div"); row.className = "ai-key";
+        const name = document.createElement("span"); name.textContent = k.name;
+        const when = document.createElement("small"); when.textContent = k.used ? "used " + new Date(k.used).toLocaleDateString() : "not used yet";
+        name.append(when);
+        const del = document.createElement("button"); del.className = "btn small"; del.textContent = "Remove";
+        del.onclick = async () => {
+          if (!confirm(`Remove "${k.name}"? It will stop working right away.`)) return;
+          try { await rcall("DELETE", "keys/" + k.id, null, S.homePin); toast("Removed"); } catch (e) { toast(remoteMsg(e), 7000); }
+          aiLoad();
+        };
+        row.append(name, del); $("aiKeys").append(row);
+      }
+    } catch (e) { $("aiKeys").innerHTML = ""; }
+  }
+  $("btnAiAdd").onclick = async () => {
+    if (!S.gateway || !S.homePin) { toast("Turn on Home gateway first.", 6000); return; }
+    const name = (prompt("Name this connection (e.g. Claude, Siri, Home Assistant):", "Claude") || "").trim();
+    if (!name) return;
+    try {
+      const j = await rcall("POST", "keys", { name }, S.homePin);
+      $("aiUrl").textContent = location.origin + "/mcp/" + j.key;
+      $("aiKey").textContent = j.key;
+      $("aiApi").textContent = location.origin + "/api/";
+      $("aiNew").hidden = false; aiLoad();
+    } catch (e) { toast(remoteMsg(e), 7000); }
+  };
+  $("btnAiDone").onclick = () => { $("aiNew").hidden = true; $("aiUrl").textContent = ""; $("aiKey").textContent = ""; };
+  document.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = async () => {
+    try { await navigator.clipboard.writeText($(b.dataset.copy).textContent); toast("Copied"); } catch { toast("Couldn't copy. Press and hold the text to copy it."); }
+  }));
+
   function renderGateway() {
     $("setGateway").checked = !!S.gateway;
     $("gwBox").hidden = !S.gateway;
