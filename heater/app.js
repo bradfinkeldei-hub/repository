@@ -1,7 +1,7 @@
 /* Ember – app logic. Plain JS, no build step. */
 (() => {
   "use strict";
-  const VERSION = "1.52"; // bump with every release (also sw.js CACHE)
+  const VERSION = "1.53"; // bump with every release (also sw.js CACHE)
   const P = window.EmberProtocol;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1585,6 +1585,23 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
       tunes: S.tunes.map((t) => ({ id: t.id, name: t.name, targetC: t.targetC })),
       manualLevel: S.level || null, leftL: left, schedNext: schedNext(),
       plug: S.gplug ? { name: S.gplug.deviceName, on: plugOn, busy: plugBusy || (plugPending ? "Waiting for cool-down…" : "") } : null, clean: clean ? { kind: clean.kind, endAt: clean.endAt } : null,
+      // Extra detail for assistants (Claude, ChatGPT…): everything the app shows.
+      x: (() => {
+        const today = stats.days[new Date().toISOString().slice(0, 10)] || { sec: 0, L: 0 };
+        const week = Object.entries(stats.days).filter(([d]) => Date.now() - Date.parse(d) < 7 * 864e5).reduce((a, [, v]) => ({ sec: a.sec + v.sec, L: a.L + v.L }), { sec: 0, L: 0 });
+        const running = s && s.power === "running";
+        const lo = Math.max(1, S.minLevel || 2);
+        return {
+          version: VERSION, unit: S.unit, bodyC: s && s.power !== "off" ? bodyC() : null, hum: useGovee() && govee.hum != null ? Math.round(govee.hum) : null,
+          heaterRoomC: s && s.ambient != null ? (heaterUnit() === "F" ? fToC(s.ambient) : s.ambient) : null,
+          runH: +(stats.runSec / 3600).toFixed(1), todayH: +(today.sec / 3600).toFixed(1), todayL: +today.L.toFixed(2), weekH: +(week.sec / 3600).toFixed(1), weekL: +week.L.toFixed(2),
+          lowH: +(stats.lowSec / 3600).toFixed(1), coachH: S.coachHours, cleanMins: S.cleanMins, minLevel: lo, tankGal: S.tankGal,
+          rateLph: running ? +fuelRate(s.level).toFixed(2) : null,
+          hoursLeft: { now: running ? +(left / fuelRate(s.level)).toFixed(1) : null, low: +(left / fuelRate(lo)).toFixed(1), max: +(left / fuelRate(maxLevel())).toFixed(1) },
+          sched: S.sched.map((x) => ({ id: x.id, name: x.name, on: !!x.on, start: x.start, stop: x.stop })),
+          cleanLeftMin: clean ? Math.max(0, Math.round((clean.endAt - Date.now()) / 60000)) : null,
+        };
+      })(),
     };
   }
   let gwKey = "", gwMinor = "", gwPushAt = 0, gwBusy = false, gwInfo = "";
@@ -1607,6 +1624,16 @@ const fcode = (n) => (n ? "E-" + String(n).padStart(2, "0") : "E-?");
       if (t) { S.tuneId = t.id; if (t.targetC != null) S.targetC = t.targetC; S.mode = "thermo"; }
     } else if (c.action === "target" && +c.value >= 4 && +c.value <= 32) { S.targetC = +c.value; S.mode = "thermo"; }
     else if (c.action === "mode" && (c.value === "thermo" || c.value === "manual")) S.mode = c.value;
+    else if (c.action === "clean" && s && s.power === "running" && !clean) { await beginClean("burn"); }
+    else if (c.action === "cleanstop" && clean) {
+      if (clean.kind === "burn") { clean = null; store.set("clean", null); $("clean").hidden = true; lastThermo = 0; }
+      else { await turnOff(); } // a shutdown burn-off asked to stop early: just turn off now
+    }
+    else if (c.action === "fuel" && +c.value >= 0) { setFuel(Math.min(S.tankGal, +c.value)); }
+    else if (c.action === "fuelfull") { setFuel(S.tankGal); }
+    else if ((c.action === "schedon" || c.action === "schedoff") && S.sched.some((x) => x.id === c.value)) {
+      S.sched.find((x) => x.id === c.value).on = c.action === "schedon"; renderSchedule();
+    }
     else if (c.action === "level") {
       const l = Math.max(1, Math.min(maxLevel(), Math.round(+c.value) || 1));
       S.mode = "manual"; S.level = l;

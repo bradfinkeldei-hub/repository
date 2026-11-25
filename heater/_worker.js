@@ -9,7 +9,7 @@
 //    Protected by a PIN you choose; only a salted hash of it is stored.
 const GOVEE = "https://openapi.api.govee.com/router/api/v1/";
 const ALLOWED = { "user/devices": "GET", "device/state": "POST", "device/control": "POST" };
-const ACTIONS = new Set(["start", "stop", "stopnow", "fan", "fanlevel", "retry", "reset", "plugon", "plugoff", "plugcycle", "tune", "target", "mode", "level"]);
+const ACTIONS = new Set(["start", "stop", "stopnow", "fan", "fanlevel", "retry", "reset", "plugon", "plugoff", "plugcycle", "tune", "target", "mode", "level", "clean", "cleanstop", "fuel", "fuelfull", "schedon", "schedoff"]);
 
 const json = (status, body) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
@@ -46,7 +46,10 @@ function valid(action, v) {
     tune: typeof v === "string" && /^[\w-]{1,40}$/.test(v),
     target: typeof v === "number" && v >= 4 && v <= 32,
     mode: v === "thermo" || v === "manual",
-    level: Number.isInteger(v) && v >= 1 && v <= 10 }[action];
+    level: Number.isInteger(v) && v >= 1 && v <= 10,
+    clean: v == null, cleanstop: v == null, fuelfull: v == null,
+    fuel: typeof v === "number" && v >= 0 && v <= 200,
+    schedon: typeof v === "string" && /^[\w-]{1,20}$/.test(v), schedoff: typeof v === "string" && /^[\w-]{1,20}$/.test(v) }[action];
 }
 // Add commands to the queue the home device picks up (every few seconds).
 async function queue(env, action, value, more = []) {
@@ -201,21 +204,27 @@ const assistant = (() => {
   const ago = (ms) => (ms < 90e3 ? Math.round(ms / 1000) + " seconds" : ms < 5400e3 ? Math.round(ms / 60e3) + " minutes" : Math.round(ms / 3600e3) + " hours");
   function describe(st) {
     if (!st) return { text: "No status yet. Ember isn't running as the home gateway (Settings → Home gateway on the device next to the heater).", ok: false };
-    const age = Date.now() - (st.serverAt || st.at || 0);
-    const lines = [];
+    const x = st.x || {}, age = Date.now() - (st.serverAt || st.at || 0);
+    const T = (c) => (c == null ? "—" : `${cToF(c)}°F (${Math.round(c)}°C)`);
+    const gal = (l) => (l / 3.785).toFixed(1) + " gal";
+    const L = [];
     const power = { off: "Off", starting: "Igniting", running: "Heating", cooling: "Cooling down", fan: "Fan only", error: "Fault" }[st.power] || "Unknown";
-    lines.push(`Heater: ${power}${st.power === "running" || st.power === "fan" ? (st.level != null ? `, level ${st.level} of ${st.max || 10}` : "") : ""}.`);
-    if (st.power === "error" && st.faultText) lines.push(`Fault: ${st.faultText}`);
-    if (st.clean) lines.push(`Burn-off running (${st.clean.kind}).`);
-    if (st.mode === "thermo" && st.targetC != null) lines.push(`Thermostat set to ${cToF(st.targetC)}°F (${Math.round(st.targetC * 10) / 10}°C)${st.tuneName ? `, preset "${st.tuneName}"` : ""}.`);
-    if (st.mode === "manual") lines.push(`Fixed power level ${st.manualLevel ?? "—"}.`);
-    if (st.roomC != null) lines.push(`Room ${cToF(st.roomC)}°F (${st.roomSrc || "sensor"}).`);
-    if (st.outC != null) lines.push(`Outside ${cToF(st.outC)}°F${st.outCity ? " in " + st.outCity : ""}.`);
-    if (st.leftL != null) lines.push(`Fuel about ${(st.leftL / 3.785).toFixed(1)} gal.`);
-    if (st.tunes && st.tunes.length) lines.push(`Presets: ${st.tunes.map((t) => `${t.name} (${cToF(t.targetC)}°F)`).join(", ")}.`);
-    if (!st.connected) lines.push("The home device is NOT connected to the heater right now, so commands will wait until it reconnects.");
-    lines.push(age > 600e3 ? `Warning: last update ${ago(age)} ago. The home device may be offline (screen locked, Bluefy closed, or no Wi-Fi).` : `Updated ${ago(age)} ago.`);
-    return { text: lines.join("\n"), ok: age <= 600e3 && !!st.connected };
+    L.push(`HEATER: ${power}${(st.power === "running" || st.power === "fan") && st.level != null ? `, level ${st.level} of ${st.max || 10}` : ""}.`);
+    if (st.power === "error" && st.faultText) L.push(`Fault: ${st.faultText}${st.faultSteps && st.faultSteps.length ? " Fix: " + st.faultSteps.join(" ") : ""}${st.noRetry ? " (Ember will not restart it automatically.)" : ""}`);
+    if (st.clean) L.push(`${st.clean.kind === "burn" ? "Clean burn (carbon clean, keeps heating after)" : "Shutdown burn-off (turns off after)"} running at full power, about ${x.cleanLeftMin ?? "?"} min left.`);
+    if (st.mode === "thermo") L.push(`Mode: thermostat, set to ${T(st.targetC)}${st.tuneName ? `, preset "${st.tuneName}"` : ""}. Runs between level ${st.hold ?? x.minLevel ?? 2} and ${st.top ?? 10}.`);
+    if (st.mode === "manual") L.push(`Mode: fixed power level ${st.manualLevel ?? "—"}.`);
+    L.push(`TEMPERATURES: room ${T(st.roomC)} (${st.roomSrc || "sensor"}${x.hum != null ? `, ${x.hum}% humidity` : ""}); outside ${st.outC != null ? T(st.outC) + (st.outCity ? " in " + st.outCity : "") : "—"}; heater body ${T(x.bodyC)}; heater intake sensor ${T(x.heaterRoomC)}.`);
+    if (st.volts) L.push(`Battery/supply: ${st.volts.toFixed ? st.volts.toFixed(1) : st.volts} V.`);
+    if (st.leftL != null) L.push(`FUEL: about ${gal(st.leftL)} left of a ${x.tankGal ?? "?"} gal tank${x.rateLph ? `; burning ${gal(x.rateLph)}/h now (≈ ${x.hoursLeft.now} h left at this level)` : ""}; ≈ ${x.hoursLeft ? x.hoursLeft.low : "?"} h at level ${x.minLevel ?? 2}, ≈ ${x.hoursLeft ? x.hoursLeft.max : "?"} h at level 10.`);
+    if (x.runH != null) L.push(`RUN TIME: today ${x.todayH} h (${gal(x.todayL * 1)}), last 7 days ${x.weekH} h (${gal(x.weekL * 1)}), total ${x.runH} h. Low-level running since the last clean burn: ${x.lowH} h (a clean burn is suggested every ${x.coachH} h).`);
+    if (x.cleanMins != null) L.push(`Default shutdown burn-off: ${x.cleanMins} min.`);
+    if (st.tunes && st.tunes.length) L.push(`Presets: ${st.tunes.map((t) => `${t.name} ${cToF(t.targetC)}°F`).join(", ")}.`);
+    if (x.sched) L.push(`Schedule: ${x.sched.map((s) => `${s.name} ${s.on ? `on ${s.start}–${s.stop}` : "off"}`).join(", ")}${st.schedNext ? ` (next: ${st.schedNext})` : ""}.`);
+    if (st.plug) L.push(`Smart plug "${st.plug.name}": ${st.plug.busy || (st.plug.on == null ? "unknown" : st.plug.on ? "on" : "off")}.`);
+    if (!st.connected) L.push("WARNING: the home device is NOT connected to the heater right now; commands wait until it reconnects.");
+    L.push(age > 600e3 ? `WARNING: last update ${ago(age)} ago. The home device may be offline (screen locked, Bluefy closed, or no Wi-Fi).` : `Updated ${ago(age)} ago${x.version ? ` · Ember v${x.version}` : ""}.`);
+    return { text: L.join("\n"), ok: age <= 600e3 && !!st.connected };
   }
   const state = (env) => env.EMBER.get("st", { type: "json" });
   const sent = async (env, what) => `${what} Sent to the home device; it acts within about 5–10 seconds.\n\nCurrent status (before the change):\n${describe(await state(env)).text}`;
@@ -223,7 +232,7 @@ const assistant = (() => {
   // Each tool: input schema + handler returning text. Shared by MCP and the plain API.
   const TOOLS = {
     get_heater_status: {
-      description: "Get the diesel heater's current status: on/off, power level, thermostat setting, room and outside temperature, fuel, presets, and whether the home device is online.",
+      description: "Everything about the heater and the Ember app: on/off, power level, mode and thermostat setting, room/outside/heater body temperatures, humidity, voltage, fuel left and burn rate with hours remaining, run hours (today, 7 days, total), hours since the last clean burn, any fault with fix steps, clean-burn progress, presets, schedule, smart plug, and whether the home device is online.",
       schema: { type: "object", properties: {} },
       run: async (env) => describe(await state(env)).text,
     },
@@ -286,6 +295,69 @@ const assistant = (() => {
       run: async (env, a) => {
         const r = a.speed ? await queue(env, "fan", null, [["fanlevel", Math.round(a.speed)]]) : await queue(env, "fan", null);
         return r.error ? "Couldn't send: " + r.error : sent(env, "Switching to fan only.");
+      },
+    },
+    start_clean_burn: {
+      description: "Start a 15-minute carbon clean burn at full power while the heater keeps running (it goes back to normal afterwards). Only works while it is heating.",
+      schema: { type: "object", properties: {} },
+      run: async (env) => {
+        const st = await state(env);
+        if (st && st.power !== "running") return "The heater has to be heating to start a clean burn. Turn it on first.\n\n" + describe(st).text;
+        const r = await queue(env, "clean", null);
+        return r.error ? "Couldn't send: " + r.error : sent(env, "Starting a 15-minute clean burn at full power.");
+      },
+    },
+    stop_clean_burn: {
+      description: "End a running clean burn early and go back to normal heating. If a shutdown burn-off is running, this turns the heater off now instead.",
+      schema: { type: "object", properties: {} },
+      run: async (env) => { const r = await queue(env, "cleanstop", null); return r.error ? "Couldn't send: " + r.error : sent(env, "Ending the burn."); },
+    },
+    set_fan_speed: {
+      description: "Change the fan speed (1–10) while in fan-only mode.",
+      schema: { type: "object", required: ["speed"], properties: { speed: { type: "integer", minimum: 1, maximum: 10 } } },
+      run: async (env, a) => { const r = await queue(env, "fanlevel", Math.round(a.speed)); return r.error ? "Couldn't send: " + r.error : sent(env, `Fan speed ${Math.round(a.speed)}.`); },
+    },
+    choose_preset: {
+      description: "Switch to a saved preset (e.g. Sleep, Comfort, Boost or the user's custom one) without turning the heater on or off.",
+      schema: { type: "object", required: ["preset"], properties: { preset: { type: "string" } } },
+      run: async (env, a) => {
+        const st = await state(env);
+        const t = (st && st.tunes || []).find((x) => x.name.toLowerCase() === String(a.preset).toLowerCase().trim());
+        if (!t) return `No preset called "${a.preset}". Saved presets: ${(st && st.tunes || []).map((x) => x.name).join(", ") || "none reported"}.`;
+        const r = await queue(env, "tune", t.id);
+        return r.error ? "Couldn't send: " + r.error : sent(env, `Preset ${t.name} (${cToF(t.targetC)}°F).`);
+      },
+    },
+    smart_plug: {
+      description: "Control the Govee smart plug the heater is plugged into: on, off (safely waits for cool-down), or power_cycle (off 30 s, then on; clears stubborn faults).",
+      schema: { type: "object", required: ["action"], properties: { action: { type: "string", enum: ["on", "off", "power_cycle"] } } },
+      run: async (env, a) => {
+        const act = { on: "plugon", off: "plugoff", power_cycle: "plugcycle" }[a.action];
+        if (!act) return "Use on, off or power_cycle.";
+        const r = await queue(env, act, null);
+        return r.error ? "Couldn't send: " + r.error : sent(env, `Smart plug: ${a.action.replace("_", " ")}.`);
+      },
+    },
+    clear_fault: {
+      description: "Clear a heater fault. restart=true clears it and tries to start again; restart=false (default) clears it and leaves the heater off. Carbon monoxide faults are never restarted automatically.",
+      schema: { type: "object", properties: { restart: { type: "boolean" } } },
+      run: async (env, a) => { const r = await queue(env, a.restart ? "retry" : "reset", null); return r.error ? "Couldn't send: " + r.error : sent(env, a.restart ? "Clearing the fault and trying again." : "Clearing the fault; the heater stays off."); },
+    },
+    log_fuel: {
+      description: "Update the fuel gauge after filling up: full=true for a full tank, or gallons for the amount now in the tank.",
+      schema: { type: "object", properties: { full: { type: "boolean" }, gallons: { type: "number", minimum: 0 } } },
+      run: async (env, a) => {
+        const r = a.full || a.gallons == null ? await queue(env, "fuelfull", null) : await queue(env, "fuel", Math.round(a.gallons * 10) / 10);
+        return r.error ? "Couldn't send: " + r.error : sent(env, a.full || a.gallons == null ? "Fuel gauge set to a full tank." : `Fuel gauge set to ${a.gallons} gal.`);
+      },
+    },
+    set_schedule: {
+      description: "Turn a schedule slot on or off: Morning, Midday or Evening (their start/stop times are set in the app).",
+      schema: { type: "object", required: ["slot", "enabled"], properties: { slot: { type: "string", enum: ["Morning", "Midday", "Evening"] }, enabled: { type: "boolean" } } },
+      run: async (env, a) => {
+        const id = String(a.slot || "").toLowerCase();
+        const r = await queue(env, a.enabled ? "schedon" : "schedoff", id);
+        return r.error ? "Couldn't send: " + r.error : sent(env, `${a.slot} schedule ${a.enabled ? "on" : "off"}.`);
       },
     },
   };

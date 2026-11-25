@@ -123,6 +123,8 @@ Plug the heater into a **Govee Wi-Fi smart plug** to cut its power completely, o
 
 Needs the home gateway (above). In Ember, open **Settings → Voice & AI assistants → Connect** and pick **Claude, ChatGPT, Siri, Home Assistant or Other**. Ember shows the steps for that service, with the link and key ready to copy (the key is shown **once**). Tap **Disconnect** next to a connection any time and it stops working immediately. Works from the home device or from a phone set up for Control from away.
 
+**What you can say:** "what's the heater doing?", "how many hours has it run today?", "how much fuel is left?", "turn it on to Comfort", "set it to 72", "level 4", "start a clean burn", "fan only at speed 6", "turn it off without the burn-off", "I filled the tank", "turn on the evening schedule", "power-cycle the plug", "clear the fault".
+
 **ChatGPT:** paid plans, with Developer mode turned on (Settings → Apps & Connectors → Advanced). Create a connector with the MCP URL and "No authentication".
 
 **Claude:** in Claude, go to **Settings → Connectors → Add custom connector** and paste the connector URL. Then just ask: "turn on my heater to Comfort", "set it to 72", "what's the heater doing?", "turn it off without the burn-off".
